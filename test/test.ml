@@ -127,6 +127,9 @@ struct
 
   let rm ?v ?dry_run ?color paths =
     run ?v ?dry_run ?color ("rm" :: paths)
+
+  let check ?v ?dry_run ?color ?path () =
+    run ?v ?dry_run ?color ("check" :: list_of_option path)
 end
 
 module Main = Make_filou (struct let path = Some main end)
@@ -199,6 +202,8 @@ let () =
   create_file "titi" "blibli";
   Clone.push [ "tutu"; "titi" ];
   trees ();
+  Main.check ();
+  Clone.check ();
 
 (*   Filou.ls (); *)
 (*   trees (); *)

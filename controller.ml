@@ -24,9 +24,9 @@ let on_copy_progress prefix ~bytes ~size =
   Progress_bar.set "%s (%d / %d) (%d%%)" prefix bytes size (bytes * 100 / size)
 
 let init (location: Device.location) =
-  let* root_dir_hash = Bare_repository.store_now location T.dir Filename_map.empty in
-  let* hash_index_hash = Bare_repository.store_now location T.hash_index Map.Char.empty in
-  Bare_repository.store_root location {
+  let* root_dir_hash = Bare.store_now location T.dir Filename_map.empty in
+  let* hash_index_hash = Bare.store_now location T.hash_index Map.Char.empty in
+  Bare.store_root location {
     root_dir = root_dir_hash;
     hash_index = hash_index_hash;
   }
@@ -42,7 +42,7 @@ let read_clone_config ~clone_location =
 
 let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
   (* Check that the remote repository is readable. *)
-  let* _ = Bare_repository.fetch_root main_location in
+  let* _ = Bare.fetch_root main_location in
   (* Initialize the clone. *)
   write_clone_config ~clone_location { main_location }
 
@@ -60,6 +60,157 @@ let find_local_clone () =
   find (Path.get_cwd ())
 
 let store_later = Repository.store_later
+
+(* Recursively check sizes, file counts,
+   and whether reachable files are available. *)
+let rec check_dir ~all_files_must_be_available expected_hash_index
+    (location: Device.location) (path: Device.path) (dir: dir hash) =
+  let* dir = Bare.fetch location T.dir dir in
+  let path_size = ref 0 in
+  let path_file_count = ref 0 in
+  let* () =
+    list_iter_e (Filename_map.bindings dir) @@ fun (filename, dir_entry) ->
+    let entry_path = path @ [ filename ] in
+    match dir_entry with
+      | Dir { hash; total_size = expected_size; total_file_count = expected_file_count } ->
+          let* size, file_count =
+            check_dir ~all_files_must_be_available expected_hash_index
+              location entry_path hash
+          in
+          if size <> expected_size then
+            failed [
+              sf "wrong size for %s (%s): expected %d, found %d"
+                (Device.show_path entry_path) (Repository.hex_of_hash hash)
+                expected_size size;
+            ]
+          else if file_count <> expected_file_count then
+            failed [
+              sf "wrong file count for %s (%s): expected %d, found %d"
+                (Device.show_path entry_path) (Repository.hex_of_hash hash)
+                expected_file_count file_count;
+            ]
+          else (
+            path_size := !path_size + size;
+            path_file_count := !path_file_count + file_count;
+            unit
+          )
+      | File { hash; size = expected_size } ->
+          let good () =
+            path_size := !path_size + expected_size;
+            path_file_count := !path_file_count + 1;
+            expected_hash_index := (
+              let previous =
+                File_hash_map.find_opt hash !expected_hash_index
+                |> default File_path_set.empty
+              in
+              File_hash_map.add hash (File_path_set.add (path, filename) previous)
+                !expected_hash_index
+            );
+            unit
+          in
+          match Bare.get_file_size location hash with
+            | ERROR { code = `not_available; msg } ->
+                if all_files_must_be_available then
+                  failed (
+                    sf "file %s (%s) is unvailable"
+                      (Device.show_path entry_path) (Repository.hex_of_hash hash) ::
+                    msg
+                  )
+                else
+                  good ()
+            | ERROR { code = `failed; _ } as x ->
+                x
+            | OK size ->
+                if size <> expected_size then
+                  failed [
+                    sf "wrong size for %s (%s): expected %d, found %d"
+                      (Device.show_path entry_path) (Repository.hex_of_hash hash)
+                      expected_size size;
+                  ]
+                else
+                  good ()
+  in
+  ok (!path_size, !path_file_count)
+
+let check (location: Device.location) =
+  let* is_main =
+    match read_clone_config ~clone_location: location with
+      | OK _ ->
+          ok false
+      | ERROR { code = `no_such_file; _ } ->
+          ok true
+      | ERROR { code = `failed; _ } as x ->
+          x
+  in
+  if is_main then
+    echo "Checking main repository at: %s" (Device.show_location location)
+  else
+    echo "Checking clone repository at: %s" (Device.show_location location);
+  let location =
+    if is_main then
+      location
+    else
+      Device.sublocation location dot_filou
+  in
+  let* root = Bare.fetch_root location in
+  let expected_hash_index = ref File_hash_map.empty in
+  let* size, count =
+    check_dir ~all_files_must_be_available: is_main expected_hash_index
+      location [] root.root_dir
+  in
+  let expected_hash_index = !expected_hash_index in
+  echo "Directory structure looks ok (total size: %d, file count: %d)." size count;
+  if is_main then echo "All files are available.";
+  let actual_hash_index = ref File_hash_map.empty in
+  let* () =
+    let* hash_index = Bare.fetch location T.hash_index root.hash_index in
+    list_iter_e (Map.Char.bindings hash_index) @@ fun (_, hash_index_1_hash) ->
+    let* hash_index_1 = Bare.fetch location T.hash_index_1 hash_index_1_hash in
+    list_iter_e (Map.Char.bindings hash_index_1) @@ fun (_, hash_index_2_hash) ->
+    let* hash_index_2 = Bare.fetch location T.hash_index_2 hash_index_2_hash in
+    list_iter_e (File_hash_map.bindings hash_index_2) @@ fun (hash, paths) ->
+    actual_hash_index := File_hash_map.add hash paths !actual_hash_index;
+    unit
+  in
+  let actual_hash_index = !actual_hash_index in
+  let* () =
+    let exception Inconsistent of string in
+    let inconsistent x = Printf.ksprintf (fun s -> raise (Inconsistent s)) x in
+    try
+      let _ =
+        File_hash_map.merge' expected_hash_index actual_hash_index @@
+        fun hash expected actual ->
+        let expected = expected |> default File_path_set.empty in
+        let actual = actual |> default File_path_set.empty in
+        let missing = File_path_set.diff expected actual in
+        let unexpected = File_path_set.diff actual expected in
+        if not (File_path_set.is_empty missing) then
+          inconsistent "missing path(s) %s for %s"
+            (String.concat ", "
+               (List.map Device.show_file_path
+                  (File_path_set.elements missing)))
+            (Repository.hex_of_hash hash)
+        else if not (File_path_set.is_empty unexpected) then
+          inconsistent "unexpected path(s) %s for %s"
+            (String.concat ", "
+               (List.map Device.show_file_path
+                  (File_path_set.elements unexpected)))
+            (Repository.hex_of_hash hash)
+        else
+          None
+      in
+      unit
+    with Inconsistent msg ->
+      failed [
+        "hash index is inconsistent";
+        msg;
+      ]
+  in
+  echo "Hash index is consistent with the directory structure.";
+  unit
+
+let tree =
+  unit (* TODO *)
 
 let push_file (setup: Clone.setup) root (((dir_path, filename) as path): Device.file_path) =
   trace ("failed to push file: " ^ Device.show_file_path path) @@

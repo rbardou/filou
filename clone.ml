@@ -59,6 +59,15 @@ struct
   let fetch_file ~source hash ~target ~target_path =
     R.fetch_file ~source: source.main hash ~target ~target_path
 
+  let get_file_size setup hash =
+    match R.get_file_size setup.main hash with
+      | ERROR { code = `not_available; _ } ->
+          R.get_file_size setup.main hash
+      | ERROR { code = `failed; _ } as x ->
+          x
+      | OK _ as x ->
+          x
+
   let store_root setup root =
     setup.clone_root_is_up_to_date <- false;
     let* () = R.store_root setup.main root in

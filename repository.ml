@@ -99,6 +99,9 @@ sig
     on_progress: (bytes: int -> size: int -> unit) ->
     (unit, [> `failed | `not_available | `already_exists ]) r
 
+  val get_file_size: t -> file hash ->
+    (int, [> `failed | `not_available ]) r
+
   val store_root: t -> root ->
     (unit, [> `failed ]) r
 
@@ -117,8 +120,8 @@ struct
   type root = Root.t
 
   (* As encoding hashes can raise [Failed_to_store_later], we need to catch it. *)
-  let encode ~trigger_store_later typ value =
-    store_not_stored_hash_when_encoding := trigger_store_later;
+  let encode ~trigger_hash_storing typ value =
+    store_not_stored_hash_when_encoding := trigger_hash_storing;
     try
       let encoded = Protype_robin.Encode.to_string ~version: Root.version typ value in
       (* Set back to [false] in case the user uses [hash_type] to encode a hash.
@@ -154,16 +157,18 @@ struct
       Device.write_file location path encoded_value
 
   let store_now location typ value =
-    let* encoded_value = encode ~trigger_store_later: true typ value in
+    let* encoded_value = encode ~trigger_hash_storing: true typ value in
     let hash = Hash.string encoded_value in
     let* () = store_raw_now location hash encoded_value in
     ok { hash; status = Stored }
 
   let store_later ?on_stored location typ value =
-    let* encoded_value = encode ~trigger_store_later: false typ value in
+    let* encoded_value = encode ~trigger_hash_storing: false typ value in
     let hash = Hash.string encoded_value in
     let store () =
       match
+        (* TODO: We need to re-encode, just to trigger hash storing. This is inefficient. *)
+        let* encoded_value = encode ~trigger_hash_storing: true typ value in
         let* () = store_raw_now location hash encoded_value in
         match on_stored with
           | None -> unit
@@ -246,11 +251,25 @@ struct
               | OK () as x ->
                   x
 
+  let get_file_size location hash =
+    let hash = hash.hash in
+    trace ("failed to get file size for " ^ Hash.to_hex hash) @@
+    let hash_path = file_path_of_hash hash in
+    match Device.stat location (Device.path_of_file_path hash_path) with
+      | ERROR { code = `no_such_file; msg } ->
+          error `not_available msg
+      | ERROR { code = `failed; _ } as x ->
+          x
+      | OK Dir ->
+          failed [ Device.show_file_path hash_path ^ " is a directory" ]
+      | OK (File { size; _ }) ->
+          ok size
+
   let root_path = [], Path.Filename.parse_exn "root"
 
   let store_root location root =
     trace "failed to store root" @@
-    let* encoded_root = encode ~trigger_store_later: true Root.typ root in
+    let* encoded_root = encode ~trigger_hash_storing: true Root.typ root in
     Device.write_file location root_path encoded_root
 
   let fetch_root location =

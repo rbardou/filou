@@ -129,6 +129,19 @@ let () =
         in
         `rm paths
       );
+      (
+        Clap.case
+          ~description: "Check for potential corruptions."
+          "check"
+        @@ fun () ->
+        let location =
+          Clap.default_string
+            ~description: "Location of the repository to check."
+            ~placeholder: "LOCATION"
+            "."
+        in
+        `check location
+      );
     ]
   in
   Clap.close ();
@@ -171,6 +184,9 @@ let () =
 (*           let* paths = list_map_e paths (Device.parse_file_path location) in *)
 (*           Controller.remove ~verbose ~dry_run ~clone paths *)
           assert false (* TODO *)
+      | `check location ->
+          let* location = Device.parse_location location in
+          Controller.check location
   with
     | OK () ->
         ()

@@ -167,10 +167,10 @@ struct
   let typ = T.root
 end
 
-module Bare_repository = Repository.Make (Root)
+module Bare = Repository.Make (Root)
 
 module Repository =
 struct
   include Repository
-  include Clone.Make (Bare_repository)
+  include Clone.Make (Bare)
 end

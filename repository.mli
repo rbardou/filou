@@ -67,6 +67,10 @@ sig
     on_progress: (bytes: int -> size: int -> unit) ->
     (unit, [> `failed | `not_available | `already_exists ]) r
 
+  (** Get the size of a file, given its hash. *)
+  val get_file_size: t -> file hash ->
+    (int, [> `failed | `not_available ]) r
+
   (** Set the root. *)
   val store_root: t -> root ->
     (unit, [> `failed ]) r
