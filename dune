@@ -1,0 +1,3 @@
+(executable
+ (name main)
+ (libraries digestif.c mysc unix clap protype protype-robin typath))

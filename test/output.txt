@@ -1,0 +1,198 @@
+# Initialize a main repository and a clone.
+$ main.exe --no-color init /tmp/filou-test/main
+$ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
+$ cd /tmp/filou-test/main
+$ tree -a -s -F
+.
+├── [       4096]  30/
+│   └── [       4096]  b6/
+│       └── [          9]  30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7
+└── [        107]  root
+
+2 directories, 2 files
+$ cd /tmp/filou-test/clone
+$ tree -a -s -F
+.
+└── [       4096]  .filou/
+    └── [         44]  config
+
+1 directory, 1 file
+$ cd /tmp/filou-test/main
+$ explore root
+{
+  root_dir = 30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7;
+  hash_index = 30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7;
+}
+$ cd /tmp/filou-test/main
+$ explore 30/b6/30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7
+[]
+$ cd /tmp/filou-test/clone
+$ explore .filou/config
+{ main = "/tmp/filou-test/main/" }
+# Add a file.
+$ cd /tmp/filou-test/clone
+$ echo blablabla > toto
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push toto
+$ cd /tmp/filou-test/main
+$ tree -a -s -F
+.
+├── [       4096]  30/
+│   └── [       4096]  b6/
+│       └── [          9]  30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7
+├── [       4096]  43/
+│   └── [       4096]  62/
+│       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
+├── [       4096]  49/
+│   └── [       4096]  2f/
+│       └── [          9]  492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d
+├── [       4096]  4a/
+│   └── [       4096]  e0/
+│       └── [         66]  4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
+├── [       4096]  67/
+│   └── [       4096]  17/
+│       └── [         66]  6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
+├── [       4096]  d4/
+│   └── [       4096]  08/
+│       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
+└── [        107]  root
+
+12 directories, 7 files
+$ cd /tmp/filou-test/clone
+$ tree -a -s -F
+.
+├── [       4096]  .filou/
+│   ├── [       4096]  43/
+│   │   └── [       4096]  62/
+│   │       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
+│   ├── [       4096]  4a/
+│   │   └── [       4096]  e0/
+│   │       └── [         66]  4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
+│   ├── [       4096]  67/
+│   │   └── [       4096]  17/
+│   │       └── [         66]  6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
+│   ├── [         44]  config
+│   ├── [       4096]  d4/
+│   │   └── [       4096]  08/
+│   │       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
+│   └── [        107]  root
+└── [          9]  toto
+
+9 directories, 7 files
+$ cd /tmp/filou-test/main
+$ explore root
+{
+  root_dir = 43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af;
+  hash_index = 6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3;
+}
+$ cd /tmp/filou-test/clone
+$ explore .filou/root
+{
+  root_dir = 43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af;
+  hash_index = 6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3;
+}
+$ cd /tmp/filou-test/main
+$ explore 43/62/43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
+[ { File = {
+      name = "toto";
+      hash = 492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d;
+      size = 9;
+    } } ]
+$ cd /tmp/filou-test/clone
+$ explore .filou/43/62/43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
+[ { File = {
+      name = "toto";
+      hash = 492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d;
+      size = 9;
+    } } ]
+$ cd /tmp/filou-test/main
+$ cat 49/2f/492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d
+blablabla%
+$ cd /tmp/filou-test/main
+$ explore 67/17/6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
+[ {
+    key = 73;
+    hash = 4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4;
+  } ]
+$ cd /tmp/filou-test/clone
+$ explore .filou/67/17/6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
+[ {
+    key = 73;
+    hash = 4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4;
+  } ]
+$ cd /tmp/filou-test/main
+$ explore 4a/e0/4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
+[ {
+    key = 47;
+    hash = d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a;
+  } ]
+$ cd /tmp/filou-test/clone
+$ explore .filou/4a/e0/4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
+[ {
+    key = 47;
+    hash = d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a;
+  } ]
+$ cd /tmp/filou-test/main
+$ explore d4/08/d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
+[ {
+    hash = 492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d;
+    paths = [ [ "toto" ] ];
+  } ]
+$ cd /tmp/filou-test/clone
+$ explore .filou/d4/08/d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
+[ {
+    hash = 492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d;
+    paths = [ [ "toto" ] ];
+  } ]
+# Add the file again.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Error:
+  failed to push file: toto:
+  file already exists
+Exit code: 1
+$ cd /tmp/filou-test/main
+$ tree -a -s -F
+.
+├── [       4096]  30/
+│   └── [       4096]  b6/
+│       └── [          9]  30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7
+├── [       4096]  43/
+│   └── [       4096]  62/
+│       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
+├── [       4096]  49/
+│   └── [       4096]  2f/
+│       └── [          9]  492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d
+├── [       4096]  4a/
+│   └── [       4096]  e0/
+│       └── [         66]  4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
+├── [       4096]  67/
+│   └── [       4096]  17/
+│       └── [         66]  6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
+├── [       4096]  d4/
+│   └── [       4096]  08/
+│       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
+└── [        107]  root
+
+12 directories, 7 files
+$ cd /tmp/filou-test/clone
+$ tree -a -s -F
+.
+├── [       4096]  .filou/
+│   ├── [       4096]  43/
+│   │   └── [       4096]  62/
+│   │       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
+│   ├── [       4096]  4a/
+│   │   └── [       4096]  e0/
+│   │       └── [         66]  4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
+│   ├── [       4096]  67/
+│   │   └── [       4096]  17/
+│   │       └── [         66]  6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
+│   ├── [         44]  config
+│   ├── [       4096]  d4/
+│   │   └── [       4096]  08/
+│   │       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
+│   └── [        107]  root
+└── [          9]  toto
+
+9 directories, 7 files
