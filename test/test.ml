@@ -193,12 +193,12 @@ let () =
   Clone.push [];
   trees ();
 
-(*   comment "Add several files."; *)
-(*   cd clone; *)
-(*   create_file "tutu" "blu"; *)
-(*   create_file "titi" "blibli"; *)
-(*   Clone.push []; *)
-(*   trees (); *)
+  comment "Add several files.";
+  cd clone;
+  create_file "tutu" "blu";
+  create_file "titi" "blibli";
+  Clone.push [ "tutu"; "titi" ];
+  trees ();
 
 (*   Filou.ls (); *)
 (*   trees (); *)
