@@ -26,10 +26,23 @@ struct
   type t = setup
 
   (* TODO: we encode and hash twice, this is unnecessary. *)
-  let store setup typ value =
-    let* hash = R.store setup.main typ value in
-    let* _ = R.store setup.clone_dot_filou typ value in
+  let store_now setup typ value =
+    let* hash = R.store_now setup.main typ value in
+    let* _ = R.store_now setup.clone_dot_filou typ value in
     ok hash
+
+  (* TODO: we encode and hash twice, this is unnecessary. *)
+  let store_later ?on_stored setup typ value =
+    R.store_later setup.main typ value
+      ~on_stored: (
+        fun () ->
+          let* _ = R.store_now setup.clone_dot_filou typ value in
+          match on_stored with
+            | None ->
+                unit
+            | Some on_stored ->
+                on_stored ()
+      )
 
   let fetch setup typ hash =
     match R.fetch setup.clone_dot_filou typ hash with

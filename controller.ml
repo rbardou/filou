@@ -24,8 +24,8 @@ let on_copy_progress prefix ~bytes ~size =
   Progress_bar.set "%s (%d / %d) (%d%%)" prefix bytes size (bytes * 100 / size)
 
 let init (location: Device.location) =
-  let* root_dir_hash = Bare_repository.store location T.dir Filename_map.empty in
-  let* hash_index_hash = Bare_repository.store location T.hash_index Map.Char.empty in
+  let* root_dir_hash = Bare_repository.store_now location T.dir Filename_map.empty in
+  let* hash_index_hash = Bare_repository.store_now location T.hash_index Map.Char.empty in
   Bare_repository.store_root location {
     root_dir = root_dir_hash;
     hash_index = hash_index_hash;
@@ -59,6 +59,8 @@ let find_local_clone () =
   in
   find (Path.get_cwd ())
 
+let store_later = Repository.store_now
+
 let push_file (setup: Clone.setup) (((dir_path, filename) as path): Device.file_path) =
   trace ("failed to push file: " ^ Device.show_file_path path) @@
   let* root = Repository.fetch_root setup in
@@ -90,7 +92,7 @@ let push_file (setup: Clone.setup) (((dir_path, filename) as path): Device.file_
           }
         in
         let new_dir = Filename_map.add head head_dir_entry dir in
-        let* new_dir_hash = Repository.store setup T.dir new_dir in
+        let* new_dir_hash = store_later setup T.dir new_dir in
         ok (new_dir_hash, added_file_hash, size_diff, file_count_diff)
     | [] ->
         match Filename_map.find_opt filename dir with
@@ -117,7 +119,7 @@ let push_file (setup: Clone.setup) (((dir_path, filename) as path): Device.file_
                 }
               in
               let new_dir = Filename_map.add filename dir_entry dir in
-              let* new_dir_hash = Repository.store setup T.dir new_dir in
+              let* new_dir_hash = store_later setup T.dir new_dir in
               ok (new_dir_hash, file_hash, file_size, 1)
   in
   let* new_root_dir_hash, added_file_hash, _, _ = update_dir [] root_dir dir_path in
@@ -148,11 +150,11 @@ let push_file (setup: Clone.setup) (((dir_path, filename) as path): Device.file_
       in
       File_hash_map.add added_file_hash new_paths hash_index_2
     in
-    let* new_hash_index_2_hash = Repository.store setup T.hash_index_2 new_hash_index_2 in
+    let* new_hash_index_2_hash = store_later setup T.hash_index_2 new_hash_index_2 in
     let new_hash_index_1 = Map.Char.add char1 new_hash_index_2_hash hash_index_1 in
-    let* new_hash_index_1_hash = Repository.store setup T.hash_index_1 new_hash_index_1 in
+    let* new_hash_index_1_hash = store_later setup T.hash_index_1 new_hash_index_1 in
     let new_hash_index = Map.Char.add char0 new_hash_index_1_hash hash_index in
-    Repository.store setup T.hash_index new_hash_index
+    store_later setup T.hash_index new_hash_index
   in
   (* TODO: only store at the end of the whole push (even if failed) so that
      if we have a journal we can have "cancel" cancel exactly the last CLI command? *)

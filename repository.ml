@@ -1,18 +1,47 @@
 open Misc
 
-type _ hash = Hash.t
+type _ hash =
+  {
+    hash: Hash.t;
+    mutable on_encode: unit -> unit;
+  }
+
+let trigger_on_encode = ref false
 
 let hash_type =
   let open Protype in
-  convert_partial string
-    ~encode: Hash.to_bin
-    ~decode: Hash.of_bin
+  let encode hash =
+    if !trigger_on_encode then (
+      let on_encode = hash.on_encode in
+      hash.on_encode <- Fun.id;
+      on_encode ();
+    );
+    Hash.to_bin hash.hash
+  in
+  let decode s =
+    match Hash.of_bin s with
+      | None ->
+          None
+      | Some hash ->
+          Some {
+            hash;
+            on_encode = Fun.id;
+          }
+  in
+  (* Cannot use [convert_partial] because of the value restriction, but this is equivalent. *)
+  Convert { typ = string; encode; decode }
 
-let hex_of_hash = Hash.to_hex
-let bin_of_hash = Hash.to_bin
-let compare_hashes = Hash.compare
+let hex_of_hash { hash; _ } = Hash.to_hex hash
+let bin_of_hash { hash; _ } = Hash.to_bin hash
+let compare_hashes { hash = a; _ } { hash = b; _ } = Hash.compare a b
 
-module Raw_hash_set = Set.Make (Hash)
+module Raw_hash_set =
+struct
+  include Set.Make (Hash)
+  let add { hash; _ } set = add hash set
+  let mem_raw = mem
+  let mem { hash; _ } set = mem_raw hash set
+end
 
 type file
 
@@ -28,8 +57,11 @@ sig
   type t
   type root
 
-  val store: t -> 'a Protype.t -> 'a ->
+  val store_now: t -> 'a Protype.t -> 'a ->
     ('a hash, [> `failed ]) r
+
+  val store_later: ?on_stored: (unit -> (unit, [ `failed ] as 'e) r) ->
+    t -> 'a Protype.t -> 'a -> ('a hash, [> `failed ]) r
 
   val fetch: t -> 'a Protype.t -> 'a hash ->
     ('a, [> `failed | `not_available ]) r
@@ -53,10 +85,29 @@ sig
     (unit, [> `failed ]) r
 end
 
+exception Failed_to_store_later of string list
+
 module Make (Root: ROOT): S with type root = Root.t and type t = Device.location =
 struct
   type t = Device.location
   type root = Root.t
+
+  (* As encoding hashes can raise [Failed_to_store_later], we need to catch it. *)
+  let encode ~trigger_store_later typ value =
+    trigger_on_encode := trigger_store_later;
+    try
+      let encoded = Protype_robin.Encode.to_string ~version: Root.version typ value in
+      (* Set back to [false] in case the user uses [hash_type] to encode a hash.
+         We only need to make sure that [on_encode] is triggered when storing data on disk. *)
+      trigger_on_encode := false;
+      ok encoded
+    with
+      | Failed_to_store_later msg ->
+          trigger_on_encode := false;
+          failed msg
+      | exn ->
+          trigger_on_encode := false;
+          raise exn
 
   let hash_part_length = 2
 
@@ -69,21 +120,44 @@ struct
     [ Path.Filename.parse_exn prefix1; Path.Filename.parse_exn prefix2 ],
     Path.Filename.parse_exn hash_string
 
-  let store location typ value =
-    let encoded_value = Protype_robin.Encode.to_string ~version: Root.version typ value in
-    let hash = Hash.string encoded_value in
-    trace ("failed to store object with hash " ^ hex_of_hash hash) @@
+  let store_raw_now location hash encoded_value =
+    trace ("failed to store object with hash " ^ Hash.to_hex hash) @@
     let path = file_path_of_hash hash in
     let* already_exists = Device.file_exists location path in
     if already_exists then
-      ok hash
+      unit
     else
-      let* () = Device.write_file location path encoded_value in
-      ok hash
+      Device.write_file location path encoded_value
+
+  let store_now location typ value =
+    let* encoded_value = encode ~trigger_store_later: true typ value in
+    let hash = Hash.string encoded_value in
+    let* () = store_raw_now location hash encoded_value in
+    ok { hash; on_encode = Fun.id }
+
+  let store_later ?on_stored location typ value =
+    let* encoded_value = encode ~trigger_store_later: false typ value in
+    let hash = Hash.string encoded_value in
+    let on_encode () =
+      match
+        let* () = store_raw_now location hash encoded_value in
+        match on_stored with
+          | None -> unit
+          | Some on_stored -> on_stored ()
+      with
+        | OK () ->
+            ()
+        | ERROR { code = `failed; msg } ->
+            raise (Failed_to_store_later msg)
+    in
+    ok {
+      hash;
+      on_encode;
+    }
 
   let fetch location typ hash =
     trace ("failed to fetch object with hash " ^ hex_of_hash hash) @@
-    let path = file_path_of_hash hash in
+    let path = file_path_of_hash hash.hash in
     match Device.read_file location path with
       | ERROR { code = `no_such_file; msg } ->
           ERROR { code = `not_available; msg }
@@ -104,7 +178,7 @@ struct
           let hash_path = file_path_of_hash hash in
           let* already_exists = Device.file_exists target hash_path in
           if already_exists then
-            ok (hash, size)
+            ok ({ hash; on_encode = Fun.id }, size)
           else
             match
               Device.copy_file ~on_progress: (fun bytes -> on_progress ~bytes ~size)
@@ -113,9 +187,10 @@ struct
               | ERROR { code = (`no_such_file | `failed); msg } ->
                   failed msg
               | OK () ->
-                  ok (hash, size)
+                  ok ({ hash; on_encode = Fun.id }, size)
 
   let fetch_file ~source hash ~target ~target_path ~on_progress =
+    let hash = hash.hash in
     trace ("failed to fetch file " ^ Device.show_file_path target_path) @@
     let hash_path = file_path_of_hash hash in
     match Device.stat source (Device.path_of_file_path hash_path) with
@@ -147,7 +222,7 @@ struct
 
   let store_root location root =
     trace "failed to store root" @@
-    let encoded_root = Protype_robin.Encode.to_string ~version: Root.version Root.typ root in
+    let* encoded_root = encode ~trigger_store_later: true Root.typ root in
     Device.write_file location root_path encoded_root
 
   let fetch_root location =
@@ -195,7 +270,7 @@ struct
                 | None ->
                     unit
                 | Some hash ->
-                    if Raw_hash_set.mem hash everything_except then
+                    if Raw_hash_set.mem_raw hash everything_except then
                       unit
                     else
                       Device.remove_file location file_path

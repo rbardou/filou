@@ -192,9 +192,13 @@ let () =
   comment "Add the file again.";
   Clone.push [];
   trees ();
-(*   explore_main "root"; *)
-(*   explore_main "97/f8/97f8bf2919daa18e16fc3f620986c72e48942f18753061c96257ddb837ef7484"; *)
-(*   explore_main "43/2d/432d7d2d758f153c1da8b5c9df084ba6a07ff27d6ca1cf2878dee52cb7648875"; *)
+
+(*   comment "Add several files."; *)
+(*   cd clone; *)
+(*   create_file "tutu" "blu"; *)
+(*   create_file "titi" "blibli"; *)
+(*   Clone.push []; *)
+(*   trees (); *)
 
 (*   Filou.ls (); *)
 (*   trees (); *)

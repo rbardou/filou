@@ -35,8 +35,20 @@ sig
   type root
 
   (** Encode an object, store it, and return its hash. *)
-  val store: t -> 'a Protype.t -> 'a ->
+  val store_now: t -> 'a Protype.t -> 'a ->
     ('a hash, [> `failed ]) r
+
+  (** Same as [store_now], but only store if needed.
+
+      More precisely, the object is only stored if it is referenced by another
+      object which is stored using [store_now] or [store_root], or if you [fetch] it.
+
+      If specified, [on_stored] is triggered after a successful store.
+
+      If storing fails, or if [on_stored] fails, the error is caught by [store_now],
+      [store_root] or [fetch]. *)
+  val store_later: ?on_stored: (unit -> (unit, [ `failed ]) r) ->
+    t -> 'a Protype.t -> 'a -> ('a hash, [> `failed ]) r
 
   (** Fetch an object from its hash and decode it. *)
   val fetch: t -> 'a Protype.t -> 'a hash ->
