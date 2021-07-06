@@ -38,6 +38,14 @@ let list_map_e l f =
   in
   map [] l
 
+let rec list_fold_e acc l f =
+  match l with
+    | [] ->
+        ok acc
+    | head :: tail ->
+        let* acc = f acc head in
+        list_fold_e acc tail f
+
 let trace error_message = function
   | OK _ as x -> x
   | ERROR { code; msg } -> ERROR { code; msg = error_message :: msg }

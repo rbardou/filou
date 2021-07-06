@@ -59,11 +59,10 @@ let find_local_clone () =
   in
   find (Path.get_cwd ())
 
-let store_later = Repository.store_now
+let store_later = Repository.store_later
 
-let push_file (setup: Clone.setup) (((dir_path, filename) as path): Device.file_path) =
+let push_file (setup: Clone.setup) root (((dir_path, filename) as path): Device.file_path) =
   trace ("failed to push file: " ^ Device.show_file_path path) @@
-  let* root = Repository.fetch_root setup in
   let* root_dir = fetch_or_fail setup T.dir root.root_dir in
   let* hash_index = fetch_or_fail setup T.hash_index root.hash_index in
   let rec update_dir dir_path_rev (dir: dir) = function
@@ -156,21 +155,30 @@ let push_file (setup: Clone.setup) (((dir_path, filename) as path): Device.file_
     let new_hash_index = Map.Char.add char0 new_hash_index_1_hash hash_index in
     store_later setup T.hash_index new_hash_index
   in
-  (* TODO: only store at the end of the whole push (even if failed) so that
-     if we have a journal we can have "cancel" cancel exactly the last CLI command? *)
-  Repository.store_root setup {
+  ok {
     root_dir = new_root_dir_hash;
     hash_index = new_hash_index_hash;
   }
 
-let rec push setup (path: Device.path) =
-  if Device.same_paths path [ dot_filou ] then
-    unit
-  else
-    let* stat = Device.stat (Clone.clone setup) path in
-    match stat with
-      | File { path; _ } ->
-          push_file setup path
-      | Dir ->
-          Device.iter_read_dir (Clone.clone setup) path @@ fun filename ->
-          push setup (path @ [ filename ])
+let push setup (paths: Device.path list) =
+  let* root = Repository.fetch_root setup in
+  let rec push root path =
+    if Device.same_paths path [ dot_filou ] then
+      ok root
+    else
+      let* stat = Device.stat (Clone.clone setup) path in
+      match stat with
+        | File { path; _ } ->
+            push_file setup root path
+        | Dir ->
+            let new_root = ref root in
+            let* () =
+              Device.iter_read_dir (Clone.clone setup) path @@ fun filename ->
+              let* root = push !new_root (path @ [ filename ]) in
+              new_root := root;
+              unit
+            in
+            ok !new_root
+  in
+  let* root = list_fold_e root paths push in
+  Repository.store_root setup root

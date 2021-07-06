@@ -1,20 +1,44 @@
 open Misc
 
-type _ hash =
+(* TODO: [store_later] is nice to avoid creating too many useless files, but:
+   - it can be good to add files iteratively and still update the root for each file;
+   - and it needs O(n) memory where n is the number of added files.
+   So do we actually want to use it?
+   - but it is also convenient to be able to cancel a push
+     => [store_later] is not useful for that, the only important thing is to have
+        a journal with relevant checkpoints
+   - it is good to avoid creating many useless files (O(n×m) where n is the number
+     of files added at the same times and m the average directory depth + the depth
+     of the hash index)
+   We can still keep it and activate / deactive it using a flag or heuristics… *)
+
+type 'a hash_status =
+  | Stored
+  | Not_stored of {
+      (* Note: the encoded value is also available in the closure, this uses
+         twice the needed amount of memory but also makes it faster to fetch. *)
+      value: 'a;
+      store: unit -> unit;
+    }
+
+type 'a hash =
   {
     hash: Hash.t;
-    mutable on_encode: unit -> unit;
+    mutable status: 'a hash_status;
   }
 
-let trigger_on_encode = ref false
+let store_not_stored_hash_when_encoding = ref false
 
 let hash_type =
   let open Protype in
   let encode hash =
-    if !trigger_on_encode then (
-      let on_encode = hash.on_encode in
-      hash.on_encode <- Fun.id;
-      on_encode ();
+    if !store_not_stored_hash_when_encoding then (
+      match hash.status with
+        | Stored ->
+            ()
+        | Not_stored { store; _ } ->
+            store ();
+            hash.status <- Stored
     );
     Hash.to_bin hash.hash
   in
@@ -25,7 +49,7 @@ let hash_type =
       | Some hash ->
           Some {
             hash;
-            on_encode = Fun.id;
+            status = Stored;
           }
   in
   (* Cannot use [convert_partial] because of the value restriction, but this is equivalent. *)
@@ -94,19 +118,19 @@ struct
 
   (* As encoding hashes can raise [Failed_to_store_later], we need to catch it. *)
   let encode ~trigger_store_later typ value =
-    trigger_on_encode := trigger_store_later;
+    store_not_stored_hash_when_encoding := trigger_store_later;
     try
       let encoded = Protype_robin.Encode.to_string ~version: Root.version typ value in
       (* Set back to [false] in case the user uses [hash_type] to encode a hash.
          We only need to make sure that [on_encode] is triggered when storing data on disk. *)
-      trigger_on_encode := false;
+      store_not_stored_hash_when_encoding := false;
       ok encoded
     with
       | Failed_to_store_later msg ->
-          trigger_on_encode := false;
+          store_not_stored_hash_when_encoding := false;
           failed msg
       | exn ->
-          trigger_on_encode := false;
+          store_not_stored_hash_when_encoding := false;
           raise exn
 
   let hash_part_length = 2
@@ -133,12 +157,12 @@ struct
     let* encoded_value = encode ~trigger_store_later: true typ value in
     let hash = Hash.string encoded_value in
     let* () = store_raw_now location hash encoded_value in
-    ok { hash; on_encode = Fun.id }
+    ok { hash; status = Stored }
 
   let store_later ?on_stored location typ value =
     let* encoded_value = encode ~trigger_store_later: false typ value in
     let hash = Hash.string encoded_value in
-    let on_encode () =
+    let store () =
       match
         let* () = store_raw_now location hash encoded_value in
         match on_stored with
@@ -152,19 +176,23 @@ struct
     in
     ok {
       hash;
-      on_encode;
+      status = Not_stored { value; store };
     }
 
   let fetch location typ hash =
-    trace ("failed to fetch object with hash " ^ hex_of_hash hash) @@
-    let path = file_path_of_hash hash.hash in
-    match Device.read_file location path with
-      | ERROR { code = `no_such_file; msg } ->
-          ERROR { code = `not_available; msg }
-      | ERROR { code = `failed; _ } as x ->
-          x
-      | OK encoded_value ->
-          decode_robin_string typ encoded_value
+    match hash.status with
+      | Not_stored { value; _ } ->
+          ok value
+      | Stored ->
+          trace ("failed to fetch object with hash " ^ hex_of_hash hash) @@
+          let path = file_path_of_hash hash.hash in
+          match Device.read_file location path with
+            | ERROR { code = `no_such_file; msg } ->
+                ERROR { code = `not_available; msg }
+            | ERROR { code = `failed; _ } as x ->
+                x
+            | OK encoded_value ->
+                decode_robin_string typ encoded_value
 
   let store_file ~source ~source_path ~target ~on_progress =
     trace ("failed to store " ^ Device.show_file_path source_path) @@
@@ -178,7 +206,7 @@ struct
           let hash_path = file_path_of_hash hash in
           let* already_exists = Device.file_exists target hash_path in
           if already_exists then
-            ok ({ hash; on_encode = Fun.id }, size)
+            ok ({ hash; status = Stored }, size)
           else
             match
               Device.copy_file ~on_progress: (fun bytes -> on_progress ~bytes ~size)
@@ -187,7 +215,7 @@ struct
               | ERROR { code = (`no_such_file | `failed); msg } ->
                   failed msg
               | OK () ->
-                  ok ({ hash; on_encode = Fun.id }, size)
+                  ok ({ hash; status = Stored }, size)
 
   let fetch_file ~source hash ~target ~target_path ~on_progress =
     let hash = hash.hash in

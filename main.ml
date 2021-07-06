@@ -150,7 +150,7 @@ let () =
           in
           let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
           (* TODO: output stuff *)
-          list_iter_e paths (Controller.push setup)
+          Controller.push setup paths
       | `pull _paths ->
 (*           let* (location, _) as clone = Controller.find_local_clone () in *)
 (*           let paths = *)
