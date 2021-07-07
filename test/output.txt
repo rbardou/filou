@@ -302,3 +302,175 @@ $ main.exe --no-color check
 Checking clone repository at: /tmp/filou-test/clone/
 Directory structure looks ok (total size: 18, file count: 3).
 Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── titi
+├── toto
+└── tutu
+# Add files in subdirectories.
+$ cd /tmp/filou-test/clone
+$ mkdir bla
+$ mkdir bla/bli
+$ echo plaf > bla/bli/plouf
+$ mkdir bla/blo
+$ echo plif > bla/blo/plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push bla/bli/plouf bla/blo/plouf
+$ cd /tmp/filou-test/main
+$ main.exe --no-color check
+Checking main repository at: /tmp/filou-test/main/
+Directory structure looks ok (total size: 26, file count: 5).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Directory structure looks ok (total size: 26, file count: 5).
+Hash index is consistent with the directory structure.
+# Test tree.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree bla
+bla
+├── bli/
+│   └── plouf
+└── blo/
+    └── plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree bla/blo
+bla/blo
+└── plouf
+$ cd /tmp/filou-test/clone/bla/bli
+$ main.exe --no-color tree
+bla/bli
+└── plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree bla/blo/blu/ble
+Error:
+  no such directory: bla/blo/blu
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree bla/blo/plouf/ble
+Error:
+  bla/blo/plouf is a file
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree bla/blo/plouf
+Error:
+  bla/blo/plouf is a file
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --depth 0
+.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --depth 1
+.
+├── bla/
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --depth 2
+.
+├── bla/
+│   ├── bli/
+│   └── blo/
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --depth 3
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --depth 0 bla
+bla
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --depth 1 bla
+bla
+├── bli/
+└── blo/
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --depth 2 bla
+bla
+├── bli/
+│   └── plouf
+└── blo/
+    └── plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --only-dirs
+.
+└── bla/
+    ├── bli/
+    └── blo/
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --depth 1 --only-dirs
+.
+└── bla/
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size
+. (26 B)
+├── bla/ (8 B)
+│   ├── bli/ (4 B)
+│   │   └── plouf (4 B)
+│   └── blo/ (4 B)
+│       └── plouf (4 B)
+├── titi (6 B)
+├── toto (9 B)
+└── tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --count
+. (5 files)
+├── bla/ (2 files)
+│   ├── bli/ (1 file)
+│   │   └── plouf
+│   └── blo/ (1 file)
+│       └── plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (26 B) (5 files)
+├── bla/ (8 B) (2 files)
+│   ├── bli/ (4 B) (1 file)
+│   │   └── plouf (4 B)
+│   └── blo/ (4 B) (1 file)
+│       └── plouf (4 B)
+├── titi (6 B)
+├── toto (9 B)
+└── tutu (3 B)
+# Test duplicates.
+$ echo plif > plif
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push plif
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf [2]
+├── plif [2]
+├── titi
+├── toto
+└── tutu

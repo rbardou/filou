@@ -92,7 +92,14 @@ let cat path =
   else
     echo "%s%%" contents
 
-let list_of_option = function None -> [] | Some x -> [ x ]
+let list_of_option ?name =
+  function
+    | None -> []
+    | Some x ->
+        match name with
+          | None -> [ x ]
+          | Some name -> [ name; x ]
+
 let flag value string = if value then [ string ] else []
 
 let v = true
@@ -130,6 +137,18 @@ struct
 
   let check ?v ?dry_run ?color ?path () =
     run ?v ?dry_run ?color ("check" :: list_of_option path)
+
+  let tree ?v ?dry_run ?color ?depth ?(only_dirs = false) ?(size = false) ?(count = false)
+      ?(duplicates = false) ?path () =
+    run ?v ?dry_run ?color (
+      "tree"
+      :: list_of_option ~name: "--depth" (Option.map string_of_int depth)
+      @ list_of_option path
+      @ flag only_dirs "--only-dirs"
+      @ flag size "--size"
+      @ flag count "--count"
+      @ flag duplicates "--duplicates"
+    )
 end
 
 module Main = Make_filou (struct let path = Some main end)
@@ -204,6 +223,45 @@ let () =
   trees ();
   Main.check ();
   Clone.check ();
+  Clone.tree ();
+
+  comment "Add files in subdirectories.";
+  cd clone;
+  mkdir "bla";
+  mkdir "bla/bli";
+  create_file "bla/bli/plouf" "plaf";
+  mkdir "bla/blo";
+  create_file "bla/blo/plouf" "plif";
+  Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
+  Main.check ();
+  Clone.check ();
+
+  comment "Test tree.";
+  Clone.tree ();
+  Clone.tree ~path: "bla" ();
+  Clone.tree ~path: "bla/blo" ();
+  cd (clone // "bla/bli");
+  Filou.tree ();
+  Clone.tree ~path: "bla/blo/blu/ble" ();
+  Clone.tree ~path: "bla/blo/plouf/ble" ();
+  Clone.tree ~path: "bla/blo/plouf" ();
+  Clone.tree ~depth: 0 ();
+  Clone.tree ~depth: 1 ();
+  Clone.tree ~depth: 2 ();
+  Clone.tree ~depth: 3 ();
+  Clone.tree ~path: "bla" ~depth: 0 ();
+  Clone.tree ~path: "bla" ~depth: 1 ();
+  Clone.tree ~path: "bla" ~depth: 2 ();
+  Clone.tree ~only_dirs: true ();
+  Clone.tree ~only_dirs: true ~depth: 1 ();
+  Clone.tree ~size: true ();
+  Clone.tree ~count: true ();
+  Clone.tree ~size: true ~count: true ();
+
+  comment "Test duplicates.";
+  create_file "plif" "plif";
+  Clone.push [ "plif" ];
+  Clone.tree ~duplicates: true ();
 
 (*   Filou.ls (); *)
 (*   trees (); *)

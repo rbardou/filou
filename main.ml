@@ -6,19 +6,19 @@ let error message =
 
 let () =
   Clap.description "FILe Organizer Ultimate";
-(*   let verbose = *)
-(*     Clap.flag *)
-(*       ~description: "Log more information." *)
-(*       ~set_long: "verbose" *)
-(*       ~set_short: 'v' *)
-(*       false *)
-(*   in *)
-(*   let dry_run = *)
-(*     Clap.flag *)
-(*       ~description: "Read-only mode: do not actually push or download files, only pretend." *)
-(*       ~set_long: "dry-run" *)
-(*       false *)
-(*   in *)
+  (*   let verbose = *)
+  (*     Clap.flag *)
+  (*       ~description: "Log more information." *)
+  (*       ~set_long: "verbose" *)
+  (*       ~set_short: 'v' *)
+  (*       false *)
+  (*   in *)
+  (*   let dry_run = *)
+  (*     Clap.flag *)
+  (*       ~description: "Read-only mode: do not actually push or download files, only pretend." *)
+  (*       ~set_long: "dry-run" *)
+  (*       false *)
+  (*   in *)
   let color =
     Clap.flag
       ~description: "Use ANSI escape codes to colorize logs."
@@ -142,6 +142,67 @@ let () =
         in
         `check location
       );
+      (
+        Clap.case
+          ~description: "Print the directory tree."
+          "tree"
+        @@ fun () ->
+        let max_depth =
+          Clap.optional_int
+            ~long: "depth"
+            ~short: 'D'
+            ~description:
+              "Maximum depth to print. 0 prints only DIR itself and not its contents."
+            ()
+        in
+        let only_main =
+          Clap.flag
+            ~set_long: "only-main"
+            ~set_short: 'm'
+            ~description: "Only print what is available in the main repository."
+            false
+        in
+        let only_dirs =
+          Clap.flag
+            ~set_long: "only-dirs"
+            ~set_short: 'd'
+            ~description: "Only print directories, not files."
+            false
+        in
+        let print_size =
+          Clap.flag
+            ~set_long: "size"
+            ~set_short: 's'
+            ~description: "Print file and directory sizes."
+            false
+        in
+        let print_file_count =
+          Clap.flag
+            ~set_long: "count"
+            ~set_short: 'c'
+            ~description: "Print file count for directories."
+            false
+        in
+        let print_duplicates =
+          Clap.flag
+            ~set_long: "duplicates"
+            ~set_short: 'p'
+            ~description:
+              "For files that have copies in other directories, print \
+               the total number of copies."
+            false
+        in
+        let path =
+          Clap.default_string
+            ~description: "Path to the directory to print."
+            ~placeholder: "DIR"
+            "."
+        in
+        `tree (
+          path, max_depth, only_main, only_dirs, print_size, print_file_count,
+          print_duplicates
+        )
+      );
     ]
   in
   Clap.close ();
@@ -165,28 +226,36 @@ let () =
           (* TODO: output stuff *)
           Controller.push setup paths
       | `pull _paths ->
-(*           let* (location, _) as clone = Controller.find_local_clone () in *)
-(*           let paths = *)
-(*             match paths with *)
-(*               | [] -> [ "." ] *)
-(*               | _ -> paths *)
-(*           in *)
-(*           let* paths = list_map_e paths (Device.parse_path location) in *)
-(*           Controller.pull ~verbose ~dry_run ~clone paths *)
+          (*           let* (location, _) as clone = Controller.find_local_clone () in *)
+          (*           let paths = *)
+          (*             match paths with *)
+          (*               | [] -> [ "." ] *)
+          (*               | _ -> paths *)
+          (*           in *)
+          (*           let* paths = list_map_e paths (Device.parse_path location) in *)
+          (*           Controller.pull ~verbose ~dry_run ~clone paths *)
           assert false (* TODO *)
       | `ls _path ->
-(*           let* (location, _) as clone = Controller.find_local_clone () in *)
-(*           let* path = Device.parse_path location path in *)
-(*           Controller.list ~color ~clone path *)
+          (*           let* (location, _) as clone = Controller.find_local_clone () in *)
+          (*           let* path = Device.parse_path location path in *)
+          (*           Controller.list ~color ~clone path *)
           assert false (* TODO *)
       | `rm _paths ->
-(*           let* (location, _) as clone = Controller.find_local_clone () in *)
-(*           let* paths = list_map_e paths (Device.parse_file_path location) in *)
-(*           Controller.remove ~verbose ~dry_run ~clone paths *)
+          (*           let* (location, _) as clone = Controller.find_local_clone () in *)
+          (*           let* paths = list_map_e paths (Device.parse_file_path location) in *)
+          (*           Controller.remove ~verbose ~dry_run ~clone paths *)
           assert false (* TODO *)
       | `check location ->
           let* location = Device.parse_location location in
           Controller.check location
+      | `tree (
+          path, max_depth, only_main, only_dirs, print_size, print_file_count,
+          print_duplicates
+        ) ->
+          let* setup = Controller.find_local_clone () in
+          let* path = Device.parse_path (Clone.clone setup) path in
+          Controller.tree ~color ~max_depth ~only_main ~only_dirs ~print_size
+            ~print_file_count ~print_duplicates setup path
   with
     | OK () ->
         ()
