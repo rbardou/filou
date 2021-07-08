@@ -34,6 +34,7 @@ $ cd /tmp/filou-test/clone
 $ echo blablabla > toto
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color push toto
+Pushed: toto
 $ cd /tmp/filou-test/main
 $ tree -a -s -F
 .
@@ -198,6 +199,8 @@ $ echo blu > tutu
 $ echo blibli > titi
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color push tutu titi
+Pushed: tutu
+Pushed: titi
 $ cd /tmp/filou-test/main
 $ tree -a -s -F
 .
@@ -313,6 +316,8 @@ $ mkdir bla/blo
 $ echo plif > bla/blo/plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color push bla/bli/plouf bla/blo/plouf
+Pushed: bla/bli/plouf
+Pushed: bla/blo/plouf
 $ cd /tmp/filou-test/main
 $ main.exe --no-color check
 Checking main repository at: /tmp/filou-test/main/
@@ -457,7 +462,13 @@ $ main.exe --no-color tree --size --count
 # Test duplicates.
 $ echo plif > plif
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color push plif
+$ main.exe -v --no-color push
+Already exists: titi
+Already exists: bla/blo/plouf
+Already exists: bla/bli/plouf
+Already exists: toto
+Already exists: tutu
+Pushed: plif (duplicate of: bla/blo/plouf)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --duplicates
 .

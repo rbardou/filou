@@ -6,13 +6,14 @@ let error message =
 
 let () =
   Clap.description "FILe Organizer Ultimate";
-  (*   let verbose = *)
-  (*     Clap.flag *)
-  (*       ~description: "Log more information." *)
-  (*       ~set_long: "verbose" *)
-  (*       ~set_short: 'v' *)
-  (*       false *)
-  (*   in *)
+  let verbose =
+    Clap.flag
+      ~description: "Log more information."
+      ~set_long: "verbose"
+      ~set_short: 'v'
+      false
+  in
+  (* TODO *)
   (*   let dry_run = *)
   (*     Clap.flag *)
   (*       ~description: "Read-only mode: do not actually push or download files, only pretend." *)
@@ -224,7 +225,7 @@ let () =
           in
           let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
           (* TODO: output stuff *)
-          Controller.push setup paths
+          Controller.push ~verbose setup paths
       | `pull _paths ->
           (*           let* (location, _) as clone = Controller.find_local_clone () in *)
           (*           let paths = *)

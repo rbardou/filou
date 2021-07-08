@@ -382,12 +382,12 @@ let tree ~color ~max_depth ~only_main ~only_dirs
             else
               Printf.printf " (%d files)" count
         in
-        let print_duplicate_count hash =
+        let duplicates hash =
           if not print_duplicates then
-            unit
+            ok File_path_set.empty
           else
             trace (
-              sf "failed to count duplicates for %s"
+              sf "failed to look up duplicates for %s"
                 (Device.show_file_path (List.rev dir_path_rev, filename))
             ) @@
             let hash_bin = Repository.bin_of_hash hash in
@@ -412,9 +412,11 @@ let tree ~color ~max_depth ~only_main ~only_dirs
               | None ->
                   failed [ "%s is missing from the hash index"; ]
               | Some set ->
-                  let count = File_path_set.cardinal set in
-                  if count <> 1 then Printf.printf " [%d]" count;
-                  unit
+                  ok set
+        in
+        let print_duplicate_count duplicates =
+          let count = File_path_set.cardinal duplicates in
+          if count >= 2 then Printf.printf " [%d]" count
         in
         let recurse hash =
           let* dir = fetch_or_fail setup T.dir hash in
@@ -427,7 +429,8 @@ let tree ~color ~max_depth ~only_main ~only_dirs
             | MDE_main (File { hash; size }) ->
                 print_filename `file_not_pulled;
                 print_size size;
-                let* () = print_duplicate_count hash in
+                let* duplicates = duplicates hash in
+                print_duplicate_count duplicates;
                 print_newline ();
                 unit
             | MDE_clone (File { size; _ }) ->
@@ -443,7 +446,8 @@ let tree ~color ~max_depth ~only_main ~only_dirs
                   (
                     print_filename `file;
                     print_size size;
-                    let* () = print_duplicate_count hash in
+                    let* duplicates = duplicates hash in
+                    print_duplicate_count duplicates;
                     print_newline ();
                     unit
                   )
@@ -488,8 +492,8 @@ let tree ~color ~max_depth ~only_main ~only_dirs
   in
   tree_dir "" 0 (List.rev dir_path) dir
 
-(* TODO: say stuff *)
-let push_file (setup: Clone.setup) root (((dir_path, filename) as path): Device.file_path) =
+let push_file ~verbose (setup: Clone.setup) root
+    (((dir_path, filename) as path): Device.file_path) =
   trace ("failed to push file: " ^ Device.show_file_path path) @@
   let* root_dir = fetch_or_fail setup T.dir root.root_dir in
   let rec update_dir dir_path_rev (dir: dir) = function
@@ -540,9 +544,7 @@ let push_file (setup: Clone.setup) root (((dir_path, filename) as path): Device.
                   ~source: (Clone.clone setup)
                   ~source_path: path
                   ~target: setup
-                  ~on_progress: (
-                    on_copy_progress ("[   PUSH   ] " ^ (Device.show_file_path path))
-                  )
+                  ~on_progress: (on_copy_progress ("Pushing: " ^ Device.show_file_path path))
               in
               let dir_entry =
                 File {
@@ -557,9 +559,10 @@ let push_file (setup: Clone.setup) root (((dir_path, filename) as path): Device.
   let* update_result = update_dir [] root_dir dir_path in
   match update_result with
     | None ->
+        if verbose then echo "Already exists: %s" (Device.show_file_path path);
         ok root
     | Some (new_root_dir_hash, added_file_hash, _, _) ->
-        let* new_hash_index_hash =
+        let* new_hash_index_hash, old_paths =
           let added_file_hash_bin = Repository.bin_of_hash added_file_hash in
           let char0 = added_file_hash_bin.[0] in
           let char1 = added_file_hash_bin.[1] in
@@ -578,27 +581,35 @@ let push_file (setup: Clone.setup) root (((dir_path, filename) as path): Device.
               | Some hash_index_2_hash ->
                   fetch_or_fail setup T.hash_index_2 hash_index_2_hash
           in
+          let old_paths =
+            File_hash_map.find_opt added_file_hash hash_index_2
+            |> default File_path_set.empty
+          in
           let new_hash_index_2 =
-            let new_paths =
-              File_path_set.add path (
-                File_hash_map.find_opt added_file_hash hash_index_2
-                |> default File_path_set.empty
-              )
-            in
+            let new_paths = File_path_set.add path old_paths in
             File_hash_map.add added_file_hash new_paths hash_index_2
           in
           let* new_hash_index_2_hash = store_later setup T.hash_index_2 new_hash_index_2 in
           let new_hash_index_1 = Map.Char.add char1 new_hash_index_2_hash hash_index_1 in
           let* new_hash_index_1_hash = store_later setup T.hash_index_1 new_hash_index_1 in
           let new_hash_index = Map.Char.add char0 new_hash_index_1_hash hash_index in
-          store_later setup T.hash_index new_hash_index
+          let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
+          ok (new_hash_index_hash, old_paths)
         in
+        if File_path_set.is_empty old_paths then
+          echo "Pushed: %s" (Device.show_file_path path)
+        else
+          echo "Pushed: %s (duplicate of: %s)" (Device.show_file_path path) (
+            File_path_set.elements old_paths
+            |> List.map Device.show_file_path
+            |> String.concat ", "
+          );
         ok {
           root_dir = new_root_dir_hash;
           hash_index = new_hash_index_hash;
         }
 
-let push setup (paths: Device.path list) =
+let push ~verbose setup (paths: Device.path list) =
   let* root = Repository.fetch_root setup in
   let rec push root path =
     if Device.same_paths path [ dot_filou ] then
@@ -607,7 +618,7 @@ let push setup (paths: Device.path list) =
       let* stat = Device.stat (Clone.clone setup) path in
       match stat with
         | File { path; _ } ->
-            push_file setup root path
+            push_file ~verbose setup root path
         | Dir ->
             let new_root = ref root in
             let* () =
@@ -620,3 +631,8 @@ let push setup (paths: Device.path list) =
   in
   let* root = list_fold_e root paths push in
   Repository.store_root setup root
+
+(* TODO:
+- pull
+- a command to list the duplicates of a file (or of several files, or a dir)
+  (or modify tree to make [2] the default and extend with └ = or something *)

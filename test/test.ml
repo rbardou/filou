@@ -260,7 +260,7 @@ let () =
 
   comment "Test duplicates.";
   create_file "plif" "plif";
-  Clone.push [ "plif" ];
+  Clone.push ~v: true [];
   Clone.tree ~duplicates: true ();
 
 (*   Filou.ls (); *)
