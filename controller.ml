@@ -326,11 +326,19 @@ let tree ~color ~max_depth ~only_main ~only_dirs
           merged_dir
       in
       let print_entry ?(last = false) (filename, merged_dir_entry) =
-        let print_prefix () =
+        let print_prefix kind =
           print_string prefix;
-          print_string (if last then "└── "  else "├── ");
+          print_string (if last then "└"  else "├");
+          match kind with
+            | `dir | `file | `inconsistent ->
+                print_string "── ";
+            | `dir_not_pulled | `file_not_pulled ->
+                print_string "-- "
+            | `dir_not_pushed | `file_not_pushed ->
+                print_string "++ "
         in
-        let print_filename kind =
+        let print_prefix_and_filename kind =
+          print_prefix kind;
           let need_to_reset_color =
             color && match kind with
               | `dir -> print_string "\027[1m\027[34m"; true
@@ -386,9 +394,9 @@ let tree ~color ~max_depth ~only_main ~only_dirs
           if not print_duplicates then
             ok File_path_set.empty
           else
+            let file_path = List.rev dir_path_rev, filename in
             trace (
-              sf "failed to look up duplicates for %s"
-                (Device.show_file_path (List.rev dir_path_rev, filename))
+              sf "failed to look up duplicates for %s" (Device.show_file_path file_path)
             ) @@
             let hash_bin = Repository.bin_of_hash hash in
             let char0 = hash_bin.[0] in
@@ -412,30 +420,35 @@ let tree ~color ~max_depth ~only_main ~only_dirs
               | None ->
                   failed [ "%s is missing from the hash index"; ]
               | Some set ->
-                  ok set
+                  ok (File_path_set.remove file_path set)
         in
-        let print_duplicate_count duplicates =
-          let count = File_path_set.cardinal duplicates in
-          if count >= 2 then Printf.printf " [%d]" count
+        let print_duplicate_paths duplicates =
+          File_path_set.iter' duplicates @@ fun duplicate_path ->
+          print_string prefix;
+          if last then
+            print_string "    = /"
+          else
+            print_string "│   = /";
+          print_string (Device.show_file_path duplicate_path);
+          print_newline ();
         in
         let recurse hash =
           let* dir = fetch_or_fail setup T.dir hash in
           tree_dir (if last then prefix ^ "    " else prefix ^ "│   ") (dir_depth + 1)
             (filename :: dir_path_rev) dir
         in
-        print_prefix ();
         let* () =
           match merged_dir_entry with
             | MDE_main (File { hash; size }) ->
-                print_filename `file_not_pulled;
+                print_prefix_and_filename `file_not_pulled;
                 print_size size;
                 let* duplicates = duplicates hash in
-                print_duplicate_count duplicates;
                 print_newline ();
+                print_duplicate_paths duplicates;
                 unit
             | MDE_clone (File { size; _ }) ->
                 if only_main then unit else (
-                  print_filename `file_not_pushed;
+                  print_prefix_and_filename `file_not_pushed;
                   print_size size;
                   print_newline ();
                   unit
@@ -444,40 +457,40 @@ let tree ~color ~max_depth ~only_main ~only_dirs
                 (* TODO: also check hash *)
                 if size = clone_size then
                   (
-                    print_filename `file;
+                    print_prefix_and_filename `file;
                     print_size size;
                     let* duplicates = duplicates hash in
-                    print_duplicate_count duplicates;
                     print_newline ();
+                    print_duplicate_paths duplicates;
                     unit
                   )
                 else
                   (
-                    print_filename `inconsistent;
+                    print_prefix_and_filename `inconsistent;
                     print_newline ();
                     unit
                   )
             | MDE_main (Dir { hash; total_size; total_file_count }) ->
-                print_filename `dir_not_pulled;
+                print_prefix_and_filename `dir_not_pulled;
                 print_size total_size;
                 print_file_count total_file_count;
                 print_newline ();
                 recurse hash
             | MDE_clone Dir ->
                 if only_main then unit else (
-                  print_filename `dir_not_pushed;
+                  print_prefix_and_filename `dir_not_pushed;
                   print_newline ();
                   unit
                 )
             | MDE_both (Dir { hash; total_size; total_file_count }, Dir) ->
-                print_filename `dir;
+                print_prefix_and_filename `dir;
                 print_size total_size;
                 print_file_count total_file_count;
                 print_newline ();
                 recurse hash
             | MDE_both (Dir _, File _)
             | MDE_both (File _, Dir) ->
-                print_filename `inconsistent;
+                print_prefix_and_filename `inconsistent;
                 print_newline ();
                 unit
         in
@@ -631,8 +644,3 @@ let push ~verbose setup (paths: Device.path list) =
   in
   let* root = list_fold_e root paths push in
   Repository.store_root setup root
-
-(* TODO:
-- pull
-- a command to list the duplicates of a file (or of several files, or a dir)
-  (or modify tree to make [2] the default and extend with └ = or something *)

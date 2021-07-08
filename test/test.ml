@@ -263,6 +263,49 @@ let () =
   Clone.push ~v: true [];
   Clone.tree ~duplicates: true ();
 
+  comment "Try to push a directory while a file already exists with the same name.";
+  rm "toto";
+  mkdir "toto";
+  create_file "toto/wrong" "this shouldn't be here";
+  Filou.push [];
+  Clone.tree ~duplicates: true ();
+  rm "toto/wrong";
+  rmdir "toto";
+  Clone.tree ~duplicates: true ();
+(*   Filou.pull []; *)
+(*   cat "toto"; *)
+
+(*   comment "Same, but with a deeper directory."; *)
+(*   rm "toto"; *)
+(*   mkdir "toto"; *)
+(*   mkdir "toto/tutu"; *)
+(*   create_file "toto/tutu/wrong" "this shouldn't be here"; *)
+(*   Filou.push []; *)
+(*   trees (); *)
+(*   Filou.ls (); *)
+(*   rm "toto/tutu/wrong"; *)
+(*   rmdir "toto/tutu"; *)
+(*   rmdir "toto"; *)
+(*   Filou.pull []; *)
+(*   cat "toto"; *)
+
+(*   comment "Try to push a file while a directory already exists for one of its parent."; *)
+(*   rm "bla/bli/blo"; *)
+(*   rm "bla/bli/blu"; *)
+(*   rmdir "bla/bli"; *)
+(*   create_file "bla/bli" "I should be a directory"; *)
+(*   Filou.push []; *)
+(*   trees (); *)
+(*   Filou.ls (); *)
+(*   rm "bla/bli"; *)
+(*   rmdir "bla"; *)
+(*   create_file "bla" "I should be a directory"; *)
+(*   Filou.push []; *)
+(*   trees (); *)
+(*   Filou.ls (); *)
+(*   rm "bla"; *)
+(*   Filou.pull []; *)
+
 (*   Filou.ls (); *)
 (*   trees (); *)
 (*   Filou.push []; *)
@@ -318,48 +361,5 @@ let () =
 (*   cat "tatator"; *)
 (*   cat "tatator2"; *)
 (*   cat "toto"; *)
-
-(*   comment "Try to push a directory while a file already exists with the same name."; *)
-(*   rm "toto"; *)
-(*   mkdir "toto"; *)
-(*   create_file "toto/wrong" "this shouldn't be here"; *)
-(*   Filou.push []; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
-(*   rm "toto/wrong"; *)
-(*   rmdir "toto"; *)
-(*   Filou.pull []; *)
-(*   cat "toto"; *)
-
-(*   comment "Same, but with a deeper directory."; *)
-(*   rm "toto"; *)
-(*   mkdir "toto"; *)
-(*   mkdir "toto/tutu"; *)
-(*   create_file "toto/tutu/wrong" "this shouldn't be here"; *)
-(*   Filou.push []; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
-(*   rm "toto/tutu/wrong"; *)
-(*   rmdir "toto/tutu"; *)
-(*   rmdir "toto"; *)
-(*   Filou.pull []; *)
-(*   cat "toto"; *)
-
-(*   comment "Try to push a file while a directory already exists for one of its parent."; *)
-(*   rm "bla/bli/blo"; *)
-(*   rm "bla/bli/blu"; *)
-(*   rmdir "bla/bli"; *)
-(*   create_file "bla/bli" "I should be a directory"; *)
-(*   Filou.push []; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
-(*   rm "bla/bli"; *)
-(*   rmdir "bla"; *)
-(*   create_file "bla" "I should be a directory"; *)
-(*   Filou.push []; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
-(*   rm "bla"; *)
-(*   Filou.pull []; *)
 
   ()

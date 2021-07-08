@@ -476,8 +476,49 @@ $ main.exe --no-color tree --duplicates
 │   ├── bli/
 │   │   └── plouf
 │   └── blo/
-│       └── plouf [2]
-├── plif [2]
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
 ├── titi
 ├── toto
+└── tutu
+# Try to push a directory while a file already exists with the same name.
+$ rm toto
+$ mkdir toto
+$ echo 'this shouldn'\''t be here' > toto/wrong
+$ main.exe --no-color push
+Error:
+  failed to push file: toto/wrong:
+  parent directory already exists as a file: .
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto?
+└── tutu
+$ rm toto/wrong
+$ rmdir toto
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├-- toto
 └── tutu
