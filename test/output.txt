@@ -509,42 +509,218 @@ $ main.exe --no-color tree --duplicates
 ├── titi
 ├── toto
 └── tutu
-# Try to push a directory while a file already exists with the same name.
-$ rm toto
-$ mkdir toto
-$ echo 'this shouldn'\''t be here' > toto/wrong
-$ main.exe --no-color push
-Error:
-  failed to push file: toto/wrong:
-  parent directory already exists as a file: .
-Exit code: 1
+# Try to pull files.
+$ rm titi
+$ rm tutu
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color tree --duplicates
+$ main.exe --no-color tree
 .
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
 │   └── blo/
 │       └── plouf
-│           = /plif
 ├── plif
-│   = /bla/blo/plouf
+├-- titi
+├── toto
+└-- tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color pull titi
+Pulled: titi
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
 ├── titi
-├── toto?
-└── tutu
-$ rm toto/wrong
-$ rmdir toto
+├── toto
+└-- tutu
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color tree --duplicates
+$ main.exe --no-color pull tutu
+Pulled: tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
 .
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
 │   └── blo/
 │       └── plouf
-│           = /plif
 ├── plif
-│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+$ rm titi
+$ rm tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├-- titi
+├── toto
+└-- tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color pull titi tutu
+Pulled: titi
+Pulled: tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ rm tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└-- tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color pull titi tutu
+Pulled: tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ rm bla/bli/plouf
+$ rmdir bla/bli
+$ rm plif
+$ rm toto
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├-- bli/
+│   │   └-- plouf
+│   └── blo/
+│       └── plouf
+├-- plif
 ├── titi
 ├-- toto
 └── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color pull bla/bli
+Pulled: bla/bli/plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├-- plif
+├── titi
+├-- toto
+└── tutu
+$ rm bla/bli/plouf
+$ rmdir bla/bli
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├-- bli/
+│   │   └-- plouf
+│   └── blo/
+│       └── plouf
+├-- plif
+├── titi
+├-- toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color pull bla
+Pulled: bla/bli/plouf
+Already exists: bla/blo/plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├-- plif
+├── titi
+├-- toto
+└── tutu
+$ rm bla/bli/plouf
+$ rmdir bla/bli
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├-- bli/
+│   │   └-- plouf
+│   └── blo/
+│       └── plouf
+├-- plif
+├── titi
+├-- toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color pull
+Pulled: bla/bli/plouf
+Already exists: bla/blo/plouf
+Pulled: plif
+Already exists: titi
+Pulled: toto
+Already exists: tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Directory structure looks ok (total size: 30, file count: 6).
+Hash index is consistent with the directory structure.
+$ cat bla/bli/plouf
+plaf%
+$ cat bla/blo/plouf
+plif%
+$ cat plif
+plif%
+$ cat titi
+blibli%
+$ cat toto
+blablabla%
+$ cat tutu
+blu%

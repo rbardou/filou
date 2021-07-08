@@ -267,15 +267,57 @@ let () =
   Clone.push ~v: true [];
   Clone.tree ~duplicates: true ();
 
-  comment "Try to push a directory while a file already exists with the same name.";
+  comment "Try to pull files.";
+  rm "titi";
+  rm "tutu";
+  Clone.tree ();
+  Clone.pull [ "titi" ];
+  Clone.tree ();
+  Clone.pull [ "tutu" ];
+  Clone.tree ();
+  rm "titi";
+  rm "tutu";
+  Clone.tree ();
+  Clone.pull [ "titi"; "tutu" ];
+  Clone.tree ();
+  rm "tutu";
+  Clone.tree ();
+  Clone.pull [ "titi"; "tutu" ];
+  Clone.tree ();
+  rm "bla/bli/plouf";
+  rmdir "bla/bli";
+  rm "plif";
   rm "toto";
-  mkdir "toto";
-  create_file "toto/wrong" "this shouldn't be here";
-  Filou.push [];
-  Clone.tree ~duplicates: true ();
-  rm "toto/wrong";
-  rmdir "toto";
-  Clone.tree ~duplicates: true ();
+  Clone.tree ();
+  Clone.pull ~v: true [ "bla/bli" ];
+  Clone.tree ();
+  rm "bla/bli/plouf";
+  rmdir "bla/bli";
+  Clone.tree ();
+  Clone.pull ~v: true [ "bla" ];
+  Clone.tree ();
+  rm "bla/bli/plouf";
+  rmdir "bla/bli";
+  Clone.tree ();
+  Clone.pull ~v: true [];
+  Clone.tree ();
+  Clone.check ();
+  cat "bla/bli/plouf";
+  cat "bla/blo/plouf";
+  cat "plif";
+  cat "titi";
+  cat "toto";
+  cat "tutu";
+
+(*   comment "Try to push a directory while a file already exists with the same name."; *)
+(*   rm "toto"; *)
+(*   mkdir "toto"; *)
+(*   create_file "toto/wrong" "this shouldn't be here"; *)
+(*   Filou.push []; *)
+(*   Clone.tree ~duplicates: true (); *)
+(*   rm "toto/wrong"; *)
+(*   rmdir "toto"; *)
+(*   Clone.tree ~duplicates: true (); *)
 (*   Filou.pull []; *)
 (*   cat "toto"; *)
 

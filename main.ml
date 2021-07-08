@@ -233,18 +233,16 @@ let () =
               | _ -> paths
           in
           let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
-          (* TODO: output stuff *)
           Controller.push ~verbose setup paths
-      | `pull _paths ->
-          (*           let* (location, _) as clone = find_local_clone () in *)
-          (*           let paths = *)
-          (*             match paths with *)
-          (*               | [] -> [ "." ] *)
-          (*               | _ -> paths *)
-          (*           in *)
-          (*           let* paths = list_map_e paths (Device.parse_path location) in *)
-          (*           Controller.pull ~verbose ~dry_run ~clone paths *)
-          assert false (* TODO *)
+      | `pull paths ->
+          let* setup = find_local_clone () in
+          let paths =
+            match paths with
+              | [] -> [ "." ]
+              | _ -> paths
+          in
+          let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
+          Controller.pull ~verbose setup paths
       | `ls _path ->
           (*           let* (location, _) as clone = find_local_clone () in *)
           (*           let* path = Device.parse_path location path in *)
@@ -266,6 +264,14 @@ let () =
           let* path = Device.parse_path (Clone.clone setup) path in
           Controller.tree ~color ~max_depth ~only_main ~only_dirs ~print_size
             ~print_file_count ~print_duplicates setup path
+      | `prune ->
+          assert false (* TODO *)
+      | `log ->
+          assert false (* TODO *)
+      | `undo ->
+          assert false (* TODO *)
+      | `redo ->
+          assert false (* TODO *)
   with
     | OK () ->
         ()

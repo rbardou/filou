@@ -623,7 +623,6 @@ let push_file ~verbose (setup: Clone.setup) root
         }
 
 let push ~verbose setup (paths: Device.path list) =
-  let* root = Repository.fetch_root setup in
   let rec push root path =
     if Device.same_paths path [ dot_filou ] then
       ok root
@@ -642,5 +641,56 @@ let push ~verbose setup (paths: Device.path list) =
             in
             ok !new_root
   in
+  let* root = Repository.fetch_root setup in
   let* root = list_fold_e root paths push in
   Repository.store_root setup root
+
+let pull ~verbose setup (paths: Device.path list) =
+  let rec pull (dir: dir) dir_path_rev (path: Device.path) =
+    match path with
+      | [] ->
+          list_iter_e (Filename_map.bindings dir) @@ fun (filename, _) ->
+          pull dir dir_path_rev [ filename ]
+      | head :: tail ->
+          match Filename_map.find_opt head dir with
+            | None ->
+                failed [
+                  "no such file or directory: " ^ Device.show_path (List.rev dir_path_rev);
+                ]
+            | Some (Dir { hash; _ }) ->
+                let* dir = fetch_or_fail setup T.dir hash in
+                pull dir (head :: dir_path_rev) tail
+            | Some (File { hash; _ }) ->
+                let target_path = List.rev dir_path_rev, head in
+                trace (sf "failed to pull %s" (Device.show_file_path target_path)) @@
+                match tail with
+                  | _ :: _ ->
+                      failed [
+                        "no such file or directory: " ^
+                        Device.show_path (List.rev_append dir_path_rev path);
+                        Device.show_path (List.rev dir_path_rev) ^
+                        " is a file";
+                      ]
+                  | [] ->
+                      match
+                        with_progress @@ fun () ->
+                        Repository.fetch_file ~source: setup hash
+                          ~target: (Clone.clone setup)
+                          ~target_path
+                          ~on_progress: (
+                          on_copy_progress ("Pulling: " ^ Device.show_file_path target_path)
+                        )
+                      with
+                        | ERROR { code = `already_exists; _ } ->
+                            if verbose then
+                              echo "Already exists: %s" (Device.show_file_path target_path);
+                            unit
+                        | ERROR { code = `failed | `not_available; msg } ->
+                            failed msg
+                        | OK () ->
+                            echo "Pulled: %s" (Device.show_file_path target_path);
+                            unit
+  in
+  let* root = Repository.fetch_root setup in
+  let* root_dir = fetch_or_fail setup T.dir root.root_dir in
+  list_iter_e paths (pull root_dir [])
