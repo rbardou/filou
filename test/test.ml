@@ -232,6 +232,8 @@ let () =
   create_file "bla/bli/plouf" "plaf";
   mkdir "bla/blo";
   create_file "bla/blo/plouf" "plif";
+  Clone.push ~dry_run: true [ "bla/bli/plouf"; "bla/blo/plouf" ];
+  Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Main.check ();
   Clone.check ();
@@ -260,6 +262,8 @@ let () =
 
   comment "Test duplicates.";
   create_file "plif" "plif";
+  Clone.push ~v: true ~dry_run: true [];
+  Clone.tree ~duplicates: true ();
   Clone.push ~v: true [];
   Clone.tree ~duplicates: true ();
 

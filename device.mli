@@ -1,9 +1,11 @@
 open Misc
 
-type location =
-  | Local of Path.absolute_dir
+type mode = RW | RO
 
-val parse_location: string -> (location, [> `failed ]) r
+type location =
+  | Local of mode * Path.absolute_dir
+
+val parse_location: mode -> string -> (location, [> `failed ]) r
 
 val show_location: location -> string
 

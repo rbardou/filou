@@ -1,23 +1,26 @@
 open Misc
 
-type location =
-  | Local of Path.absolute_dir
+type mode = RW | RO
 
-let parse_location string =
+type location =
+  | Local of mode * Path.absolute_dir
+
+let parse_location mode string =
   match Path.parse string with
     | None ->
         failed [ "invalid location: " ^ string ]
     | Some path ->
-        OK (Local (Path.Any_relativity.to_absolute (Path.Any.to_dir path)))
+        let path = Path.Any_relativity.to_absolute (Path.Any.to_dir path) in
+        OK (Local (mode, path))
 
 let show_location = function
-  | Local path ->
+  | Local (_, path) ->
       Path.show path
 
 let sublocation location filename =
   match location with
-    | Local path ->
-        Local (Path.Dir (filename, path))
+    | Local (mode, path) ->
+        Local (mode, Path.Dir (filename, path))
 
 type path = Path.Filename.t list
 
@@ -53,7 +56,7 @@ let repository_path_of_path full_path =
 
 let parse_path location string =
   match location with
-    | Local repository_root ->
+    | Local (_, repository_root) ->
         match Path.parse string with
           | None ->
               failed [ "invalid path: \"" ^ String.escaped string ^ "\"" ]
@@ -133,7 +136,9 @@ let close_dir fd =
 
 let with_lock location (path: file_path) f =
   match location with
-    | Local device_path ->
+    | Local (RO, _) ->
+        f ()
+    | Local (RW, device_path) ->
         let full_path = local_file_path device_path path in
         let full_path_string = Path.show full_path in
         let flags: Unix.open_flag list =
@@ -173,7 +178,7 @@ let with_lock location (path: file_path) f =
 
 let iter_read_dir location (path: path) f =
   match location with
-    | Local device_path ->
+    | Local (_, device_path) ->
         let full_path = local_dir_path device_path path in
         match Unix.opendir (Path.show full_path) with
           | exception Unix.Unix_error (ENOENT, _, _) ->
@@ -267,9 +272,14 @@ let make_parent_directories (path: (Path.absolute, _) Path.t) =
     | Some parent ->
         make parent
 
+let read_only () =
+  failed [ "read-only mode is active" ]
+
 let write_file_incrementally_gen unix_write location path write_contents =
   match location with
-    | Local device_path ->
+    | Local (RO, _) ->
+        read_only ()
+    | Local (RW, device_path) ->
         let full_path = local_file_path device_path path in
         let* () = make_parent_directories full_path in
         let temp_path = dot_part full_path in
@@ -335,7 +345,7 @@ let write_file location path contents =
 
 let read_file_incrementally location path read_contents =
   match location with
-    | Local device_path ->
+    | Local (_, device_path) ->
         let full_path = local_file_path device_path path in
         let full_path_string = Path.show full_path in
         let flags: Unix.open_flag list =
@@ -395,7 +405,7 @@ let stat location (path: path) =
     | head :: tail ->
         let file_path = List.rev tail, head in
         match location with
-          | Local device_path ->
+          | Local (_, device_path) ->
               let full_path = local_file_path device_path file_path in
               let full_path_string = Path.show full_path in
               match Unix.stat full_path_string with
@@ -468,7 +478,7 @@ let run_and_read command arguments =
 
 let hash location (path: file_path) =
   match location with
-    | Local device_path ->
+    | Local (_, device_path) ->
         let full_path = local_file_path device_path path in
         let full_path_string = Path.show full_path in
         let failed msg = failed (("failed to hash: " ^ full_path_string) :: msg) in
@@ -521,7 +531,9 @@ let copy_file
 (* Should not be exposed in the .mli: it does not recurse. *)
 let remove_directory location (path: path) =
   match location with
-    | Local device_path ->
+    | Local (RO, _) ->
+        read_only ()
+    | Local (RW, device_path) ->
         let full_path = local_path device_path path in
         let full_path_string = Path.Any_kind.show full_path in
         match Unix.rmdir full_path_string with
@@ -538,7 +550,9 @@ let remove_directory location (path: path) =
 let remove_file location ((dir_path, _) as file_path: file_path) =
   let* () =
     match location with
-      | Local device_path ->
+      | Local (RO, _) ->
+          read_only ()
+      | Local (RW, device_path) ->
           let full_path = local_file_path device_path file_path in
           let full_path_string = Path.show full_path in
           try

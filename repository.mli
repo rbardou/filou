@@ -34,6 +34,27 @@ sig
   (** Repository roots. *)
   type root
 
+  (** Activate read-only mode.
+
+      In read-only mode, nothing is written on the device, but
+      non-file objects can still be fetched, including those that were
+      "stored" during read-only mode, and file sizes can still be read
+      with [get_file_size], even for files that were "stored" during
+      read-only mode. Roots are not stored, and [fetch_root] returns
+      the last root that was "stored" during read-only
+      mode. [garbage_collect] does nothing.
+
+      It is not possible to deactivate read-only mode because files of
+      hashes that are obtained in this mode are not actually available,
+      so it would be dangerous to store objects, as they could
+      reference those files. You can actually still write objects if
+      you re-apply the functor, but this is strongly discouraged.
+
+      Read-only mode is meant to implement "dry runs". In particular,
+      most read accesses that would occur when storing objects or files
+      still occur even if they are not necessary. *)
+  val set_read_only: unit -> unit
+
   (** Encode an object, store it, and return its hash. *)
   val store_now: t -> 'a Protype.t -> 'a ->
     ('a hash, [> `failed ]) r
@@ -80,6 +101,8 @@ sig
     (root, [> `failed ]) r
 
   (** Remove objects which are not in a given hash set. *)
+  (* TODO: rework this, [everything_except] could be computed automatically
+     (and update the description of [set_read_only]). *)
   val garbage_collect: t -> everything_except: Raw_hash_set.t ->
     (unit, [> `failed ]) r
 end

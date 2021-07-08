@@ -315,9 +315,15 @@ $ echo plaf > bla/bli/plouf
 $ mkdir bla/blo
 $ echo plif > bla/blo/plouf
 $ cd /tmp/filou-test/clone
+$ main.exe --dry-run --no-color push bla/bli/plouf bla/blo/plouf
+Pushed: bla/bli/plouf
+Pushed: bla/blo/plouf
+$ cd /tmp/filou-test/clone
 $ main.exe --no-color push bla/bli/plouf bla/blo/plouf
 Pushed: bla/bli/plouf
 Pushed: bla/blo/plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push bla/bli/plouf bla/blo/plouf
 $ cd /tmp/filou-test/main
 $ main.exe --no-color check
 Checking main repository at: /tmp/filou-test/main/
@@ -461,6 +467,26 @@ $ main.exe --no-color tree --size --count
 └── tutu (3 B)
 # Test duplicates.
 $ echo plif > plif
+$ cd /tmp/filou-test/clone
+$ main.exe -v --dry-run --no-color push
+Already exists: titi
+Already exists: bla/blo/plouf
+Already exists: bla/bli/plouf
+Already exists: toto
+Already exists: tutu
+Pushed: plif (duplicate of: bla/blo/plouf)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├++ plif
+├── titi
+├── toto
+└── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
 Already exists: titi

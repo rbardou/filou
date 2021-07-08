@@ -46,9 +46,9 @@ let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
   (* Initialize the clone. *)
   write_clone_config ~clone_location { main_location }
 
-let find_local_clone () =
+let find_local_clone mode =
   let rec find current =
-    let clone_location = Device.Local current in
+    let clone_location = Device.Local (mode, current) in
     match read_clone_config ~clone_location with
       | OK config ->
           OK (Clone.setup ~main: config.main_location ~clone: clone_location)

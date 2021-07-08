@@ -25,6 +25,9 @@ struct
   type root = R.root
   type t = setup
 
+  let set_read_only () =
+    R.set_read_only ()
+
   (* TODO: we encode and hash twice, this is unnecessary. *)
   let store_now setup typ value =
     let* hash = R.store_now setup.main typ value in

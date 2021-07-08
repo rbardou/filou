@@ -13,6 +13,7 @@ open Misc
    We can still keep it and activate / deactive it using a flag or heuristics… *)
 
 type 'a hash_status =
+  | File of { size: int } (* only used for read-only mode *)
   | Stored
   | Not_stored of {
       (* Note: the encoded value is also available in the closure, this uses
@@ -34,7 +35,7 @@ let hash_type =
   let encode hash =
     if !store_not_stored_hash_when_encoding then (
       match hash.status with
-        | Stored ->
+        | File _ | Stored ->
             ()
         | Not_stored { store; _ } ->
             store ();
@@ -81,6 +82,8 @@ sig
   type t
   type root
 
+  val set_read_only: unit -> unit
+
   val store_now: t -> 'a Protype.t -> 'a ->
     ('a hash, [> `failed ]) r
 
@@ -119,6 +122,10 @@ struct
   type t = Device.location
   type root = Root.t
 
+  let read_only = ref false
+
+  let set_read_only () = read_only := true
+
   (* As encoding hashes can raise [Failed_to_store_later], we need to catch it. *)
   let encode ~trigger_hash_storing typ value =
     store_not_stored_hash_when_encoding := trigger_hash_storing;
@@ -153,14 +160,21 @@ struct
     let* already_exists = Device.file_exists location path in
     if already_exists then
       unit
+    else if !read_only then
+      (* This function is never actually called in read-only mode,
+         except if read-only mode was set *after* some calls to [store_later]. *)
+      unit
     else
       Device.write_file location path encoded_value
 
   let store_now location typ value =
     let* encoded_value = encode ~trigger_hash_storing: true typ value in
     let hash = Hash.string encoded_value in
-    let* () = store_raw_now location hash encoded_value in
-    ok { hash; status = Stored }
+    if !read_only then
+      ok { hash; status = Not_stored { value; store = fun () -> () } }
+    else
+      let* () = store_raw_now location hash encoded_value in
+      ok { hash; status = Stored }
 
   let store_later ?on_stored location typ value =
     let* encoded_value = encode ~trigger_hash_storing: false typ value in
@@ -169,7 +183,12 @@ struct
       match
         (* TODO: We need to re-encode, just to trigger hash storing. This is inefficient. *)
         let* encoded_value = encode ~trigger_hash_storing: true typ value in
-        let* () = store_raw_now location hash encoded_value in
+        let* () =
+          if !read_only then
+            unit
+          else
+            store_raw_now location hash encoded_value
+        in
         match on_stored with
           | None -> unit
           | Some on_stored -> on_stored ()
@@ -185,11 +204,13 @@ struct
     }
 
   let fetch location typ hash =
+    trace ("failed to fetch object with hash " ^ hex_of_hash hash) @@
     match hash.status with
+      | File _ ->
+          failed [ "this is a file, not an object" ]
       | Not_stored { value; _ } ->
           ok value
       | Stored ->
-          trace ("failed to fetch object with hash " ^ hex_of_hash hash) @@
           let path = file_path_of_hash hash.hash in
           match Device.read_file location path with
             | ERROR { code = `no_such_file; msg } ->
@@ -212,6 +233,8 @@ struct
           let* already_exists = Device.file_exists target hash_path in
           if already_exists then
             ok ({ hash; status = Stored }, size)
+          else if !read_only then
+            ok ({ hash; status = File { size } }, size)
           else
             match
               Device.copy_file ~on_progress: (fun bytes -> on_progress ~bytes ~size)
@@ -241,6 +264,8 @@ struct
                 (Device.show_file_path target_path)
                 (Device.show_location target);
             ]
+          else if !read_only then
+            unit
           else
             match
               Device.copy_file ~on_progress: (fun bytes -> on_progress ~bytes ~size)
@@ -252,12 +277,18 @@ struct
                   x
 
   let get_file_size location hash =
-    let hash = hash.hash in
-    trace ("failed to get file size for " ^ Hash.to_hex hash) @@
-    let hash_path = file_path_of_hash hash in
+    trace ("failed to get file size for " ^ Hash.to_hex hash.hash) @@
+    let hash_path = file_path_of_hash hash.hash in
     match Device.stat location (Device.path_of_file_path hash_path) with
       | ERROR { code = `no_such_file; msg } ->
-          error `not_available msg
+          if !read_only then
+            match hash.status with
+              | File { size } ->
+                  ok size
+              | Stored | Not_stored _ ->
+                  error `not_available msg
+          else
+            error `not_available msg
       | ERROR { code = `failed; _ } as x ->
           x
       | OK Dir ->
@@ -267,18 +298,37 @@ struct
 
   let root_path = [], Path.Filename.parse_exn "root"
 
+  let current_root = ref None
+
+  (* TODO: read-only mode *)
   let store_root location root =
     trace "failed to store root" @@
     let* encoded_root = encode ~trigger_hash_storing: true Root.typ root in
-    Device.write_file location root_path encoded_root
+    if !read_only then
+      (
+        current_root := Some root;
+        unit
+      )
+    else
+      Device.write_file location root_path encoded_root
 
   let fetch_root location =
-    trace "failed to fetch root" @@
-    match Device.read_file location root_path with
+    let actually_fetch_root () =
+      trace "failed to fetch root" @@
+      match Device.read_file location root_path with
       | ERROR { code = (`no_such_file | `failed); msg } ->
           failed msg
       | OK encoded_root ->
           decode_robin_string Root.typ encoded_root
+    in
+    if !read_only then
+      match !current_root with
+        | None ->
+            actually_fetch_root ()
+        | Some root ->
+            ok root
+    else
+      actually_fetch_root ()
 
   let garbage_collect location ~everything_except =
     match
@@ -318,6 +368,8 @@ struct
                     unit
                 | Some hash ->
                     if Raw_hash_set.mem_raw hash everything_except then
+                      unit
+                    else if !read_only then
                       unit
                     else
                       Device.remove_file location file_path

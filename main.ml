@@ -13,13 +13,12 @@ let () =
       ~set_short: 'v'
       false
   in
-  (* TODO *)
-  (*   let dry_run = *)
-  (*     Clap.flag *)
-  (*       ~description: "Read-only mode: do not actually push or download files, only pretend." *)
-  (*       ~set_long: "dry-run" *)
-  (*       false *)
-  (*   in *)
+  let dry_run =
+    Clap.flag
+      ~description: "Read-only mode: do not write anything, only pretend."
+      ~set_long: "dry-run"
+      false
+  in
   let color =
     Clap.flag
       ~description: "Use ANSI escape codes to colorize logs."
@@ -207,17 +206,27 @@ let () =
     ]
   in
   Clap.close ();
+  (* Belt and suspenders:
+     - set device to RO even though [Repository] will not even try to write;
+     - set both [Bare] and [Repository] to RO even though [Repository] calls [Bare]. *)
+  if dry_run then (
+    State.Bare.set_read_only ();
+    State.Repository.set_read_only ();
+  );
+  let device_mode = if dry_run then Device.RO else RW in
+  let parse_location = Device.parse_location device_mode in
+  let find_local_clone () = Controller.find_local_clone device_mode in
   match
     match command with
       | `init location ->
-          let* location = Device.parse_location location in
+          let* location = parse_location location in
           Controller.init location
       | `clone (main_location, clone_location) ->
-          let* main_location = Device.parse_location main_location in
-          let* clone_location = Device.parse_location clone_location in
+          let* main_location = parse_location main_location in
+          let* clone_location = parse_location clone_location in
           Controller.clone ~main_location ~clone_location
       | `push paths ->
-          let* setup = Controller.find_local_clone () in
+          let* setup = find_local_clone () in
           let paths =
             match paths with
               | [] -> [ "." ]
@@ -227,7 +236,7 @@ let () =
           (* TODO: output stuff *)
           Controller.push ~verbose setup paths
       | `pull _paths ->
-          (*           let* (location, _) as clone = Controller.find_local_clone () in *)
+          (*           let* (location, _) as clone = find_local_clone () in *)
           (*           let paths = *)
           (*             match paths with *)
           (*               | [] -> [ "." ] *)
@@ -237,23 +246,23 @@ let () =
           (*           Controller.pull ~verbose ~dry_run ~clone paths *)
           assert false (* TODO *)
       | `ls _path ->
-          (*           let* (location, _) as clone = Controller.find_local_clone () in *)
+          (*           let* (location, _) as clone = find_local_clone () in *)
           (*           let* path = Device.parse_path location path in *)
           (*           Controller.list ~color ~clone path *)
           assert false (* TODO *)
       | `rm _paths ->
-          (*           let* (location, _) as clone = Controller.find_local_clone () in *)
+          (*           let* (location, _) as clone = find_local_clone () in *)
           (*           let* paths = list_map_e paths (Device.parse_file_path location) in *)
           (*           Controller.remove ~verbose ~dry_run ~clone paths *)
           assert false (* TODO *)
       | `check location ->
-          let* location = Device.parse_location location in
+          let* location = parse_location location in
           Controller.check location
       | `tree (
           path, max_depth, only_main, only_dirs, print_size, print_file_count,
           print_duplicates
         ) ->
-          let* setup = Controller.find_local_clone () in
+          let* setup = find_local_clone () in
           let* path = Device.parse_path (Clone.clone setup) path in
           Controller.tree ~color ~max_depth ~only_main ~only_dirs ~print_size
             ~print_file_count ~print_duplicates setup path

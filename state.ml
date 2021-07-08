@@ -144,7 +144,8 @@ struct
       ~encode: Device.show_location
       ~decode: (
         fun s ->
-          match Device.parse_location s with
+          (* TODO: do we want to be able to configure main repositories in read-only? *)
+          match Device.parse_location RW s with
             | ERROR _ -> None
             | OK x -> Some x
       )
