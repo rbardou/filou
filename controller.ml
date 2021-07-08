@@ -488,10 +488,10 @@ let tree ~color ~max_depth ~only_main ~only_dirs
   in
   tree_dir "" 0 (List.rev dir_path) dir
 
+(* TODO: say stuff *)
 let push_file (setup: Clone.setup) root (((dir_path, filename) as path): Device.file_path) =
   trace ("failed to push file: " ^ Device.show_file_path path) @@
   let* root_dir = fetch_or_fail setup T.dir root.root_dir in
-  let* hash_index = fetch_or_fail setup T.hash_index root.hash_index in
   let rec update_dir dir_path_rev (dir: dir) = function
     | head :: tail ->
         let* head_dir, head_dir_total_size, head_dir_total_file_count =
@@ -507,26 +507,32 @@ let push_file (setup: Clone.setup) root (((dir_path, filename) as path): Device.
                 let* dir = fetch_or_fail setup T.dir head_dir_hash in
                 ok (dir, total_size, total_file_count)
         in
-        let* new_head_dir_hash, added_file_hash, size_diff, file_count_diff =
+        let* update_result =
           update_dir (head :: dir_path_rev) head_dir tail
         in
-        let head_dir_entry =
-          Dir {
-            hash = new_head_dir_hash;
-            total_size = head_dir_total_size + size_diff;
-            total_file_count = head_dir_total_file_count + file_count_diff;
-          }
-        in
-        let new_dir = Filename_map.add head head_dir_entry dir in
-        let* new_dir_hash = store_later setup T.dir new_dir in
-        ok (new_dir_hash, added_file_hash, size_diff, file_count_diff)
+        (
+          match update_result with
+            | None ->
+                ok None
+            | Some (new_head_dir_hash, added_file_hash, size_diff, file_count_diff) ->
+                let head_dir_entry =
+                  Dir {
+                    hash = new_head_dir_hash;
+                    total_size = head_dir_total_size + size_diff;
+                    total_file_count = head_dir_total_file_count + file_count_diff;
+                  }
+                in
+                let new_dir = Filename_map.add head head_dir_entry dir in
+                let* new_dir_hash = store_later setup T.dir new_dir in
+                ok (Some (new_dir_hash, added_file_hash, size_diff, file_count_diff))
+        )
     | [] ->
         match Filename_map.find_opt filename dir with
           | Some (Dir _) ->
               failed [ "file already exists as a directory" ]
           | Some (File _) ->
               (* TODO: check if hashes are the same *)
-              failed [ "file already exists" ]
+              ok None
           | None ->
               let* file_hash, file_size =
                 with_progress @@ fun () ->
@@ -546,46 +552,51 @@ let push_file (setup: Clone.setup) root (((dir_path, filename) as path): Device.
               in
               let new_dir = Filename_map.add filename dir_entry dir in
               let* new_dir_hash = store_later setup T.dir new_dir in
-              ok (new_dir_hash, file_hash, file_size, 1)
+              ok (Some (new_dir_hash, file_hash, file_size, 1))
   in
-  let* new_root_dir_hash, added_file_hash, _, _ = update_dir [] root_dir dir_path in
-  let* new_hash_index_hash =
-    let added_file_hash_bin = Repository.bin_of_hash added_file_hash in
-    let char0 = added_file_hash_bin.[0] in
-    let char1 = added_file_hash_bin.[1] in
-    let* hash_index_1 =
-      match Map.Char.find_opt char0 hash_index with
-        | None ->
-            ok Map.Char.empty
-        | Some hash_index_1_hash ->
-            fetch_or_fail setup T.hash_index_1 hash_index_1_hash
-    in
-    let* hash_index_2 =
-      match Map.Char.find_opt char1 hash_index_1 with
-        | None ->
-            ok File_hash_map.empty
-        | Some hash_index_2_hash ->
-            fetch_or_fail setup T.hash_index_2 hash_index_2_hash
-    in
-    let new_hash_index_2 =
-      let new_paths =
-        File_path_set.add path (
-          File_hash_map.find_opt added_file_hash hash_index_2
-          |> default File_path_set.empty
-        )
-      in
-      File_hash_map.add added_file_hash new_paths hash_index_2
-    in
-    let* new_hash_index_2_hash = store_later setup T.hash_index_2 new_hash_index_2 in
-    let new_hash_index_1 = Map.Char.add char1 new_hash_index_2_hash hash_index_1 in
-    let* new_hash_index_1_hash = store_later setup T.hash_index_1 new_hash_index_1 in
-    let new_hash_index = Map.Char.add char0 new_hash_index_1_hash hash_index in
-    store_later setup T.hash_index new_hash_index
-  in
-  ok {
-    root_dir = new_root_dir_hash;
-    hash_index = new_hash_index_hash;
-  }
+  let* update_result = update_dir [] root_dir dir_path in
+  match update_result with
+    | None ->
+        ok root
+    | Some (new_root_dir_hash, added_file_hash, _, _) ->
+        let* new_hash_index_hash =
+          let added_file_hash_bin = Repository.bin_of_hash added_file_hash in
+          let char0 = added_file_hash_bin.[0] in
+          let char1 = added_file_hash_bin.[1] in
+          let* hash_index = fetch_or_fail setup T.hash_index root.hash_index in
+          let* hash_index_1 =
+            match Map.Char.find_opt char0 hash_index with
+              | None ->
+                  ok Map.Char.empty
+              | Some hash_index_1_hash ->
+                  fetch_or_fail setup T.hash_index_1 hash_index_1_hash
+          in
+          let* hash_index_2 =
+            match Map.Char.find_opt char1 hash_index_1 with
+              | None ->
+                  ok File_hash_map.empty
+              | Some hash_index_2_hash ->
+                  fetch_or_fail setup T.hash_index_2 hash_index_2_hash
+          in
+          let new_hash_index_2 =
+            let new_paths =
+              File_path_set.add path (
+                File_hash_map.find_opt added_file_hash hash_index_2
+                |> default File_path_set.empty
+              )
+            in
+            File_hash_map.add added_file_hash new_paths hash_index_2
+          in
+          let* new_hash_index_2_hash = store_later setup T.hash_index_2 new_hash_index_2 in
+          let new_hash_index_1 = Map.Char.add char1 new_hash_index_2_hash hash_index_1 in
+          let* new_hash_index_1_hash = store_later setup T.hash_index_1 new_hash_index_1 in
+          let new_hash_index = Map.Char.add char0 new_hash_index_1_hash hash_index in
+          store_later setup T.hash_index new_hash_index
+        in
+        ok {
+          root_dir = new_root_dir_hash;
+          hash_index = new_hash_index_hash;
+        }
 
 let push setup (paths: Device.path list) =
   let* root = Repository.fetch_root setup in

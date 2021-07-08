@@ -147,10 +147,6 @@ $ explore .filou/d4/08/d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b
 # Add the file again.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color push
-Error:
-  failed to push file: toto:
-  file already exists
-Exit code: 1
 $ cd /tmp/filou-test/main
 $ tree -a -s -F
 .
