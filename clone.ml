@@ -87,6 +87,6 @@ struct
     )
 
   let garbage_collect setup =
-    let* () = R.garbage_collect setup.clone_dot_filou in
+    (* TODO: also GC the clone *)
     R.garbage_collect setup.main
 end

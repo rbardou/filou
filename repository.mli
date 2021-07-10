@@ -102,8 +102,11 @@ sig
   val fetch_root: t ->
     (root, [> `failed ]) r
 
-  (** Remove unreachable objects. *)
-  val garbage_collect: t -> (unit, [> `failed ]) r
+  (** Remove unreachable objects.
+
+      Return [(count, size)] where [count] is the number of objects that were
+      removed and [size] is the sum of the size of those objects. *)
+  val garbage_collect: t -> (int * int, [> `failed ]) r
 end
 
 module Make (Root: ROOT): S with type root = Root.t and type t = Device.location

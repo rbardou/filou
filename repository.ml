@@ -32,13 +32,17 @@ type 'a hash =
   | File_hash: Hash.t -> file hash
   | File_hash_with_size: Hash.t * int -> file hash (* for read-only mode *)
 
+type packed_hash = H: 'a hash -> packed_hash
+
 let store_not_stored_hash_when_encoding = ref false
 
-type _ Protype.annotation += Hash: Hash.t Protype.annotation
+type _ Protype.annotation +=
+  | Hash: 'a Protype.t -> 'a hash Protype.annotation
+  | File_hash: file hash Protype.annotation
 
 let raw_hash_type =
   let open Protype in
-  annotate Hash (convert_partial string ~encode: Hash.to_bin ~decode: Hash.of_bin)
+  convert_partial string ~encode: Hash.to_bin ~decode: Hash.of_bin
 
 let hash_type (type a) (typ: a Protype.t) =
   let open Protype in
@@ -67,7 +71,7 @@ let hash_type (type a) (typ: a Protype.t) =
     )
   in
   (* Cannot use [convert_partial] because of the value restriction, but this is equivalent. *)
-  Convert { typ = raw_hash_type; encode; decode }
+  Annotate (Hash typ, Convert { typ = raw_hash_type; encode; decode })
 
 let hash_of_hash (type a) (hash: a hash) =
   match hash with
@@ -80,15 +84,11 @@ let bin_of_hash hash = Hash.to_bin (hash_of_hash hash)
 let compare_hashes a b = Hash.compare (hash_of_hash a) (hash_of_hash b)
 
 let file_hash_type =
-  Protype.convert raw_hash_type ~encode: hash_of_hash ~decode: (fun h -> File_hash h)
+  let open Protype in
+  annotate File_hash @@
+  convert raw_hash_type ~encode: hash_of_hash ~decode: (fun h -> File_hash h)
 
-(* module Raw_hash_set = *)
-(* struct *)
-(*   include Set.Make (Hash) *)
-(*   let add hash set = add (hash_of_hash hash) set *)
-(*   let mem_raw = mem *)
-(*   let mem { hash; _ } set = mem_raw hash set *)
-(* end *)
+module Hash_set = Set.Make (Hash)
 
 module type ROOT =
 sig
@@ -131,7 +131,7 @@ sig
   val fetch_root: t ->
     (root, [> `failed ]) r
 
-  val garbage_collect: t -> (unit, [> `failed ]) r
+  val garbage_collect: t -> (int * int, [> `failed ]) r
 end
 
 exception Failed_to_store_later of string list
@@ -353,71 +353,97 @@ struct
     else
       actually_fetch_root ()
 
-(*   let direct_value_dependencies typ value = *)
-(*     let equal: 'a. 'a -> 'a Protype.annotation -> Hash.t option = *)
-(*       fun (type a) (x: a) (annotation: a Protype.annotation): Hash.t option -> *)
-(*         match annotation with *)
-(*           | Hash -> Some x *)
-(*           | _ -> None *)
-(*     in *)
-(*     Protype.find_all { equal } typ value *)
+  let direct_value_dependencies typ value =
+    let equal: 'a. 'a -> 'a Protype.annotation -> packed_hash option =
+      fun (type a) (x: a) (annotation: a Protype.annotation): packed_hash option ->
+        match annotation with
+          | Hash _ -> Some (H x)
+          | File_hash -> Some (H x)
+          | _ -> None
+    in
+    Protype.find_all { equal } typ value
 
-(*   let direct_hash_dependencies location hash = *)
-(*     match hash with *)
-(*       | Value_hash { typ; _ } *)
-(*     fetch location hash *)
+  let direct_hash_dependencies (type a) location (hash: a hash) =
+    match hash with
+      | File_hash _ | File_hash_with_size _ ->
+          ok []
+      | Value_hash { typ; _ } ->
+          match fetch location hash with
+            | ERROR { code = (`failed | `not_available); msg } ->
+                failed msg
+            | OK value ->
+                ok (direct_value_dependencies typ value)
 
-  let garbage_collect _location =
-    assert false
-(*     let* root = fetch_root location in *)
-(*     let* reachable = assert false (\* TODO *\) in *)
-(*     match *)
-(*       let rec garbage_collect_dir dir_path = *)
-(*         Device.iter_read_dir location dir_path @@ fun filename -> *)
-(*         let filename_string = Path.Filename.show filename in *)
-(*         let sub_path = dir_path @ [ filename ] in *)
-(*         match Device.stat location sub_path with *)
-(*           | ERROR { code = `no_such_file; _ } -> *)
-(*               unit *)
-(*           | ERROR { code = `failed; _ } as x -> *)
-(*               x *)
-(*           | OK Dir -> *)
-(*               if String.length filename_string <> hash_part_length then *)
-(*                 unit *)
-(*               else *)
-(*                 let is_hex = *)
-(*                   let rec loop i = *)
-(*                     if i >= hash_part_length then *)
-(*                       true *)
-(*                     else *)
-(*                       match filename_string.[i] with *)
-(*                         | '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' -> *)
-(*                             loop (i + 1) *)
-(*                         | _ -> *)
-(*                             false *)
-(*                   in *)
-(*                   loop 0 *)
-(*                 in *)
-(*                 if is_hex then *)
-(*                   garbage_collect_dir sub_path *)
-(*                 else *)
-(*                   unit *)
-(*           | OK (File { path = file_path; _ }) -> *)
-(*               match Hash.of_hex filename_string with *)
-(*                 | None -> *)
-(*                     unit *)
-(*                 | Some hash -> *)
-(*                     if Raw_hash_set.mem_raw hash reachable then *)
-(*                       unit *)
-(*                     else if !read_only then *)
-(*                       unit *)
-(*                     else *)
-(*                       Device.remove_file location file_path *)
-(*       in *)
-(*       garbage_collect_dir [] *)
-(*     with *)
-(*       | ERROR { code = `no_such_file; _ } -> *)
-(*           unit *)
-(*       | ERROR { code = `failed; _ } | OK () as x -> *)
-(*           x *)
+  let rec reachable_hashes_from_hash: 'a. _ -> _ -> 'a hash -> _ =
+    fun (type a) acc location (hash: a hash) ->
+    let h = hash_of_hash hash in
+    if Hash_set.mem h acc then
+      ok acc
+    else
+      let acc = Hash_set.add h acc in
+      let* direct_deps = direct_hash_dependencies location hash in
+      list_fold_e acc direct_deps @@ fun acc (H dep_hash) ->
+      reachable_hashes_from_hash acc location dep_hash
+
+  let reachable_hashes_from_root location =
+    let* root = fetch_root location in
+    let direct_deps = direct_value_dependencies Root.typ root in
+    list_fold_e Hash_set.empty direct_deps @@ fun acc (H dep_hash) ->
+    reachable_hashes_from_hash acc location dep_hash
+
+  let garbage_collect location =
+    let removed_object_count = ref 0 in
+    let removed_object_total_size = ref 0 in
+    let* reachable = reachable_hashes_from_root location in
+    match
+      let rec garbage_collect_dir dir_path =
+        Device.iter_read_dir location dir_path @@ fun filename ->
+        let filename_string = Path.Filename.show filename in
+        let sub_path = dir_path @ [ filename ] in
+        match Device.stat location sub_path with
+          | ERROR { code = `no_such_file; _ } ->
+              unit
+          | ERROR { code = `failed; _ } as x ->
+              x
+          | OK Dir ->
+              if String.length filename_string <> hash_part_length then
+                unit
+              else
+                let is_hex =
+                  let rec loop i =
+                    if i >= hash_part_length then
+                      true
+                    else
+                      match filename_string.[i] with
+                        | '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' ->
+                            loop (i + 1)
+                        | _ ->
+                            false
+                  in
+                  loop 0
+                in
+                if is_hex then
+                  garbage_collect_dir sub_path
+                else
+                  unit
+          | OK (File { path = file_path; size }) ->
+              match Hash.of_hex filename_string with
+                | None ->
+                    unit
+                | Some hash ->
+                    if Hash_set.mem hash reachable || !read_only then
+                      unit
+                    else
+                      let* () = Device.remove_file location file_path in
+                      incr removed_object_count;
+                      removed_object_total_size := !removed_object_total_size + size;
+                      unit
+      in
+      let* () = garbage_collect_dir [] in
+      ok (!removed_object_count, !removed_object_total_size)
+    with
+      | ERROR { code = (`no_such_file | `failed); msg } ->
+          failed msg
+      | OK _ as x ->
+          x
 end

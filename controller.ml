@@ -142,6 +142,8 @@ let rec check_dir ~all_files_must_be_available expected_hash_index
   ok (!path_size, !path_file_count)
 
 (* TODO: check whether we kept empty Dir nodes (same in hash index). *)
+(* TODO: check hashes of all files (if --hash?) *)
+(* TODO: also check the cloned repository (but here we only need to check hashes) *)
 let check (location: Device.location) =
   let* location =
     match read_clone_config ~clone_location: location with
@@ -219,6 +221,29 @@ type merged_dir_entry =
   | MDE_main of State.dir_entry
   | MDE_clone of Device.stat
   | MDE_both of State.dir_entry * Device.stat
+
+let show_size size =
+  (* By using string_of_int instead of divisions and modulos we
+     are more compatible with 32bit architectures. *)
+  let str = string_of_int size in
+  let len = String.length str in
+  if len <= 3 then
+    Printf.sprintf "%s B" str
+  else
+    let with_unit unit =
+      let f =
+        match String.length str mod 3 with
+          | 1 -> Printf.sprintf "%c.%c%c %s"
+          | 2 -> Printf.sprintf "%c%c.%c %s"
+          | _ -> Printf.sprintf "%c%c%c %s"
+      in
+      f str.[0] str.[1] str.[2] unit
+    in
+    if len <= 6 then with_unit "kB" else
+    if len <= 9 then with_unit "MB" else
+    if len <= 12 then with_unit "GB" else
+    if len <= 14 then with_unit "TB" else
+      Printf.sprintf "%d TB" (size / 1_000_000_000_000)
 
 let tree ~color ~max_depth ~only_main ~only_dirs
     ~print_size ~print_file_count ~print_duplicates
@@ -371,27 +396,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
         in
         let print_size size =
           if print_size then
-            (* By using string_of_int instead of divisions and modulos we
-               are more compatible with 32bit architectures. *)
-            let str = string_of_int size in
-            let len = String.length str in
-            if len <= 3 then
-              Printf.printf " (%s B)" str
-            else
-              let with_unit unit =
-                let f =
-                  match String.length str mod 3 with
-                    | 1 -> Printf.printf " (%c.%c%c %s)"
-                    | 2 -> Printf.printf " (%c%c.%c %s)"
-                    | _ -> Printf.printf " (%c%c%c %s)"
-                in
-                f str.[0] str.[1] str.[2] unit
-              in
-              if len <= 6 then with_unit "kB" else
-              if len <= 9 then with_unit "MB" else
-              if len <= 12 then with_unit "GB" else
-              if len <= 14 then with_unit "TB" else
-                Printf.printf " (%d TB)" (size / 1_000_000_000_000)
+            Printf.printf " (%s)" (show_size size)
         in
         let print_file_count count =
           if print_file_count then
@@ -907,3 +912,8 @@ let remove ~recursive setup (paths: Device.path list) =
                 )
         in
         Repository.store_root setup root
+
+let prune setup =
+  let* (count, size) = State.Repository.garbage_collect setup in
+  echo "Removed %d objects totalling %s." count (show_size size);
+  unit

@@ -181,12 +181,7 @@ let () =
       );
       (
         Clap.case
-          ~description:
-            "Remove files from the main repository. Files are not \
-             removed from the clone repository if they have been \
-             pulled. If other files exist with the same content, only \
-             the specified paths are removed. The content is only \
-             removed if no path lead to it."
+          ~description: "Remove files." (* TODO: explain that they stay in the clone, and in the inventory until prune *)
           "rm"
         @@ fun () ->
         let recursive =
@@ -216,6 +211,13 @@ let () =
             "."
         in
         `check location
+      );
+      (
+        Clap.case
+          ~description: "Delete unreachable objects. This can take a while." (* TODO: explain what this means *)
+          "prune"
+        @@ fun () ->
+        `prune
       );
     ]
   in
@@ -273,7 +275,8 @@ let () =
           let* location = parse_location location in
           Controller.check location
       | `prune ->
-          assert false (* TODO *)
+          let* setup = find_local_clone () in
+          Controller.prune setup
       | `log ->
           assert false (* TODO *)
       | `undo ->

@@ -880,3 +880,25 @@ $ main.exe --no-color pull
 Pulled: bla/bli/plouf
 $ cat bla/bli/plouf
 plaf%
+# Check what prune removes.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color prune
+Removed 25 objects totalling 3.45 kB.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking main repository at: /tmp/filou-test/main/
+Directory structure looks ok (total size: 30, file count: 6).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu

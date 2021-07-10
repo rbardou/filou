@@ -149,17 +149,20 @@ struct
       @ flag count "--count"
       @ flag duplicates "--duplicates"
     )
+
+  let prune ?v ?dry_run ?color () =
+    run ?v ?dry_run ?color [ "prune" ]
 end
 
 module Main = Make_filou (struct let path = Some main end)
 module Clone = Make_filou (struct let path = Some clone end)
 module Filou = Make_filou (struct let path = None end)
 
-(* let tree () = cmd "tree" [ "-a"; "-s"; "-F" ] *)
+let tree () = cmd "tree" [ "-a"; "-s"; "-F" ]
 
-(* let main_tree () = *)
-(*   cd main; *)
-(*   tree () *)
+let main_tree () =
+  cd main;
+  tree ()
 
 (* let clone_tree () = *)
 (*   cd clone; *)
@@ -176,20 +179,20 @@ let explore path =
   let contents = read_file path in
   Format.printf "%a@." Protype_robin.Explore.pp_string contents
 
-(* let explore_main path = *)
-(*   cd main; *)
-(*   explore path *)
+let explore_main path =
+  cd main;
+  explore path
 
 let explore_clone path =
   cd clone;
   explore (".filou" // path)
 
-(* let explore_hash hash = *)
-(*   explore (String.sub hash 0 2 // String.sub hash 2 2 // hash) *)
+let explore_hash hash =
+  explore (String.sub hash 0 2 // String.sub hash 2 2 // hash)
 
-(* let explore_main_hash hash = *)
-(*   cd main; *)
-(*   explore_hash hash *)
+let explore_main_hash hash =
+  cd main;
+  explore_hash hash
 
 (* let explore_clone_hash hash = *)
 (*   cd clone; *)
@@ -396,5 +399,10 @@ let () =
   rm "bla/bli";
   Clone.pull [];
   cat "bla/bli/plouf";
+
+  comment "Check what prune removes.";
+  Clone.prune ();
+  Clone.check ();
+  Clone.tree ();
 
   ()
