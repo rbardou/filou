@@ -4,12 +4,9 @@ $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
 $ cd /tmp/filou-test/main
 $ tree -a -s -F
 .
-├── [       4096]  30/
-│   └── [       4096]  b6/
-│       └── [          9]  30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7
-└── [        107]  root
+└── [         21]  root
 
-2 directories, 2 files
+0 directories, 1 file
 $ cd /tmp/filou-test/clone
 $ tree -a -s -F
 .
@@ -19,13 +16,7 @@ $ tree -a -s -F
 1 directory, 1 file
 $ cd /tmp/filou-test/main
 $ explore root
-{
-  root_dir = 30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7;
-  hash_index = 30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7;
-}
-$ cd /tmp/filou-test/main
-$ explore 30/b6/30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7
-[]
+14 (Empty)
 $ cd /tmp/filou-test/clone
 $ explore .filou/config
 { main = "/tmp/filou-test/main/" }
@@ -38,9 +29,6 @@ Pushed: toto
 $ cd /tmp/filou-test/main
 $ tree -a -s -F
 .
-├── [       4096]  30/
-│   └── [       4096]  b6/
-│       └── [          9]  30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7
 ├── [       4096]  43/
 │   └── [       4096]  62/
 │       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
@@ -56,9 +44,9 @@ $ tree -a -s -F
 ├── [       4096]  d4/
 │   └── [       4096]  08/
 │       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-└── [        107]  root
+└── [        122]  root
 
-12 directories, 7 files
+10 directories, 6 files
 $ cd /tmp/filou-test/clone
 $ tree -a -s -F
 .
@@ -76,35 +64,35 @@ $ tree -a -s -F
 │   ├── [       4096]  d4/
 │   │   └── [       4096]  08/
 │   │       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-│   └── [        107]  root
+│   └── [        122]  root
 └── [          9]  toto
 
 9 directories, 7 files
 $ cd /tmp/filou-test/main
 $ explore root
-{
-  root_dir = 43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af;
-  hash_index = 6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3;
-}
+{ Non_empty = {
+    root_dir = 43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af;
+    hash_index = 6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3;
+  } }
 $ cd /tmp/filou-test/clone
 $ explore .filou/root
-{
-  root_dir = 43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af;
-  hash_index = 6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3;
-}
+{ Non_empty = {
+    root_dir = 43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af;
+    hash_index = 6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3;
+  } }
 $ cd /tmp/filou-test/main
 $ explore 43/62/43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
 [ { File = {
       name = "toto";
       hash = 492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d;
-      size = 9;
+      size = 9 (File);
     } } ]
 $ cd /tmp/filou-test/clone
 $ explore .filou/43/62/43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
 [ { File = {
       name = "toto";
       hash = 492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d;
-      size = 9;
+      size = 9 (File);
     } } ]
 $ cd /tmp/filou-test/main
 $ cat 49/2f/492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d
@@ -151,9 +139,6 @@ $ main.exe --no-color push
 $ cd /tmp/filou-test/main
 $ tree -a -s -F
 .
-├── [       4096]  30/
-│   └── [       4096]  b6/
-│       └── [          9]  30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7
 ├── [       4096]  43/
 │   └── [       4096]  62/
 │       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
@@ -169,9 +154,9 @@ $ tree -a -s -F
 ├── [       4096]  d4/
 │   └── [       4096]  08/
 │       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-└── [        107]  root
+└── [        122]  root
 
-12 directories, 7 files
+10 directories, 6 files
 $ cd /tmp/filou-test/clone
 $ tree -a -s -F
 .
@@ -189,7 +174,7 @@ $ tree -a -s -F
 │   ├── [       4096]  d4/
 │   │   └── [       4096]  08/
 │   │       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-│   └── [        107]  root
+│   └── [        122]  root
 └── [          9]  toto
 
 9 directories, 7 files
@@ -210,9 +195,6 @@ $ tree -a -s -F
 ├── [       4096]  11/
 │   └── [       4096]  0b/
 │       └── [         75]  110b9d9fca0b77c70ce1541e0c879a922d4dec77c377f37aacfd20787a4acf9b
-├── [       4096]  30/
-│   └── [       4096]  b6/
-│       └── [          9]  30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7
 ├── [       4096]  31/
 │   └── [       4096]  50/
 │       └── [         66]  3150d1f7c68723180ccc7b65f18c5e2f7a685a0a22e67af9ac831d37419ef024
@@ -246,9 +228,9 @@ $ tree -a -s -F
 ├── [       4096]  f4/
 │   └── [       4096]  c4/
 │       └── [          3]  f4c4849bc6706c939b0ed38a3ba4809f2259df732e0ed3235636329c6cf3792e
-└── [        107]  root
+└── [        122]  root
 
-28 directories, 15 files
+26 directories, 14 files
 $ cd /tmp/filou-test/clone
 $ tree -a -s -F
 .
@@ -284,7 +266,7 @@ $ tree -a -s -F
 │   ├── [       4096]  ee/
 │   │   └── [       4096]  e9/
 │   │       └── [         66]  eee9c3eb3dac45cf2b811d773adec1ea9daf4d92759260200a359587f97792d6
-│   └── [        107]  root
+│   └── [        122]  root
 ├── [          6]  titi
 ├── [          9]  toto
 └── [          3]  tutu

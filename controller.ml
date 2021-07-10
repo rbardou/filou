@@ -24,12 +24,7 @@ let on_copy_progress prefix ~bytes ~size =
   Progress_bar.set "%s (%d / %d) (%d%%)" prefix bytes size (bytes * 100 / size)
 
 let init (location: Device.location) =
-  let* root_dir_hash = Bare.store_now location T.dir Filename_map.empty in
-  let* hash_index_hash = Bare.store_now location T.hash_index Map.Char.empty in
-  Bare.store_root location {
-    root_dir = root_dir_hash;
-    hash_index = hash_index_hash;
-  }
+  Bare.store_root location Empty
 
 let write_clone_config ~clone_location config =
   Device.write_file clone_location dot_filou_config
@@ -60,6 +55,20 @@ let find_local_clone mode =
   find (Path.get_cwd ())
 
 let store_later = Repository.store_later
+
+let fetch_root_dir setup (root: root) =
+  match root with
+    | Empty ->
+        ok Filename_map.empty
+    | Non_empty root ->
+        fetch_or_fail setup T.dir root.root_dir
+
+let fetch_hash_index setup (root: root) =
+  match root with
+    | Empty ->
+        ok Map.Char.empty
+    | Non_empty root ->
+        fetch_or_fail setup T.hash_index root.hash_index
 
 (* Recursively check sizes, file counts,
    and whether reachable files are available. *)
@@ -153,61 +162,66 @@ let check (location: Device.location) =
       Device.sublocation location dot_filou
   in
   let* root = Bare.fetch_root location in
-  let expected_hash_index = ref File_hash_map.empty in
-  let* size, count =
-    check_dir ~all_files_must_be_available: is_main expected_hash_index
-      location [] root.root_dir
-  in
-  let expected_hash_index = !expected_hash_index in
-  echo "Directory structure looks ok (total size: %d, file count: %d)." size count;
-  if is_main then echo "All files are available.";
-  let actual_hash_index = ref File_hash_map.empty in
-  let* () =
-    let* hash_index = Bare.fetch location T.hash_index root.hash_index in
-    list_iter_e (Map.Char.bindings hash_index) @@ fun (_, hash_index_1_hash) ->
-    let* hash_index_1 = Bare.fetch location T.hash_index_1 hash_index_1_hash in
-    list_iter_e (Map.Char.bindings hash_index_1) @@ fun (_, hash_index_2_hash) ->
-    let* hash_index_2 = Bare.fetch location T.hash_index_2 hash_index_2_hash in
-    list_iter_e (File_hash_map.bindings hash_index_2) @@ fun (hash, paths) ->
-    actual_hash_index := File_hash_map.add hash paths !actual_hash_index;
-    unit
-  in
-  let actual_hash_index = !actual_hash_index in
-  let* () =
-    let exception Inconsistent of string in
-    let inconsistent x = Printf.ksprintf (fun s -> raise (Inconsistent s)) x in
-    try
-      let _ =
-        File_hash_map.merge' expected_hash_index actual_hash_index @@
-        fun hash expected actual ->
-        let expected = expected |> default File_path_set.empty in
-        let actual = actual |> default File_path_set.empty in
-        let missing = File_path_set.diff expected actual in
-        let unexpected = File_path_set.diff actual expected in
-        if not (File_path_set.is_empty missing) then
-          inconsistent "missing path(s) %s for %s"
-            (String.concat ", "
-               (List.map Device.show_file_path
-                  (File_path_set.elements missing)))
-            (Repository.hex_of_hash hash)
-        else if not (File_path_set.is_empty unexpected) then
-          inconsistent "unexpected path(s) %s for %s"
-            (String.concat ", "
-               (List.map Device.show_file_path
-                  (File_path_set.elements unexpected)))
-            (Repository.hex_of_hash hash)
-        else
-          None
-      in
-      unit
-    with Inconsistent msg ->
-      failed [
-        "hash index is inconsistent";
-        msg;
-      ]
-  in
-  echo "Hash index is consistent with the directory structure.";
-  unit
+  match root with
+    | Empty ->
+        echo "Repository is empty.";
+        unit
+    | Non_empty root ->
+        let expected_hash_index = ref File_hash_map.empty in
+        let* size, count =
+          check_dir ~all_files_must_be_available: is_main expected_hash_index
+            location [] root.root_dir
+        in
+        let expected_hash_index = !expected_hash_index in
+        echo "Directory structure looks ok (total size: %d, file count: %d)." size count;
+        if is_main then echo "All files are available.";
+        let actual_hash_index = ref File_hash_map.empty in
+        let* () =
+          let* hash_index = Bare.fetch location T.hash_index root.hash_index in
+          list_iter_e (Map.Char.bindings hash_index) @@ fun (_, hash_index_1_hash) ->
+          let* hash_index_1 = Bare.fetch location T.hash_index_1 hash_index_1_hash in
+          list_iter_e (Map.Char.bindings hash_index_1) @@ fun (_, hash_index_2_hash) ->
+          let* hash_index_2 = Bare.fetch location T.hash_index_2 hash_index_2_hash in
+          list_iter_e (File_hash_map.bindings hash_index_2) @@ fun (hash, paths) ->
+          actual_hash_index := File_hash_map.add hash paths !actual_hash_index;
+          unit
+        in
+        let actual_hash_index = !actual_hash_index in
+        let* () =
+          let exception Inconsistent of string in
+          let inconsistent x = Printf.ksprintf (fun s -> raise (Inconsistent s)) x in
+          try
+            let _ =
+              File_hash_map.merge' expected_hash_index actual_hash_index @@
+              fun hash expected actual ->
+              let expected = expected |> default File_path_set.empty in
+              let actual = actual |> default File_path_set.empty in
+              let missing = File_path_set.diff expected actual in
+              let unexpected = File_path_set.diff actual expected in
+              if not (File_path_set.is_empty missing) then
+                inconsistent "missing path(s) %s for %s"
+                  (String.concat ", "
+                     (List.map Device.show_file_path
+                        (File_path_set.elements missing)))
+                  (Repository.hex_of_hash hash)
+              else if not (File_path_set.is_empty unexpected) then
+                inconsistent "unexpected path(s) %s for %s"
+                  (String.concat ", "
+                     (List.map Device.show_file_path
+                        (File_path_set.elements unexpected)))
+                  (Repository.hex_of_hash hash)
+              else
+                None
+            in
+            unit
+          with Inconsistent msg ->
+            failed [
+              "hash index is inconsistent";
+              msg;
+            ]
+        in
+        echo "Hash index is consistent with the directory structure.";
+        unit
 
 type merged_dir_entry =
   | MDE_main of State.dir_entry
@@ -218,22 +232,26 @@ let tree ~color ~max_depth ~only_main ~only_dirs
     ~print_size ~print_file_count ~print_duplicates
     (setup: Clone.setup) (dir_path: Device.path) =
   let* root = Repository.fetch_root setup in
-  let* root_dir = fetch_or_fail setup T.dir root.root_dir in
-  let rec find_dir dir_path_rev dir = function
-    | [] ->
-        ok dir
-    | head :: tail ->
-        let dir_path_rev = head :: dir_path_rev in
-        match Filename_map.find_opt head dir with
-          | None ->
-              failed [ sf "no such directory: %s" (Device.show_path (List.rev dir_path_rev)) ]
-          | Some (File _) ->
-              failed [ sf "%s is a file" (Device.show_path (List.rev dir_path_rev)) ]
-          | Some (Dir { hash; _ }) ->
-              let* subdir = fetch_or_fail setup T.dir hash in
-              find_dir dir_path_rev subdir tail
+  let* root_dir = fetch_root_dir setup root in
+  let* dir =
+    let rec find_dir dir_path_rev dir = function
+      | [] ->
+          ok dir
+      | head :: tail ->
+          let dir_path_rev = head :: dir_path_rev in
+          match Filename_map.find_opt head dir with
+            | None ->
+                failed [
+                  sf "no such directory: %s" (Device.show_path (List.rev dir_path_rev))
+                ]
+            | Some (File _) ->
+                failed [ sf "%s is a file" (Device.show_path (List.rev dir_path_rev)) ]
+            | Some (Dir { hash; _ }) ->
+                let* subdir = fetch_or_fail setup T.dir hash in
+                find_dir dir_path_rev subdir tail
+    in
+    find_dir [] root_dir dir_path
   in
-  let* dir = find_dir [] root_dir dir_path in
   (
     let total_size =
       if print_size then
@@ -401,7 +419,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
             let hash_bin = Repository.bin_of_hash hash in
             let char0 = hash_bin.[0] in
             let char1 = hash_bin.[1] in
-            let* hash_index = fetch_or_fail setup T.hash_index root.hash_index in
+            let* hash_index = fetch_hash_index setup root in
             let* hash_index_1 =
               match Map.Char.find_opt char0 hash_index with
                 | None ->
@@ -505,10 +523,10 @@ let tree ~color ~max_depth ~only_main ~only_dirs
   in
   tree_dir "" 0 (List.rev dir_path) dir
 
-let push_file ~verbose (setup: Clone.setup) root
+let push_file ~verbose (setup: Clone.setup) (root: root)
     (((dir_path, filename) as path): Device.file_path) =
   trace ("failed to push file: " ^ Device.show_file_path path) @@
-  let* root_dir = fetch_or_fail setup T.dir root.root_dir in
+  let* root_dir = fetch_root_dir setup root in
   let rec update_dir dir_path_rev (dir: dir) = function
     | head :: tail ->
         let* head_dir, head_dir_total_size, head_dir_total_file_count =
@@ -579,7 +597,7 @@ let push_file ~verbose (setup: Clone.setup) root
           let added_file_hash_bin = Repository.bin_of_hash added_file_hash in
           let char0 = added_file_hash_bin.[0] in
           let char1 = added_file_hash_bin.[1] in
-          let* hash_index = fetch_or_fail setup T.hash_index root.hash_index in
+          let* hash_index = fetch_hash_index setup root in
           let* hash_index_1 =
             match Map.Char.find_opt char0 hash_index with
               | None ->
@@ -617,10 +635,12 @@ let push_file ~verbose (setup: Clone.setup) root
             |> List.map Device.show_file_path
             |> String.concat ", "
           );
-        ok {
-          root_dir = new_root_dir_hash;
-          hash_index = new_hash_index_hash;
-        }
+        ok (
+          Non_empty {
+            root_dir = new_root_dir_hash;
+            hash_index = new_hash_index_hash;
+          }
+        )
 
 let push ~verbose setup (paths: Device.path list) =
   let rec push root path =
@@ -692,5 +712,122 @@ let pull ~verbose setup (paths: Device.path list) =
                             unit
   in
   let* root = Repository.fetch_root setup in
-  let* root_dir = fetch_or_fail setup T.dir root.root_dir in
+  let* root_dir = fetch_root_dir setup root in
   list_iter_e paths (pull root_dir [])
+
+type remove_result =
+  | Removed_whole_dir
+  | Dir_not_empty of {
+      new_dir_hash: dir Repository.hash;
+      size_diff: int; (* positive, to be subtracted *)
+      file_count_diff: int; (* positive, to be subtracted *)
+    }
+
+let remove ~recursive setup (paths: Device.path list) =
+  ignore (recursive, setup, paths);
+  assert false
+(*   let rec remove (dir: dir) dir_path_rev (path: Device.path) = *)
+(*     match path with *)
+(*       | [] -> *)
+(*           (\* Fully followed the requested path: remove where we are, i.e. [dir]. *\) *)
+(*           if recursive then *)
+(* (\*             (\\* TODO: after that we need to return how to update the parent... *\\) *\) *)
+(* (\*             let* () = *\) *)
+(* (\*               list_iter_e (Filename_map.bindings dir) @@ fun (filename, _) -> *\) *)
+(* (\*               let* (_: remove_result) = remove dir dir_path_rev [ filename ] in *\) *)
+(* (\*               unit *\) *)
+(* (\*             in *\) *)
+(*             ok Removed_whole_dir *)
+(*           else *)
+(*             failed [ *)
+(*               sf "%s is a directory, use --recursive (or -r) to remove it and its contents" *)
+(*                 (Device.show_path (List.rev dir_path_rev)) *)
+(*             ] *)
+(*       | head :: tail -> *)
+(*           match Filename_map.find_opt head dir with *)
+(*             | None -> *)
+(*                 failed [ *)
+(*                   "no such file or directory: " ^ Device.show_path (List.rev dir_path_rev); *)
+(*                 ] *)
+(*             | Some (Dir { hash; total_size; total_file_count }) -> *)
+(*                 (\* Requested to remove [head/tail] from [dir]. *\) *)
+(*                 (\* Find [subdir] named [head] in [dir]. *\) *)
+(*                 let* subdir = fetch_or_fail setup T.dir hash in *)
+(*                 (\* Remove [tail] from [subdir]. *\) *)
+(*                 let* remove_result = *)
+(*                   remove subdir (head :: dir_path_rev) tail *)
+(*                 in *)
+(*                 (\* Update [dir]. *\) *)
+(*                 ( *)
+(*                   match remove_result with *)
+(*                     | Removed_whole_dir -> *)
+(*                         let new_dir = Filename_map.remove head dir in *)
+(*                         if Filename_map.is_empty new_dir then *)
+(*                           ok Removed_whole_dir *)
+(*                         else *)
+(*                           let* new_dir_hash = Repository.store_later setup T.dir new_dir in *)
+(*                           (\* TODO: share with below? *\) *)
+(*                           ok ( *)
+(*                             Dir_not_empty { *)
+(*                               new_dir_hash; *)
+(*                               size_diff = total_size; *)
+(*                               file_count_diff = total_file_count; *)
+(*                             } *)
+(*                           ) *)
+(*                     | Dir_not_empty { new_dir_hash; size_diff; file_count_diff } -> *)
+(*                         let new_dir = *)
+(*                           Filename_map.add head *)
+(*                             ( *)
+(*                               Dir { *)
+(*                                 hash = new_dir_hash; *)
+(*                                 total_size = total_size - size_diff; *)
+(*                                 total_file_count = total_file_count - file_count_diff; *)
+(*                               } *)
+(*                             ) *)
+(*                             dir *)
+(*                         in *)
+(*                         let* new_dir_hash = Repository.store_later setup T.dir new_dir in *)
+(*                         ok ( *)
+(*                           Dir_not_empty { *)
+(*                             new_dir_hash; *)
+(*                             size_diff; *)
+(*                             file_count_diff; *)
+(*                           } *)
+(*                         ) *)
+(*                 ) *)
+(*             | Some (File { size; _ }) -> *)
+(*                 match tail with *)
+(*                   | _ :: _ -> *)
+(*                       failed [ *)
+(*                         "no such file or directory: " ^ *)
+(*                         Device.show_path (List.rev_append dir_path_rev path); *)
+(*                         Device.show_path (List.rev dir_path_rev) ^ *)
+(*                         " is a file"; *)
+(*                       ] *)
+(*                   | [] -> *)
+(*                       (\* Remove from current [dir]. *\) *)
+(*                       let new_dir = Filename_map.remove head dir in *)
+(*                       let* new_dir_hash = *)
+(*                         if Filename_map.is_empty new_dir then *)
+(*                           ok None *)
+(*                         else *)
+(*                           let* new_dir_hash = Repository.store_later setup T.dir new_dir in *)
+(*                           ok (Some new_dir_hash) *)
+(*                       in *)
+(*                       (\* Return information necessary to update the parent. *\) *)
+(*                       match new_dir_hash with *)
+(*                         | None -> *)
+(*                             ok Removed_whole_dir *)
+(*                         | Some new_dir_hash -> *)
+(*                             ok ( *)
+(*                               Dir_not_empty { *)
+(*                                 new_dir_hash; *)
+(*                                 size_diff = size; *)
+(*                                 file_count_diff = 1; *)
+(*                               } *)
+(*                             ) *)
+(*   in *)
+(*   (\* TODO: update hash_index *\) *)
+(*   let* root = Repository.fetch_root setup in *)
+(*   let* root_dir = fetch_or_fail setup T.dir root.root_dir in *)
+(*   list_iter_e paths (remove root_dir []) *)

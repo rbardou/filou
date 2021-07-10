@@ -32,11 +32,15 @@ type hash_index_1 = hash_index_2 hash Map.Char.t
 
 type hash_index = hash_index_1 hash Map.Char.t
 
-type root =
+type non_empty_root =
   {
     root_dir: dir hash;
     hash_index: hash_index hash;
   }
+
+type root =
+  | Empty
+  | Non_empty of non_empty_root
 
 type clone_config =
   {
@@ -133,11 +137,17 @@ struct
 
   let hash_index: hash_index t = char_to_hash_map ()
 
-  let root: root t =
+  let non_empty_root: non_empty_root t =
     record @@
     ("root_dir", hash, fun x -> x.root_dir) @
     ("hash_index", hash, fun x -> x.hash_index) @:
     fun root_dir hash_index -> { root_dir; hash_index }
+
+  let root: root t =
+    let empty = case "Empty" unit (fun () -> Empty) in
+    let non_empty = case "Non_empty" non_empty_root (fun x -> Non_empty x) in
+    variant [ Case empty; Case non_empty ] @@
+    function Empty -> value empty () | Non_empty x -> value non_empty x
 
   let location: Device.location t =
     convert_partial string

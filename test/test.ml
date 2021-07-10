@@ -190,7 +190,6 @@ let () =
   Filou.clone ~main ~clone ();
   trees ();
   explore_main "root";
-  explore_main "30/b6/30b6b1e835d55d653feb9555039b083167d8a55a8879a9ae71fe029853c6a7d7";
   explore_clone "config";
 
   comment "Add a file.";

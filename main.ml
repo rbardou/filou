@@ -189,13 +189,20 @@ let () =
              removed if no path lead to it."
           "rm"
         @@ fun () ->
+        let recursive =
+          Clap.flag
+            ~description: "If a PATH is a directory, remove it recursively."
+            ~set_long: "recursive"
+            ~set_short: 'r'
+            false
+        in
         let paths =
           Clap.list_string
             ~description: "Paths of the files to remove."
-            ~placeholder: "DIR"
+            ~placeholder: "PATH"
             ()
         in
-        `rm paths
+        `rm (paths, recursive)
       );
       (
         Clap.case
@@ -258,11 +265,10 @@ let () =
           in
           let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
           Controller.pull ~verbose setup paths
-      | `rm _paths ->
-          (*           let* (location, _) as clone = find_local_clone () in *)
-          (*           let* paths = list_map_e paths (Device.parse_file_path location) in *)
-          (*           Controller.remove ~verbose ~dry_run ~clone paths *)
-          assert false (* TODO *)
+      | `rm (paths, recursive) ->
+          let* setup = find_local_clone () in
+          let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
+          Controller.remove ~recursive setup paths
       | `check location ->
           let* location = parse_location location in
           Controller.check location
