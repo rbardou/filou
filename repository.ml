@@ -13,7 +13,6 @@ open Misc
    We can still keep it and activate / deactive it using a flag or heuristics… *)
 
 type 'a hash_status =
-  | File of { size: int } (* only used for read-only mode *)
   | Stored
   | Not_stored of {
       (* Note: the encoded value is also available in the closure, this uses
@@ -22,53 +21,74 @@ type 'a hash_status =
       store: unit -> unit;
     }
 
+type file
+
 type 'a hash =
-  {
-    hash: Hash.t;
-    mutable status: 'a hash_status;
-  }
+  | Value_hash of {
+      hash: Hash.t;
+      typ: 'a Protype.t;
+      mutable status: 'a hash_status;
+    }
+  | File_hash: Hash.t -> file hash
+  | File_hash_with_size: Hash.t * int -> file hash (* for read-only mode *)
 
 let store_not_stored_hash_when_encoding = ref false
 
-let hash_type =
+type _ Protype.annotation += Hash: Hash.t Protype.annotation
+
+let raw_hash_type =
   let open Protype in
-  let encode hash =
-    if !store_not_stored_hash_when_encoding then (
-      match hash.status with
-        | File _ | Stored ->
-            ()
-        | Not_stored { store; _ } ->
-            store ();
-            hash.status <- Stored
-    );
-    Hash.to_bin hash.hash
+  annotate Hash (convert_partial string ~encode: Hash.to_bin ~decode: Hash.of_bin)
+
+let hash_type (type a) (typ: a Protype.t) =
+  let open Protype in
+  let encode (hash: a hash) =
+    match hash with
+      | Value_hash hash ->
+          if !store_not_stored_hash_when_encoding then (
+            match hash.status with
+              | Stored ->
+                  ()
+              | Not_stored { store; _ } ->
+                  store ();
+                  hash.status <- Stored
+          );
+          hash.hash
+      | File_hash hash | File_hash_with_size (hash, _) ->
+          hash
   in
-  let decode s =
-    match Hash.of_bin s with
-      | None ->
-          None
-      | Some hash ->
-          Some {
-            hash;
-            status = Stored;
-          }
+  let decode hash =
+    Some (
+      Value_hash {
+        hash;
+        typ;
+        status = Stored;
+      }
+    )
   in
   (* Cannot use [convert_partial] because of the value restriction, but this is equivalent. *)
-  Convert { typ = string; encode; decode }
+  Convert { typ = raw_hash_type; encode; decode }
 
-let hex_of_hash { hash; _ } = Hash.to_hex hash
-let bin_of_hash { hash; _ } = Hash.to_bin hash
-let compare_hashes { hash = a; _ } { hash = b; _ } = Hash.compare a b
+let hash_of_hash (type a) (hash: a hash) =
+  match hash with
+    | Value_hash { hash; _ }
+    | File_hash hash
+    | File_hash_with_size (hash, _) -> hash
 
-module Raw_hash_set =
-struct
-  include Set.Make (Hash)
-  let add { hash; _ } set = add hash set
-  let mem_raw = mem
-  let mem { hash; _ } set = mem_raw hash set
-end
+let hex_of_hash hash = Hash.to_hex (hash_of_hash hash)
+let bin_of_hash hash = Hash.to_bin (hash_of_hash hash)
+let compare_hashes a b = Hash.compare (hash_of_hash a) (hash_of_hash b)
 
-type file
+let file_hash_type =
+  Protype.convert raw_hash_type ~encode: hash_of_hash ~decode: (fun h -> File_hash h)
+
+(* module Raw_hash_set = *)
+(* struct *)
+(*   include Set.Make (Hash) *)
+(*   let add hash set = add (hash_of_hash hash) set *)
+(*   let mem_raw = mem *)
+(*   let mem { hash; _ } set = mem_raw hash set *)
+(* end *)
 
 module type ROOT =
 sig
@@ -90,7 +110,7 @@ sig
   val store_later: ?on_stored: (unit -> (unit, [ `failed ] as 'e) r) ->
     t -> 'a Protype.t -> 'a -> ('a hash, [> `failed ]) r
 
-  val fetch: t -> 'a Protype.t -> 'a hash ->
+  val fetch: t -> 'a hash ->
     ('a, [> `failed | `not_available ]) r
 
   val store_file: source: Device.location -> source_path: Device.file_path -> target: t ->
@@ -111,8 +131,7 @@ sig
   val fetch_root: t ->
     (root, [> `failed ]) r
 
-  val garbage_collect: t -> everything_except: Raw_hash_set.t ->
-    (unit, [> `failed ]) r
+  val garbage_collect: t -> (unit, [> `failed ]) r
 end
 
 exception Failed_to_store_later of string list
@@ -171,10 +190,10 @@ struct
     let* encoded_value = encode ~trigger_hash_storing: true typ value in
     let hash = Hash.string encoded_value in
     if !read_only then
-      ok { hash; status = Not_stored { value; store = fun () -> () } }
+      ok (Value_hash { hash; typ; status = Not_stored { value; store = fun () -> () } })
     else
       let* () = store_raw_now location hash encoded_value in
-      ok { hash; status = Stored }
+      ok (Value_hash { hash; typ; status = Stored })
 
   let store_later ?on_stored location typ value =
     let* encoded_value = encode ~trigger_hash_storing: false typ value in
@@ -198,20 +217,17 @@ struct
         | ERROR { code = `failed; msg } ->
             raise (Failed_to_store_later msg)
     in
-    ok {
-      hash;
-      status = Not_stored { value; store };
-    }
+    ok (Value_hash { hash; typ; status = Not_stored { value; store } })
 
-  let fetch location typ hash =
+  let fetch (type a) location (hash: a hash) =
     trace ("failed to fetch object with hash " ^ hex_of_hash hash) @@
-    match hash.status with
-      | File _ ->
+    match hash with
+      | File_hash _ | File_hash_with_size _ ->
           failed [ "this is a file, not an object" ]
-      | Not_stored { value; _ } ->
+      | Value_hash { status = Not_stored { value; _ }; _ } ->
           ok value
-      | Stored ->
-          let path = file_path_of_hash hash.hash in
+      | Value_hash { status = Stored; hash; typ } ->
+          let path = file_path_of_hash hash in
           match Device.read_file location path with
             | ERROR { code = `no_such_file; msg } ->
                 ERROR { code = `not_available; msg }
@@ -231,10 +247,8 @@ struct
           let* hash = Device.hash source source_path in
           let hash_path = file_path_of_hash hash in
           let* already_exists = Device.file_exists target hash_path in
-          if already_exists then
-            ok ({ hash; status = Stored }, size)
-          else if !read_only then
-            ok ({ hash; status = File { size } }, size)
+          if already_exists || !read_only then
+            ok (File_hash_with_size (hash, size), size)
           else
             match
               Device.copy_file ~on_progress: (fun bytes -> on_progress ~bytes ~size)
@@ -243,49 +257,58 @@ struct
               | ERROR { code = (`no_such_file | `failed); msg } ->
                   failed msg
               | OK () ->
-                  ok ({ hash; status = Stored }, size)
+                  ok (File_hash_with_size (hash, size), size)
 
   let fetch_file ~source hash ~target ~target_path ~on_progress =
-    let hash = hash.hash in
     trace ("failed to fetch file " ^ Device.show_file_path target_path) @@
-    let hash_path = file_path_of_hash hash in
-    match Device.stat source (Device.path_of_file_path hash_path) with
-      | ERROR { code = `no_such_file; msg } ->
-          error `not_available msg
-      | ERROR { code = `failed; _ } as x ->
-          x
-      | OK Dir ->
-          failed [ Device.show_file_path hash_path ^ " is a directory" ]
-      | OK (File { size; _ }) ->
-          let* already_exists = Device.file_exists target target_path in
-          if already_exists then
-            error `already_exists [
-              sf "file %s already exists in %s"
-                (Device.show_file_path target_path)
-                (Device.show_location target);
-            ]
-          else if !read_only then
-            unit
-          else
-            match
-              Device.copy_file ~on_progress: (fun bytes -> on_progress ~bytes ~size)
-                ~source: (source, hash_path) ~target: (target, target_path)
-            with
-              | ERROR { code = (`no_such_file | `failed); msg } ->
-                  failed msg
-              | OK () as x ->
-                  x
+    match hash with
+    | Value_hash _ ->
+        (* The only way for this to happen is if the user stored a value
+           of type [file], which requires a value of type [file Protype.t],
+           and the only way for the user to get such a type is to make it
+           using [Protype.convert] with encoding functions that raise exceptions. *)
+        failed [ "this is not a file but a value" ]
+    | File_hash hash | File_hash_with_size (hash, _) ->
+        let hash_path = file_path_of_hash hash in
+        match Device.stat source (Device.path_of_file_path hash_path) with
+          | ERROR { code = `no_such_file; msg } ->
+              error `not_available msg
+          | ERROR { code = `failed; _ } as x ->
+              x
+          | OK Dir ->
+              failed [ Device.show_file_path hash_path ^ " is a directory" ]
+          | OK (File { size; _ }) ->
+              let* already_exists = Device.file_exists target target_path in
+              if already_exists then
+                error `already_exists [
+                  sf "file %s already exists in %s"
+                    (Device.show_file_path target_path)
+                    (Device.show_location target);
+                ]
+              else if !read_only then
+                unit
+              else
+                match
+                  Device.copy_file ~on_progress: (fun bytes -> on_progress ~bytes ~size)
+                    ~source: (source, hash_path) ~target: (target, target_path)
+                with
+                  | ERROR { code = (`no_such_file | `failed); msg } ->
+                      failed msg
+                  | OK () as x ->
+                      x
 
   let get_file_size location hash =
-    trace ("failed to get file size for " ^ Hash.to_hex hash.hash) @@
-    let hash_path = file_path_of_hash hash.hash in
+    trace ("failed to get file size for " ^ hex_of_hash hash) @@
+    let hash_path = file_path_of_hash (hash_of_hash hash) in
     match Device.stat location (Device.path_of_file_path hash_path) with
       | ERROR { code = `no_such_file; msg } ->
           if !read_only then
-            match hash.status with
-              | File { size } ->
+            match hash with
+              | File_hash_with_size (_, size) ->
+                  (* TODO: we could also do that in the beginning and
+                     thus use this as a cache. *)
                   ok size
-              | Stored | Not_stored _ ->
+              | File_hash _ | Value_hash _ ->
                   error `not_available msg
           else
             error `not_available msg
@@ -330,54 +353,71 @@ struct
     else
       actually_fetch_root ()
 
-  let garbage_collect location ~everything_except =
-    match
-      let rec garbage_collect_dir dir_path =
-        Device.iter_read_dir location dir_path @@ fun filename ->
-        let filename_string = Path.Filename.show filename in
-        let sub_path = dir_path @ [ filename ] in
-        match Device.stat location sub_path with
-          | ERROR { code = `no_such_file; _ } ->
-              unit
-          | ERROR { code = `failed; _ } as x ->
-              x
-          | OK Dir ->
-              if String.length filename_string <> hash_part_length then
-                unit
-              else
-                let is_hex =
-                  let rec loop i =
-                    if i >= hash_part_length then
-                      true
-                    else
-                      match filename_string.[i] with
-                        | '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' ->
-                            loop (i + 1)
-                        | _ ->
-                            false
-                  in
-                  loop 0
-                in
-                if is_hex then
-                  garbage_collect_dir sub_path
-                else
-                  unit
-          | OK (File { path = file_path; _ }) ->
-              match Hash.of_hex filename_string with
-                | None ->
-                    unit
-                | Some hash ->
-                    if Raw_hash_set.mem_raw hash everything_except then
-                      unit
-                    else if !read_only then
-                      unit
-                    else
-                      Device.remove_file location file_path
-      in
-      garbage_collect_dir []
-    with
-      | ERROR { code = `no_such_file; _ } ->
-          unit
-      | ERROR { code = `failed; _ } | OK () as x ->
-          x
+(*   let direct_value_dependencies typ value = *)
+(*     let equal: 'a. 'a -> 'a Protype.annotation -> Hash.t option = *)
+(*       fun (type a) (x: a) (annotation: a Protype.annotation): Hash.t option -> *)
+(*         match annotation with *)
+(*           | Hash -> Some x *)
+(*           | _ -> None *)
+(*     in *)
+(*     Protype.find_all { equal } typ value *)
+
+(*   let direct_hash_dependencies location hash = *)
+(*     match hash with *)
+(*       | Value_hash { typ; _ } *)
+(*     fetch location hash *)
+
+  let garbage_collect _location =
+    assert false
+(*     let* root = fetch_root location in *)
+(*     let* reachable = assert false (\* TODO *\) in *)
+(*     match *)
+(*       let rec garbage_collect_dir dir_path = *)
+(*         Device.iter_read_dir location dir_path @@ fun filename -> *)
+(*         let filename_string = Path.Filename.show filename in *)
+(*         let sub_path = dir_path @ [ filename ] in *)
+(*         match Device.stat location sub_path with *)
+(*           | ERROR { code = `no_such_file; _ } -> *)
+(*               unit *)
+(*           | ERROR { code = `failed; _ } as x -> *)
+(*               x *)
+(*           | OK Dir -> *)
+(*               if String.length filename_string <> hash_part_length then *)
+(*                 unit *)
+(*               else *)
+(*                 let is_hex = *)
+(*                   let rec loop i = *)
+(*                     if i >= hash_part_length then *)
+(*                       true *)
+(*                     else *)
+(*                       match filename_string.[i] with *)
+(*                         | '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' -> *)
+(*                             loop (i + 1) *)
+(*                         | _ -> *)
+(*                             false *)
+(*                   in *)
+(*                   loop 0 *)
+(*                 in *)
+(*                 if is_hex then *)
+(*                   garbage_collect_dir sub_path *)
+(*                 else *)
+(*                   unit *)
+(*           | OK (File { path = file_path; _ }) -> *)
+(*               match Hash.of_hex filename_string with *)
+(*                 | None -> *)
+(*                     unit *)
+(*                 | Some hash -> *)
+(*                     if Raw_hash_set.mem_raw hash reachable then *)
+(*                       unit *)
+(*                     else if !read_only then *)
+(*                       unit *)
+(*                     else *)
+(*                       Device.remove_file location file_path *)
+(*       in *)
+(*       garbage_collect_dir [] *)
+(*     with *)
+(*       | ERROR { code = `no_such_file; _ } -> *)
+(*           unit *)
+(*       | ERROR { code = `failed; _ } | OK () as x -> *)
+(*           x *)
 end

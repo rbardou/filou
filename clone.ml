@@ -47,10 +47,10 @@ struct
                 on_stored ()
       )
 
-  let fetch setup typ hash =
-    match R.fetch setup.clone_dot_filou typ hash with
+  let fetch setup hash =
+    match R.fetch setup.clone_dot_filou hash with
       | ERROR { code = `not_available; _ } ->
-          R.fetch setup.main typ hash
+          R.fetch setup.main hash
       | ERROR { code = `failed; _ } as x ->
           x
       | OK _ as x ->
@@ -86,7 +86,7 @@ struct
         setup.main
     )
 
-  let garbage_collect setup ~everything_except =
-    let* () = R.garbage_collect setup.clone_dot_filou ~everything_except in
-    R.garbage_collect setup.main ~everything_except
+  let garbage_collect setup =
+    let* () = R.garbage_collect setup.clone_dot_filou in
+    R.garbage_collect setup.main
 end

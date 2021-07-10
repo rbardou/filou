@@ -3,8 +3,8 @@ open State
 
 let empty_dir: dir = Filename_map.empty
 
-let fetch_or_fail setup typ hash =
-  match Repository.fetch setup typ hash with
+let fetch_or_fail setup hash =
+  match Repository.fetch setup hash with
     | ERROR { code = (`not_available | `failed); msg } ->
         failed msg
     | OK _ as x ->
@@ -61,20 +61,20 @@ let fetch_root_dir setup (root: root) =
     | Empty ->
         ok Filename_map.empty
     | Non_empty root ->
-        fetch_or_fail setup T.dir root.root_dir
+        fetch_or_fail setup root.root_dir
 
 let fetch_hash_index setup (root: root) =
   match root with
     | Empty ->
         ok Map.Char.empty
     | Non_empty root ->
-        fetch_or_fail setup T.hash_index root.hash_index
+        fetch_or_fail setup root.hash_index
 
 (* Recursively check sizes, file counts,
    and whether reachable files are available. *)
 let rec check_dir ~all_files_must_be_available expected_hash_index
     (location: Device.location) (path: Device.path) (dir: dir hash) =
-  let* dir = Bare.fetch location T.dir dir in
+  let* dir = Bare.fetch location dir in
   let path_size = ref 0 in
   let path_file_count = ref 0 in
   let* () =
@@ -143,25 +143,16 @@ let rec check_dir ~all_files_must_be_available expected_hash_index
 
 (* TODO: check whether we kept empty Dir nodes (same in hash index). *)
 let check (location: Device.location) =
-  let* is_main =
+  let* location =
     match read_clone_config ~clone_location: location with
-      | OK _ ->
-          ok false
+      | OK config ->
+          ok config.main_location
       | ERROR { code = `no_such_file; _ } ->
-          ok true
+          ok location
       | ERROR { code = `failed; _ } as x ->
           x
   in
-  if is_main then
-    echo "Checking main repository at: %s" (Device.show_location location)
-  else
-    echo "Checking clone repository at: %s" (Device.show_location location);
-  let location =
-    if is_main then
-      location
-    else
-      Device.sublocation location dot_filou
-  in
+  echo "Checking main repository at: %s" (Device.show_location location);
   let* root = Bare.fetch_root location in
   match root with
     | Empty ->
@@ -170,19 +161,19 @@ let check (location: Device.location) =
     | Non_empty root ->
         let expected_hash_index = ref File_hash_map.empty in
         let* size, count =
-          check_dir ~all_files_must_be_available: is_main expected_hash_index
+          check_dir ~all_files_must_be_available: true expected_hash_index
             location [] root.root_dir
         in
         let expected_hash_index = !expected_hash_index in
         echo "Directory structure looks ok (total size: %d, file count: %d)." size count;
-        if is_main then echo "All files are available.";
+        echo "All files are available.";
         let actual_hash_index = ref File_hash_map.empty in
         let* () =
-          let* hash_index = Bare.fetch location T.hash_index root.hash_index in
+          let* hash_index = Bare.fetch location root.hash_index in
           list_iter_e (Map.Char.bindings hash_index) @@ fun (_, hash_index_1_hash) ->
-          let* hash_index_1 = Bare.fetch location T.hash_index_1 hash_index_1_hash in
+          let* hash_index_1 = Bare.fetch location hash_index_1_hash in
           list_iter_e (Map.Char.bindings hash_index_1) @@ fun (_, hash_index_2_hash) ->
-          let* hash_index_2 = Bare.fetch location T.hash_index_2 hash_index_2_hash in
+          let* hash_index_2 = Bare.fetch location hash_index_2_hash in
           list_iter_e (File_hash_map.bindings hash_index_2) @@ fun (hash, paths) ->
           actual_hash_index := File_hash_map.add hash paths !actual_hash_index;
           unit
@@ -248,7 +239,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
             | Some (File _) ->
                 failed [ sf "%s is a file" (Device.show_path (List.rev dir_path_rev)) ]
             | Some (Dir { hash; _ }) ->
-                let* subdir = fetch_or_fail setup T.dir hash in
+                let* subdir = fetch_or_fail setup hash in
                 find_dir dir_path_rev subdir tail
     in
     find_dir [] root_dir dir_path
@@ -426,14 +417,14 @@ let tree ~color ~max_depth ~only_main ~only_dirs
                 | None ->
                     ok Map.Char.empty
                 | Some hash_index_1_hash ->
-                    fetch_or_fail setup T.hash_index_1 hash_index_1_hash
+                    fetch_or_fail setup hash_index_1_hash
             in
             let* hash_index_2 =
               match Map.Char.find_opt char1 hash_index_1 with
                 | None ->
                     ok File_hash_map.empty
                 | Some hash_index_2_hash ->
-                    fetch_or_fail setup T.hash_index_2 hash_index_2_hash
+                    fetch_or_fail setup hash_index_2_hash
             in
             match File_hash_map.find_opt hash hash_index_2 with
               | None ->
@@ -452,7 +443,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
           print_newline ();
         in
         let recurse hash =
-          let* dir = fetch_or_fail setup T.dir hash in
+          let* dir = fetch_or_fail setup hash in
           tree_dir (if last then prefix ^ "    " else prefix ^ "│   ") (dir_depth + 1)
             (filename :: dir_path_rev) dir
         in
@@ -540,7 +531,7 @@ let push_file ~verbose (setup: Clone.setup) (root: root)
                   (Device.show_file_path (List.rev dir_path_rev, head));
                 ]
             | Some (Dir { hash = head_dir_hash; total_size; total_file_count }) ->
-                let* dir = fetch_or_fail setup T.dir head_dir_hash in
+                let* dir = fetch_or_fail setup head_dir_hash in
                 ok (dir, total_size, total_file_count)
         in
         let* update_result =
@@ -604,14 +595,14 @@ let push_file ~verbose (setup: Clone.setup) (root: root)
               | None ->
                   ok Map.Char.empty
               | Some hash_index_1_hash ->
-                  fetch_or_fail setup T.hash_index_1 hash_index_1_hash
+                  fetch_or_fail setup hash_index_1_hash
           in
           let* hash_index_2 =
             match Map.Char.find_opt char1 hash_index_1 with
               | None ->
                   ok File_hash_map.empty
               | Some hash_index_2_hash ->
-                  fetch_or_fail setup T.hash_index_2 hash_index_2_hash
+                  fetch_or_fail setup hash_index_2_hash
           in
           let old_paths =
             File_hash_map.find_opt added_file_hash hash_index_2
@@ -679,7 +670,7 @@ let pull ~verbose setup (paths: Device.path list) =
                   "no such file or directory: " ^ Device.show_path (List.rev dir_path_rev);
                 ]
             | Some (Dir { hash; _ }) ->
-                let* dir = fetch_or_fail setup T.dir hash in
+                let* dir = fetch_or_fail setup hash in
                 pull dir (head :: dir_path_rev) tail
             | Some (File { hash; _ }) ->
                 let target_path = List.rev dir_path_rev, head in
@@ -752,7 +743,7 @@ let remove ~recursive setup (paths: Device.path list) =
             | Some (Dir { hash; total_size; total_file_count }) ->
                 (* Requested to remove [head/tail] from [dir]. *)
                 (* Find [subdir] named [head] in [dir]. *)
-                let* subdir = fetch_or_fail setup T.dir hash in
+                let* subdir = fetch_or_fail setup hash in
                 (* Remove [tail] from [subdir]. *)
                 let* remove_result =
                   remove_from_dir subdir (head :: dir_path_rev) tail
@@ -855,7 +846,7 @@ let remove ~recursive setup (paths: Device.path list) =
                    is a task for the garbage collector. *)
                 (* TODO: this is probably inefficient as we re-fetch stuff
                    that we just stored. *)
-                let* hash_index = fetch_or_fail setup T.hash_index root.hash_index in
+                let* hash_index = fetch_or_fail setup root.hash_index in
                 let* new_hash_index =
                   list_fold_e hash_index !removed_paths @@
                   fun hash_index (hash, path) ->
@@ -867,14 +858,14 @@ let remove ~recursive setup (paths: Device.path list) =
                       | None ->
                           ok Map.Char.empty
                       | Some hash_index_1_hash ->
-                          fetch_or_fail setup T.hash_index_1 hash_index_1_hash
+                          fetch_or_fail setup hash_index_1_hash
                   in
                   let* hash_index_2 =
                     match Map.Char.find_opt char1 hash_index_1 with
                       | None ->
                           ok File_hash_map.empty
                       | Some hash_index_2_hash ->
-                          fetch_or_fail setup T.hash_index_2 hash_index_2_hash
+                          fetch_or_fail setup hash_index_2_hash
                   in
                   let set =
                     match File_hash_map.find_opt hash hash_index_2 with

@@ -1,183 +1,49 @@
 # Initialize a main repository and a clone.
 $ main.exe --no-color init /tmp/filou-test/main
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
-$ cd /tmp/filou-test/main
-$ tree -a -s -F
-.
-└── [         21]  root
-
-0 directories, 1 file
-$ cd /tmp/filou-test/clone
-$ tree -a -s -F
-.
-└── [       4096]  .filou/
-    └── [         44]  config
-
-1 directory, 1 file
-$ cd /tmp/filou-test/main
-$ explore root
-14 (Empty)
 $ cd /tmp/filou-test/clone
 $ explore .filou/config
 { main = "/tmp/filou-test/main/" }
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking main repository at: /tmp/filou-test/main/
+Repository is empty.
+$ cd /tmp/filou-test/main
+$ main.exe --no-color check
+Checking main repository at: /tmp/filou-test/main/
+Repository is empty.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
 # Add a file.
 $ cd /tmp/filou-test/clone
 $ echo blablabla > toto
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color push toto
 Pushed: toto
-$ cd /tmp/filou-test/main
-$ tree -a -s -F
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking main repository at: /tmp/filou-test/main/
+Directory structure looks ok (total size: 9, file count: 1).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
 .
-├── [       4096]  43/
-│   └── [       4096]  62/
-│       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
-├── [       4096]  49/
-│   └── [       4096]  2f/
-│       └── [          9]  492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d
-├── [       4096]  4a/
-│   └── [       4096]  e0/
-│       └── [         66]  4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
-├── [       4096]  67/
-│   └── [       4096]  17/
-│       └── [         66]  6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
-├── [       4096]  d4/
-│   └── [       4096]  08/
-│       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-└── [        122]  root
-
-10 directories, 6 files
-$ cd /tmp/filou-test/clone
-$ tree -a -s -F
-.
-├── [       4096]  .filou/
-│   ├── [       4096]  43/
-│   │   └── [       4096]  62/
-│   │       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
-│   ├── [       4096]  4a/
-│   │   └── [       4096]  e0/
-│   │       └── [         66]  4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
-│   ├── [       4096]  67/
-│   │   └── [       4096]  17/
-│   │       └── [         66]  6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
-│   ├── [         44]  config
-│   ├── [       4096]  d4/
-│   │   └── [       4096]  08/
-│   │       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-│   └── [        122]  root
-└── [          9]  toto
-
-9 directories, 7 files
-$ cd /tmp/filou-test/main
-$ explore root
-{ Non_empty = {
-    root_dir = 43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af;
-    hash_index = 6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3;
-  } }
-$ cd /tmp/filou-test/clone
-$ explore .filou/root
-{ Non_empty = {
-    root_dir = 43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af;
-    hash_index = 6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3;
-  } }
-$ cd /tmp/filou-test/main
-$ explore 43/62/43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
-[ { File = {
-      name = "toto";
-      hash = 492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d;
-      size = 9 (File);
-    } } ]
-$ cd /tmp/filou-test/clone
-$ explore .filou/43/62/43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
-[ { File = {
-      name = "toto";
-      hash = 492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d;
-      size = 9 (File);
-    } } ]
-$ cd /tmp/filou-test/main
-$ cat 49/2f/492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d
-blablabla%
-$ cd /tmp/filou-test/main
-$ explore 67/17/6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
-[ {
-    key = 73;
-    hash = 4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4;
-  } ]
-$ cd /tmp/filou-test/clone
-$ explore .filou/67/17/6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
-[ {
-    key = 73;
-    hash = 4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4;
-  } ]
-$ cd /tmp/filou-test/main
-$ explore 4a/e0/4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
-[ {
-    key = 47;
-    hash = d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a;
-  } ]
-$ cd /tmp/filou-test/clone
-$ explore .filou/4a/e0/4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
-[ {
-    key = 47;
-    hash = d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a;
-  } ]
-$ cd /tmp/filou-test/main
-$ explore d4/08/d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-[ {
-    hash = 492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d;
-    paths = [ [ "toto" ] ];
-  } ]
-$ cd /tmp/filou-test/clone
-$ explore .filou/d4/08/d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-[ {
-    hash = 492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d;
-    paths = [ [ "toto" ] ];
-  } ]
+└── toto
 # Add the file again.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color push
-$ cd /tmp/filou-test/main
-$ tree -a -s -F
-.
-├── [       4096]  43/
-│   └── [       4096]  62/
-│       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
-├── [       4096]  49/
-│   └── [       4096]  2f/
-│       └── [          9]  492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d
-├── [       4096]  4a/
-│   └── [       4096]  e0/
-│       └── [         66]  4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
-├── [       4096]  67/
-│   └── [       4096]  17/
-│       └── [         66]  6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
-├── [       4096]  d4/
-│   └── [       4096]  08/
-│       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-└── [        122]  root
-
-10 directories, 6 files
 $ cd /tmp/filou-test/clone
-$ tree -a -s -F
+$ main.exe --no-color check
+Checking main repository at: /tmp/filou-test/main/
+Directory structure looks ok (total size: 9, file count: 1).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
 .
-├── [       4096]  .filou/
-│   ├── [       4096]  43/
-│   │   └── [       4096]  62/
-│   │       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
-│   ├── [       4096]  4a/
-│   │   └── [       4096]  e0/
-│   │       └── [         66]  4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
-│   ├── [       4096]  67/
-│   │   └── [       4096]  17/
-│   │       └── [         66]  6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
-│   ├── [         44]  config
-│   ├── [       4096]  d4/
-│   │   └── [       4096]  08/
-│   │       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-│   └── [        122]  root
-└── [          9]  toto
-
-9 directories, 7 files
+└── toto
 # Add several files.
 $ cd /tmp/filou-test/clone
 $ echo blu > tutu
@@ -187,92 +53,6 @@ $ main.exe --no-color push tutu titi
 Pushed: tutu
 Pushed: titi
 $ cd /tmp/filou-test/main
-$ tree -a -s -F
-.
-├── [       4096]  0d/
-│   └── [       4096]  f1/
-│       └── [          6]  0df18a03c0666caa8a7f0f6f7c01d4c46a492078f7870eabcc1ce23bbfded77e
-├── [       4096]  11/
-│   └── [       4096]  0b/
-│       └── [         75]  110b9d9fca0b77c70ce1541e0c879a922d4dec77c377f37aacfd20787a4acf9b
-├── [       4096]  31/
-│   └── [       4096]  50/
-│       └── [         66]  3150d1f7c68723180ccc7b65f18c5e2f7a685a0a22e67af9ac831d37419ef024
-├── [       4096]  43/
-│   └── [       4096]  62/
-│       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
-├── [       4096]  49/
-│   └── [       4096]  2f/
-│       └── [          9]  492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d
-├── [       4096]  4a/
-│   └── [       4096]  e0/
-│       └── [         66]  4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
-├── [       4096]  67/
-│   └── [       4096]  17/
-│       └── [         66]  6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
-├── [       4096]  96/
-│   └── [       4096]  d7/
-│       └── [         75]  96d715270363db479c425f67fe6d5c8e140cdea3a9bc20466c6714a7ef018910
-├── [       4096]  d4/
-│   └── [       4096]  08/
-│       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-├── [       4096]  db/
-│   └── [       4096]  98/
-│       └── [        146]  db98ac496b2132c0f862c1f980a189bfefa1d1057b8c85e1ce7ad26e7eb0d86c
-├── [       4096]  e3/
-│   └── [       4096]  2f/
-│       └── [        183]  e32f37329bddf96df5a4ef77dd15efa20f5184f00c059206251d801251a96126
-├── [       4096]  ee/
-│   └── [       4096]  e9/
-│       └── [         66]  eee9c3eb3dac45cf2b811d773adec1ea9daf4d92759260200a359587f97792d6
-├── [       4096]  f4/
-│   └── [       4096]  c4/
-│       └── [          3]  f4c4849bc6706c939b0ed38a3ba4809f2259df732e0ed3235636329c6cf3792e
-└── [        122]  root
-
-26 directories, 14 files
-$ cd /tmp/filou-test/clone
-$ tree -a -s -F
-.
-├── [       4096]  .filou/
-│   ├── [       4096]  11/
-│   │   └── [       4096]  0b/
-│   │       └── [         75]  110b9d9fca0b77c70ce1541e0c879a922d4dec77c377f37aacfd20787a4acf9b
-│   ├── [       4096]  31/
-│   │   └── [       4096]  50/
-│   │       └── [         66]  3150d1f7c68723180ccc7b65f18c5e2f7a685a0a22e67af9ac831d37419ef024
-│   ├── [       4096]  43/
-│   │   └── [       4096]  62/
-│   │       └── [         87]  43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af
-│   ├── [       4096]  4a/
-│   │   └── [       4096]  e0/
-│   │       └── [         66]  4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4
-│   ├── [       4096]  67/
-│   │   └── [       4096]  17/
-│   │       └── [         66]  6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3
-│   ├── [       4096]  96/
-│   │   └── [       4096]  d7/
-│   │       └── [         75]  96d715270363db479c425f67fe6d5c8e140cdea3a9bc20466c6714a7ef018910
-│   ├── [         44]  config
-│   ├── [       4096]  d4/
-│   │   └── [       4096]  08/
-│   │       └── [         75]  d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a
-│   ├── [       4096]  db/
-│   │   └── [       4096]  98/
-│   │       └── [        146]  db98ac496b2132c0f862c1f980a189bfefa1d1057b8c85e1ce7ad26e7eb0d86c
-│   ├── [       4096]  e3/
-│   │   └── [       4096]  2f/
-│   │       └── [        183]  e32f37329bddf96df5a4ef77dd15efa20f5184f00c059206251d801251a96126
-│   ├── [       4096]  ee/
-│   │   └── [       4096]  e9/
-│   │       └── [         66]  eee9c3eb3dac45cf2b811d773adec1ea9daf4d92759260200a359587f97792d6
-│   └── [        122]  root
-├── [          6]  titi
-├── [          9]  toto
-└── [          3]  tutu
-
-21 directories, 15 files
-$ cd /tmp/filou-test/main
 $ main.exe --no-color check
 Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 18, file count: 3).
@@ -280,8 +60,9 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 18, file count: 3).
+All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
@@ -314,8 +95,9 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 26, file count: 5).
+All files are available.
 Hash index is consistent with the directory structure.
 # Test tree.
 $ cd /tmp/filou-test/clone
@@ -691,8 +473,9 @@ $ main.exe --no-color tree
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 30, file count: 6).
+All files are available.
 Hash index is consistent with the directory structure.
 $ cat bla/bli/plouf
 plaf%
@@ -723,8 +506,9 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm plif
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 26, file count: 5).
+All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
@@ -742,8 +526,9 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm titi toto tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 8, file count: 2).
+All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
@@ -761,8 +546,9 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm bla/bli/plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 4, file count: 1).
+All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
@@ -779,7 +565,7 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm bla/blo/plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Repository is empty.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
@@ -813,8 +599,9 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm plif bla/bli/plouf bla/blo/plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 18, file count: 3).
+All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
@@ -831,8 +618,9 @@ Pushed: bla/bli/plouf
 Pushed: plif (duplicate of: bla/blo/plouf)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 30, file count: 6).
+All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
@@ -853,8 +641,9 @@ Error:
 Exit code: 1
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 30, file count: 6).
+All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
@@ -872,8 +661,9 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm -r plif bla/bli
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 22, file count: 4).
+All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
@@ -906,8 +696,9 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm -r bla
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Directory structure looks ok (total size: 22, file count: 4).
+All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
@@ -937,7 +728,7 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm -r .
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
-Checking clone repository at: /tmp/filou-test/clone/
+Checking main repository at: /tmp/filou-test/main/
 Repository is empty.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count

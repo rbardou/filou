@@ -51,7 +51,8 @@ module T =
 struct
   open Protype
 
-  let hash: _ hash t = Repository.hash_type
+  let hash = Repository.hash_type
+  let file_hash = Repository.file_hash_type
 
   let filename: Path.Filename.t t =
     convert_partial string
@@ -59,11 +60,12 @@ struct
       ~decode: Path.Filename.parse
 
   let dir: dir t =
+    recursive @@ fun dir ->
     let entry =
       let dir_record =
         record @@
         ("name", filename, fun (x, _, _, _) -> x) @
-        ("hash", hash, fun (_, x, _, _) -> x) @
+        ("hash", hash dir, fun (_, x, _, _) -> x) @ (* TODO *)
         ("size", int, fun (_, _, x, _) -> x) @
         ("count", int, fun (_, _, _, x) -> x) @:
         fun name hash size count -> name, hash, size, count
@@ -71,7 +73,7 @@ struct
       let file_record =
         record @@
         ("name", filename, fun (x, _, _) -> x) @
-        ("hash", hash, fun (_, x, _) -> x) @
+        ("hash", file_hash, fun (_, x, _) -> x) @
         ("size", int, fun (_, _, x) -> x) @:
         fun name hash size -> name, hash, size
       in
@@ -89,14 +91,16 @@ struct
             `file (filename, hash, size)
     in
     let decode list =
-      List.fold_left' Filename_map.empty list @@ fun acc entry ->
-      match entry with
-        | `dir (filename, hash, total_size, total_file_count) ->
-            Filename_map.add filename (Dir { hash; total_size; total_file_count }) acc
-        | `file (filename, hash, size) ->
-            Filename_map.add filename (File { hash; size }) acc
+      Some (
+        List.fold_left' Filename_map.empty list @@ fun acc entry ->
+        match entry with
+          | `dir (filename, hash, total_size, total_file_count) ->
+              Filename_map.add filename (Dir { hash; total_size; total_file_count }) acc
+          | `file (filename, hash, size) ->
+              Filename_map.add filename (File { hash; size }) acc
+      )
     in
-    convert (list entry) ~encode ~decode
+    Convert { typ = list entry; encode; decode }
 
   let file_path: Device.file_path t =
     convert_partial (list filename)
@@ -118,29 +122,29 @@ struct
   let hash_index_2: hash_index_2 t =
     let entry =
       record @@
-      ("hash", hash, fst) @
+      ("hash", file_hash, fst) @
       ("paths", file_path_set, snd) @:
       fun hash paths -> hash, paths
     in
     convert (list entry) ~encode: File_hash_map.bindings ~decode: File_hash_map.of_list
 
-  let char_to_hash_map (): _ hash Map.Char.t t =
+  let char_to_hash_map typ =
     let entry =
       record @@
       ("key", char, fst) @
-      ("hash", hash, snd) @:
+      ("hash", hash typ, snd) @:
       fun key hash -> key, hash
     in
     convert (list entry) ~encode: Map.Char.bindings ~decode: Map.Char.of_list
 
-  let hash_index_1: hash_index_1 t = char_to_hash_map ()
+  let hash_index_1: hash_index_1 t = char_to_hash_map hash_index_2
 
-  let hash_index: hash_index t = char_to_hash_map ()
+  let hash_index: hash_index t = char_to_hash_map hash_index_1
 
   let non_empty_root: non_empty_root t =
     record @@
-    ("root_dir", hash, fun x -> x.root_dir) @
-    ("hash_index", hash, fun x -> x.hash_index) @:
+    ("root_dir", hash dir, fun x -> x.root_dir) @
+    ("hash_index", hash hash_index, fun x -> x.hash_index) @:
     fun root_dir hash_index -> { root_dir; hash_index }
 
   let root: root t =

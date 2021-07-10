@@ -155,71 +155,72 @@ module Main = Make_filou (struct let path = Some main end)
 module Clone = Make_filou (struct let path = Some clone end)
 module Filou = Make_filou (struct let path = None end)
 
-let tree () = cmd "tree" [ "-a"; "-s"; "-F" ]
+(* let tree () = cmd "tree" [ "-a"; "-s"; "-F" ] *)
 
-let main_tree () =
-  cd main;
-  tree ()
+(* let main_tree () = *)
+(*   cd main; *)
+(*   tree () *)
 
-let clone_tree () =
-  cd clone;
-  tree ()
+(* let clone_tree () = *)
+(*   cd clone; *)
+(*   tree () *)
 
-let trees () =
-  main_tree ();
-  clone_tree ()
+(* let trees () = *)
+(*   main_tree (); *)
+(*   clone_tree () *)
 
-let hash path = cmd "sha256sum" [ path ]
+(* let hash path = cmd "sha256sum" [ path ] *)
 
 let explore path =
   echo "$ explore %s" path;
   let contents = read_file path in
   Format.printf "%a@." Protype_robin.Explore.pp_string contents
 
-let explore_main path =
-  cd main;
-  explore path
+(* let explore_main path = *)
+(*   cd main; *)
+(*   explore path *)
 
 let explore_clone path =
   cd clone;
   explore (".filou" // path)
 
+(* let explore_hash hash = *)
+(*   explore (String.sub hash 0 2 // String.sub hash 2 2 // hash) *)
+
+(* let explore_main_hash hash = *)
+(*   cd main; *)
+(*   explore_hash hash *)
+
+(* let explore_clone_hash hash = *)
+(*   cd clone; *)
+(*   explore_hash hash *)
+
 let () =
   comment "Initialize a main repository and a clone.";
   Filou.init ~main ();
   Filou.clone ~main ~clone ();
-  trees ();
-  explore_main "root";
   explore_clone "config";
+  Clone.check ();
+  Main.check ();
+  Clone.tree ();
 
   comment "Add a file.";
   cd clone;
   create_file "toto" "blablabla";
   Clone.push [ "toto" ];
-  trees ();
-  explore_main "root";
-  explore_clone "root";
-  explore_main "43/62/43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af";
-  explore_clone "43/62/43628a90e30d5475fb81855cb7b994b364b181b1a538fdf88d5b782df542a1af";
-  cd main;
-  cat "49/2f/492f3f38d6b5d3ca859514e250e25ba65935bcdd9f4f40c124b773fe536fee7d";
-  explore_main "67/17/6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3";
-  explore_clone "67/17/6717e0988b22ed4459cd506aa2f47500f995bfd12b5162b0e2ef32d5e90755d3";
-  explore_main "4a/e0/4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4";
-  explore_clone "4a/e0/4ae0108366313268bd8cd1d15bb66c9f957ee59c6becee2c8d925e87be605df4";
-  explore_main "d4/08/d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a";
-  explore_clone "d4/08/d40850c643ac4845ca143fd122616a1e4caa5b9c1ed7b031b90d4541b69a0f4a";
+  Clone.check ();
+  Clone.tree ();
 
   comment "Add the file again.";
   Clone.push [];
-  trees ();
+  Clone.check ();
+  Clone.tree ();
 
   comment "Add several files.";
   cd clone;
   create_file "tutu" "blu";
   create_file "titi" "blibli";
   Clone.push [ "tutu"; "titi" ];
-  trees ();
   Main.check ();
   Clone.check ();
   Clone.tree ();

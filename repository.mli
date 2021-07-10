@@ -2,20 +2,22 @@ open Misc
 
 type 'a hash
 
-val hash_type: _ hash Protype.t
+val hash_type: 'a Protype.t -> 'a hash Protype.t
 val hex_of_hash: _ hash -> string
 val bin_of_hash: _ hash -> string
 val compare_hashes: _ hash -> _ hash -> int
 
-module Raw_hash_set:
-sig
-  type t
-  val empty: t
-  val add: _ hash -> t -> t
-  val mem: _ hash -> t -> bool
-end
+(* module Raw_hash_set: *)
+(* sig *)
+(*   type t *)
+(*   val empty: t *)
+(*   val add: _ hash -> t -> t *)
+(*   val mem: _ hash -> t -> bool *)
+(* end *)
 
 type file
+
+val file_hash_type: file hash Protype.t
 
 module type ROOT =
 sig
@@ -72,7 +74,7 @@ sig
     t -> 'a Protype.t -> 'a -> ('a hash, [> `failed ]) r
 
   (** Fetch an object from its hash and decode it. *)
-  val fetch: t -> 'a Protype.t -> 'a hash ->
+  val fetch: t -> 'a hash ->
     ('a, [> `failed | `not_available ]) r
 
   (** Store a file as an object. *)
@@ -100,11 +102,8 @@ sig
   val fetch_root: t ->
     (root, [> `failed ]) r
 
-  (** Remove objects which are not in a given hash set. *)
-  (* TODO: rework this, [everything_except] could be computed automatically
-     (and update the description of [set_read_only]). *)
-  val garbage_collect: t -> everything_except: Raw_hash_set.t ->
-    (unit, [> `failed ]) r
+  (** Remove unreachable objects. *)
+  val garbage_collect: t -> (unit, [> `failed ]) r
 end
 
 module Make (Root: ROOT): S with type root = Root.t and type t = Device.location
