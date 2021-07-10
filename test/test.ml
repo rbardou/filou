@@ -346,62 +346,54 @@ let () =
   Clone.rm ~r: true [ "." ];
   Clone.check ();
   Clone.tree ~size: true ~count: true ();
+  Clone.push [];
+  Clone.tree ();
 
-(*   comment "Try to push a directory while a file already exists with the same name."; *)
-(*   rm "toto"; *)
-(*   mkdir "toto"; *)
-(*   create_file "toto/wrong" "this shouldn't be here"; *)
-(*   Filou.push []; *)
-(*   Clone.tree ~duplicates: true (); *)
-(*   rm "toto/wrong"; *)
-(*   rmdir "toto"; *)
-(*   Clone.tree ~duplicates: true (); *)
-(*   Filou.pull []; *)
-(*   cat "toto"; *)
+  comment "Try to push a directory while a file already exists with the same name.";
+  rm "toto";
+  mkdir "toto";
+  create_file "toto/wrong" "this shouldn't be here";
+  Clone.push [];
+  Clone.tree ~duplicates: true ();
+  rm "toto/wrong";
+  rmdir "toto";
+  Clone.tree ~duplicates: true ();
+  Clone.pull [];
+  cat "toto";
 
-(*   comment "Same, but with a deeper directory."; *)
-(*   rm "toto"; *)
-(*   mkdir "toto"; *)
-(*   mkdir "toto/tutu"; *)
-(*   create_file "toto/tutu/wrong" "this shouldn't be here"; *)
-(*   Filou.push []; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
-(*   rm "toto/tutu/wrong"; *)
-(*   rmdir "toto/tutu"; *)
-(*   rmdir "toto"; *)
-(*   Filou.pull []; *)
-(*   cat "toto"; *)
+  comment "Same, but with a deeper directory.";
+  rm "toto";
+  mkdir "toto";
+  mkdir "toto/tutu";
+  create_file "toto/tutu/wrong" "this shouldn't be here";
+  Clone.push [];
+  rm "toto/tutu/wrong";
+  rmdir "toto/tutu";
+  rmdir "toto";
+  Clone.pull [];
+  cat "toto";
 
-(*   comment "Try to push a file while a directory already exists for one of its parent."; *)
-(*   rm "bla/bli/blo"; *)
-(*   rm "bla/bli/blu"; *)
-(*   rmdir "bla/bli"; *)
-(*   create_file "bla/bli" "I should be a directory"; *)
-(*   Filou.push []; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
-(*   rm "bla/bli"; *)
-(*   rmdir "bla"; *)
-(*   create_file "bla" "I should be a directory"; *)
-(*   Filou.push []; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
-(*   rm "bla"; *)
-(*   Filou.pull []; *)
+  comment "Same, but with a deeper directory but the first directory exists.";
+  rm "bla/bli/plouf";
+  mkdir "bla/bli/plouf";
+  mkdir "bla/bli/plouf/tutu";
+  create_file "bla/bli/plouf/tutu/wrong" "this shouldn't be here";
+  Clone.push [];
+  rm "bla/bli/plouf/tutu/wrong";
+  rmdir "bla/bli/plouf/tutu";
+  rmdir "bla/bli/plouf";
+  Clone.pull [];
+  cat "bla/bli/plouf";
+  Clone.tree ();
 
-(*   Filou.ls (); *)
-(*   trees (); *)
-(*   Filou.push []; *)
-(*   Filou.ls (); *)
-(*   rm "toto"; *)
-(*   Filou.ls (); *)
-(*   Filou.pull []; *)
-(*   trees (); *)
-(*   hash "toto"; *)
-(*   Filou.push []; *)
-(*   Filou.rm [ "toto" ]; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
+  comment "Try to push a file while a directory already exists for one of its parent.";
+  rm "bla/bli/plouf";
+  rmdir "bla/bli";
+  create_file "bla/bli" "I should be a directory";
+  Clone.push [];
+  Clone.tree ();
+  rm "bla/bli";
+  Clone.pull [];
+  cat "bla/bli/plouf";
 
   ()

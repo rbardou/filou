@@ -947,3 +947,145 @@ $ main.exe --no-color tree --size --count
 ├++ titi (6 B)
 ├++ toto (9 B)
 └++ tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Pushed: titi
+Pushed: bla/blo/plouf
+Pushed: bla/bli/plouf
+Pushed: toto
+Pushed: tutu
+Pushed: plif (duplicate of: bla/blo/plouf)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+# Try to push a directory while a file already exists with the same name.
+$ rm toto
+$ mkdir toto
+$ echo 'this shouldn'\''t be here' > toto/wrong
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Error:
+  failed to push file: toto/wrong:
+  parent directory already exists as a file: toto
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto?
+└── tutu
+$ rm toto/wrong
+$ rmdir toto
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├-- toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color pull
+Pulled: toto
+$ cat toto
+blablabla%
+# Same, but with a deeper directory.
+$ rm toto
+$ mkdir toto
+$ mkdir toto/tutu
+$ echo 'this shouldn'\''t be here' > toto/tutu/wrong
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Error:
+  failed to push file: toto/tutu/wrong:
+  parent directory already exists as a file: toto
+Exit code: 1
+$ rm toto/tutu/wrong
+$ rmdir toto/tutu
+$ rmdir toto
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color pull
+Pulled: toto
+$ cat toto
+blablabla%
+# Same, but with a deeper directory but the first directory exists.
+$ rm bla/bli/plouf
+$ mkdir bla/bli/plouf
+$ mkdir bla/bli/plouf/tutu
+$ echo 'this shouldn'\''t be here' > bla/bli/plouf/tutu/wrong
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Error:
+  failed to push file: bla/bli/plouf/tutu/wrong:
+  parent directory already exists as a file: bla/bli/plouf
+Exit code: 1
+$ rm bla/bli/plouf/tutu/wrong
+$ rmdir bla/bli/plouf/tutu
+$ rmdir bla/bli/plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color pull
+Pulled: bla/bli/plouf
+$ cat bla/bli/plouf
+plaf%
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+# Try to push a file while a directory already exists for one of its parent.
+$ rm bla/bli/plouf
+$ rmdir bla/bli
+$ echo 'I should be a directory' > bla/bli
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Error:
+  failed to push file: bla/bli:
+  file already exists as a directory
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli?
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ rm bla/bli
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color pull
+Pulled: bla/bli/plouf
+$ cat bla/bli/plouf
+plaf%

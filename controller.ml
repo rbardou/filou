@@ -537,7 +537,7 @@ let push_file ~verbose (setup: Clone.setup) (root: root)
             | Some (File _) ->
                 failed [
                   "parent directory already exists as a file: " ^
-                  (Device.show_path (List.rev dir_path_rev));
+                  (Device.show_file_path (List.rev dir_path_rev, head));
                 ]
             | Some (Dir { hash = head_dir_hash; total_size; total_file_count }) ->
                 let* dir = fetch_or_fail setup T.dir head_dir_hash in
