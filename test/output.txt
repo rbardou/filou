@@ -706,3 +706,244 @@ $ cat toto
 blablabla%
 $ cat tutu
 blu%
+# Remove files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (30 B) (6 files)
+├── bla/ (8 B) (2 files)
+│   ├── bli/ (4 B) (1 file)
+│   │   └── plouf (4 B)
+│   └── blo/ (4 B) (1 file)
+│       └── plouf (4 B)
+├── plif (4 B)
+├── titi (6 B)
+├── toto (9 B)
+└── tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color rm plif
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Directory structure looks ok (total size: 26, file count: 5).
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (26 B) (5 files)
+├── bla/ (8 B) (2 files)
+│   ├── bli/ (4 B) (1 file)
+│   │   └── plouf (4 B)
+│   └── blo/ (4 B) (1 file)
+│       └── plouf (4 B)
+├++ plif (4 B)
+├── titi (6 B)
+├── toto (9 B)
+└── tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color rm titi toto tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Directory structure looks ok (total size: 8, file count: 2).
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (8 B) (2 files)
+├── bla/ (8 B) (2 files)
+│   ├── bli/ (4 B) (1 file)
+│   │   └── plouf (4 B)
+│   └── blo/ (4 B) (1 file)
+│       └── plouf (4 B)
+├++ plif (4 B)
+├++ titi (6 B)
+├++ toto (9 B)
+└++ tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color rm bla/bli/plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Directory structure looks ok (total size: 4, file count: 1).
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (4 B) (1 files)
+├── bla/ (4 B) (1 file)
+│   ├++ bli/
+│   └── blo/ (4 B) (1 file)
+│       └── plouf (4 B)
+├++ plif (4 B)
+├++ titi (6 B)
+├++ toto (9 B)
+└++ tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color rm bla/blo/plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Repository is empty.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (0 B) (0 files)
+├++ bla/
+├++ plif (4 B)
+├++ titi (6 B)
+├++ toto (9 B)
+└++ tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Pushed: titi
+Pushed: bla/blo/plouf
+Pushed: bla/bli/plouf
+Pushed: toto
+Pushed: tutu
+Pushed: plif (duplicate of: bla/blo/plouf)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (30 B) (6 files)
+├── bla/ (8 B) (2 files)
+│   ├── bli/ (4 B) (1 file)
+│   │   └── plouf (4 B)
+│   └── blo/ (4 B) (1 file)
+│       └── plouf (4 B)
+├── plif (4 B)
+├── titi (6 B)
+├── toto (9 B)
+└── tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color rm plif bla/bli/plouf bla/blo/plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Directory structure looks ok (total size: 18, file count: 3).
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (18 B) (3 files)
+├++ bla/
+├++ plif (4 B)
+├── titi (6 B)
+├── toto (9 B)
+└── tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Pushed: bla/blo/plouf
+Pushed: bla/bli/plouf
+Pushed: plif (duplicate of: bla/blo/plouf)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Directory structure looks ok (total size: 30, file count: 6).
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (30 B) (6 files)
+├── bla/ (8 B) (2 files)
+│   ├── bli/ (4 B) (1 file)
+│   │   └── plouf (4 B)
+│   └── blo/ (4 B) (1 file)
+│       └── plouf (4 B)
+├── plif (4 B)
+├── titi (6 B)
+├── toto (9 B)
+└── tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color rm plif bla/bli
+Error:
+  bla/bli is a directory, use --recursive (or -r) to remove it and its contents
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Directory structure looks ok (total size: 30, file count: 6).
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (30 B) (6 files)
+├── bla/ (8 B) (2 files)
+│   ├── bli/ (4 B) (1 file)
+│   │   └── plouf (4 B)
+│   └── blo/ (4 B) (1 file)
+│       └── plouf (4 B)
+├── plif (4 B)
+├── titi (6 B)
+├── toto (9 B)
+└── tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color rm -r plif bla/bli
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Directory structure looks ok (total size: 22, file count: 4).
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (22 B) (4 files)
+├── bla/ (4 B) (1 file)
+│   ├++ bli/
+│   └── blo/ (4 B) (1 file)
+│       └── plouf (4 B)
+├++ plif (4 B)
+├── titi (6 B)
+├── toto (9 B)
+└── tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Pushed: bla/bli/plouf
+Pushed: plif (duplicate of: bla/blo/plouf)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color rm -r bla
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Directory structure looks ok (total size: 22, file count: 4).
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (22 B) (4 files)
+├++ bla/
+├── plif (4 B)
+├── titi (6 B)
+├── toto (9 B)
+└── tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Pushed: bla/blo/plouf (duplicate of: plif)
+Pushed: bla/bli/plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color rm -r .
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Checking clone repository at: /tmp/filou-test/clone/
+Repository is empty.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --size --count
+. (0 B) (0 files)
+├++ bla/
+├++ plif (4 B)
+├++ titi (6 B)
+├++ toto (9 B)
+└++ tutu (3 B)

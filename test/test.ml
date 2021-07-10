@@ -132,8 +132,8 @@ struct
   let ls ?v ?dry_run ?color ?path () =
     run ?v ?dry_run ?color ("ls" :: list_of_option path)
 
-  let rm ?v ?dry_run ?color paths =
-    run ?v ?dry_run ?color ("rm" :: paths)
+  let rm ?v ?dry_run ?color ?(r = false) paths =
+    run ?v ?dry_run ?color ("rm" :: flag r "-r" @ paths)
 
   let check ?v ?dry_run ?color ?path () =
     run ?v ?dry_run ?color ("check" :: list_of_option path)
@@ -308,6 +308,45 @@ let () =
   cat "toto";
   cat "tutu";
 
+  comment "Remove files.";
+  Clone.tree ~size: true ~count: true ();
+  Clone.rm [ "plif" ];
+  Clone.check ();
+  Clone.tree ~size: true ~count: true ();
+  Clone.rm [ "titi"; "toto"; "tutu"; ];
+  Clone.check ();
+  Clone.tree ~size: true ~count: true ();
+  Clone.rm [ "bla/bli/plouf" ];
+  Clone.check ();
+  Clone.tree ~size: true ~count: true ();
+  Clone.rm [ "bla/blo/plouf" ];
+  Clone.check ();
+  Clone.tree ~size: true ~count: true ();
+  Clone.push [];
+  Clone.tree ~size: true ~count: true ();
+  Clone.rm [ "plif"; "bla/bli/plouf"; "bla/blo/plouf" ];
+  Clone.check ();
+  Clone.tree ~size: true ~count: true ();
+  Clone.push [];
+  Clone.check ();
+  Clone.tree ~size: true ~count: true ();
+  Clone.rm [ "plif"; "bla/bli" ];
+  Clone.check ();
+  Clone.tree ~size: true ~count: true ();
+  Clone.rm ~r: true [ "plif"; "bla/bli" ];
+  Clone.check ();
+  Clone.tree ~size: true ~count: true ();
+  Clone.push [];
+  Clone.tree ();
+  Clone.rm ~r: true [ "bla" ];
+  Clone.check ();
+  Clone.tree ~size: true ~count: true ();
+  Clone.push [];
+  Clone.tree ();
+  Clone.rm ~r: true [ "." ];
+  Clone.check ();
+  Clone.tree ~size: true ~count: true ();
+
 (*   comment "Try to push a directory while a file already exists with the same name."; *)
 (*   rm "toto"; *)
 (*   mkdir "toto"; *)
@@ -364,47 +403,5 @@ let () =
 (*   Filou.rm [ "toto" ]; *)
 (*   trees (); *)
 (*   Filou.ls (); *)
-
-(*   comment "Play with two more files which are equal."; *)
-(*   create_file "tatator" "anursetanruseitanrsiute"; *)
-(*   create_file "tatator2" "anursetanruseitanrsiute"; *)
-(*   Filou.push [ "toto" ]; *)
-(*   Filou.push []; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
-(*   Filou.rm [ "toto" ]; *)
-(*   trees (); *)
-(*   Filou.rm [ "tatator2" ]; *)
-(*   trees (); *)
-(*   Filou.rm [ "tatator" ]; *)
-(*   trees (); *)
-
-(*   comment "Play with subdirectories."; *)
-(*   mkdir "bla"; *)
-(*   mkdir "bla/bli"; *)
-(*   create_file "bla/bli/blo" "blabliblo"; *)
-(*   create_file "bla/bli/blu" "bliblablo"; *)
-(*   Filou.push [ "bla/bli" ]; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
-(*   Filou.push []; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
-
-(*   comment "Remove files from the clone and pull them again."; *)
-(*   rm "bla/bli/blo"; *)
-(*   rm "bla/bli/blu"; *)
-(*   rm "tatator"; *)
-(*   rm "tatator2"; *)
-(*   rm "toto"; *)
-(*   Filou.ls (); *)
-(*   Filou.pull []; *)
-(*   trees (); *)
-(*   Filou.ls (); *)
-(*   cat "bla/bli/blo"; *)
-(*   cat "bla/bli/blu"; *)
-(*   cat "tatator"; *)
-(*   cat "tatator2"; *)
-(*   cat "toto"; *)
 
   ()

@@ -141,6 +141,7 @@ let rec check_dir ~all_files_must_be_available expected_hash_index
   in
   ok (!path_size, !path_file_count)
 
+(* TODO: check whether we kept empty Dir nodes (same in hash index). *)
 let check (location: Device.location) =
   let* is_main =
     match read_clone_config ~clone_location: location with
@@ -716,6 +717,7 @@ let pull ~verbose setup (paths: Device.path list) =
   list_iter_e paths (pull root_dir [])
 
 type remove_result =
+  | Unchanged
   | Removed_whole_dir
   | Dir_not_empty of {
       new_dir_hash: dir Repository.hash;
@@ -724,110 +726,193 @@ type remove_result =
     }
 
 let remove ~recursive setup (paths: Device.path list) =
-  ignore (recursive, setup, paths);
-  assert false
-(*   let rec remove (dir: dir) dir_path_rev (path: Device.path) = *)
-(*     match path with *)
-(*       | [] -> *)
-(*           (\* Fully followed the requested path: remove where we are, i.e. [dir]. *\) *)
-(*           if recursive then *)
-(* (\*             (\\* TODO: after that we need to return how to update the parent... *\\) *\) *)
-(* (\*             let* () = *\) *)
-(* (\*               list_iter_e (Filename_map.bindings dir) @@ fun (filename, _) -> *\) *)
-(* (\*               let* (_: remove_result) = remove dir dir_path_rev [ filename ] in *\) *)
-(* (\*               unit *\) *)
-(* (\*             in *\) *)
-(*             ok Removed_whole_dir *)
-(*           else *)
-(*             failed [ *)
-(*               sf "%s is a directory, use --recursive (or -r) to remove it and its contents" *)
-(*                 (Device.show_path (List.rev dir_path_rev)) *)
-(*             ] *)
-(*       | head :: tail -> *)
-(*           match Filename_map.find_opt head dir with *)
-(*             | None -> *)
-(*                 failed [ *)
-(*                   "no such file or directory: " ^ Device.show_path (List.rev dir_path_rev); *)
-(*                 ] *)
-(*             | Some (Dir { hash; total_size; total_file_count }) -> *)
-(*                 (\* Requested to remove [head/tail] from [dir]. *\) *)
-(*                 (\* Find [subdir] named [head] in [dir]. *\) *)
-(*                 let* subdir = fetch_or_fail setup T.dir hash in *)
-(*                 (\* Remove [tail] from [subdir]. *\) *)
-(*                 let* remove_result = *)
-(*                   remove subdir (head :: dir_path_rev) tail *)
-(*                 in *)
-(*                 (\* Update [dir]. *\) *)
-(*                 ( *)
-(*                   match remove_result with *)
-(*                     | Removed_whole_dir -> *)
-(*                         let new_dir = Filename_map.remove head dir in *)
-(*                         if Filename_map.is_empty new_dir then *)
-(*                           ok Removed_whole_dir *)
-(*                         else *)
-(*                           let* new_dir_hash = Repository.store_later setup T.dir new_dir in *)
-(*                           (\* TODO: share with below? *\) *)
-(*                           ok ( *)
-(*                             Dir_not_empty { *)
-(*                               new_dir_hash; *)
-(*                               size_diff = total_size; *)
-(*                               file_count_diff = total_file_count; *)
-(*                             } *)
-(*                           ) *)
-(*                     | Dir_not_empty { new_dir_hash; size_diff; file_count_diff } -> *)
-(*                         let new_dir = *)
-(*                           Filename_map.add head *)
-(*                             ( *)
-(*                               Dir { *)
-(*                                 hash = new_dir_hash; *)
-(*                                 total_size = total_size - size_diff; *)
-(*                                 total_file_count = total_file_count - file_count_diff; *)
-(*                               } *)
-(*                             ) *)
-(*                             dir *)
-(*                         in *)
-(*                         let* new_dir_hash = Repository.store_later setup T.dir new_dir in *)
-(*                         ok ( *)
-(*                           Dir_not_empty { *)
-(*                             new_dir_hash; *)
-(*                             size_diff; *)
-(*                             file_count_diff; *)
-(*                           } *)
-(*                         ) *)
-(*                 ) *)
-(*             | Some (File { size; _ }) -> *)
-(*                 match tail with *)
-(*                   | _ :: _ -> *)
-(*                       failed [ *)
-(*                         "no such file or directory: " ^ *)
-(*                         Device.show_path (List.rev_append dir_path_rev path); *)
-(*                         Device.show_path (List.rev dir_path_rev) ^ *)
-(*                         " is a file"; *)
-(*                       ] *)
-(*                   | [] -> *)
-(*                       (\* Remove from current [dir]. *\) *)
-(*                       let new_dir = Filename_map.remove head dir in *)
-(*                       let* new_dir_hash = *)
-(*                         if Filename_map.is_empty new_dir then *)
-(*                           ok None *)
-(*                         else *)
-(*                           let* new_dir_hash = Repository.store_later setup T.dir new_dir in *)
-(*                           ok (Some new_dir_hash) *)
-(*                       in *)
-(*                       (\* Return information necessary to update the parent. *\) *)
-(*                       match new_dir_hash with *)
-(*                         | None -> *)
-(*                             ok Removed_whole_dir *)
-(*                         | Some new_dir_hash -> *)
-(*                             ok ( *)
-(*                               Dir_not_empty { *)
-(*                                 new_dir_hash; *)
-(*                                 size_diff = size; *)
-(*                                 file_count_diff = 1; *)
-(*                               } *)
-(*                             ) *)
-(*   in *)
-(*   (\* TODO: update hash_index *\) *)
-(*   let* root = Repository.fetch_root setup in *)
-(*   let* root_dir = fetch_or_fail setup T.dir root.root_dir in *)
-(*   list_iter_e paths (remove root_dir []) *)
+  let removed_paths = ref [] in
+  let rec remove_from_dir (dir: dir) dir_path_rev (path: Device.path) =
+    match path with
+      | [] ->
+          (* Fully followed the requested path: remove where we are, i.e. [dir]. *)
+          if recursive then
+            (* We could return [Removed_whole_dir], but we need to update [removed_paths]. *)
+            let* () =
+              list_iter_e (Filename_map.bindings dir) @@ fun (filename, _) ->
+              let* (_: remove_result) = remove_from_dir dir dir_path_rev [ filename ] in
+              unit
+            in
+            ok Removed_whole_dir
+          else
+            failed [
+              sf "%s is a directory, use --recursive (or -r) to remove it and its contents"
+                (Device.show_path (List.rev dir_path_rev))
+            ]
+      | head :: tail ->
+          match Filename_map.find_opt head dir with
+            | None ->
+                (* Requested to remove something that doesn't exist. *)
+                ok Unchanged
+            | Some (Dir { hash; total_size; total_file_count }) ->
+                (* Requested to remove [head/tail] from [dir]. *)
+                (* Find [subdir] named [head] in [dir]. *)
+                let* subdir = fetch_or_fail setup T.dir hash in
+                (* Remove [tail] from [subdir]. *)
+                let* remove_result =
+                  remove_from_dir subdir (head :: dir_path_rev) tail
+                in
+                (* Update [dir]. *)
+                (
+                  match remove_result with
+                    | Unchanged ->
+                        ok Unchanged
+                    | Removed_whole_dir ->
+                        (* Removed [subdir], i.e. [head], completely. *)
+                        let new_dir = Filename_map.remove head dir in
+                        if Filename_map.is_empty new_dir then
+                          ok Removed_whole_dir
+                        else
+                          let* new_dir_hash = store_later setup T.dir new_dir in
+                          (* TODO: share with below? *)
+                          ok (
+                            Dir_not_empty {
+                              new_dir_hash;
+                              size_diff = total_size;
+                              file_count_diff = total_file_count;
+                            }
+                          )
+                    | Dir_not_empty { new_dir_hash; size_diff; file_count_diff } ->
+                        (* Removed part of [head], which still contains files. *)
+                        let new_dir =
+                          Filename_map.add head
+                            (
+                              Dir {
+                                hash = new_dir_hash;
+                                total_size = total_size - size_diff;
+                                total_file_count = total_file_count - file_count_diff;
+                              }
+                            )
+                            dir
+                        in
+                        let* new_dir_hash = store_later setup T.dir new_dir in
+                        ok (
+                          Dir_not_empty {
+                            new_dir_hash;
+                            size_diff;
+                            file_count_diff;
+                          }
+                        )
+                )
+            | Some (File { hash; size }) ->
+                match tail with
+                  | _ :: _ ->
+                      failed [
+                        "no such file or directory: " ^
+                        Device.show_path (List.rev_append dir_path_rev path);
+                        Device.show_path (List.rev dir_path_rev) ^
+                        " is a file";
+                      ]
+                  | [] ->
+                      (* Remove file [head] from current [dir]. *)
+                      let new_dir = Filename_map.remove head dir in
+                      removed_paths :=
+                        (hash, (List.rev dir_path_rev, head)) :: !removed_paths;
+                      if Filename_map.is_empty new_dir then
+                        ok Removed_whole_dir
+                      else
+                        let* new_dir_hash = store_later setup T.dir new_dir in
+                        ok (
+                          Dir_not_empty {
+                            new_dir_hash;
+                            size_diff = size;
+                            file_count_diff = 1;
+                          }
+                        )
+  in
+  let* root = Repository.fetch_root setup in
+  match root, paths with
+    | Empty, [] ->
+        unit
+    | Empty, _ :: _ ->
+        failed [ "repository is empty" ]
+    | Non_empty { hash_index; _ }, _ ->
+        (* Update [root_dir]. *)
+        let* root =
+          list_fold_e root paths @@ fun root path ->
+          let* root_dir = fetch_root_dir setup root in
+          let* remove_result = remove_from_dir root_dir [] path in
+          match remove_result with
+            | Removed_whole_dir ->
+                ok Empty
+            | Unchanged ->
+                ok root
+            | Dir_not_empty { new_dir_hash; _ } ->
+                ok (Non_empty { root_dir = new_dir_hash; hash_index })
+        in
+        let* root =
+          match root with
+            | Empty ->
+                ok Empty
+            | Non_empty root ->
+                (* Update [hash_index].
+                   Note: removing files with no pathes that lead to them
+                   is a task for the garbage collector. *)
+                (* TODO: this is probably inefficient as we re-fetch stuff
+                   that we just stored. *)
+                let* hash_index = fetch_or_fail setup T.hash_index root.hash_index in
+                let* new_hash_index =
+                  list_fold_e hash_index !removed_paths @@
+                  fun hash_index (hash, path) ->
+                  let hash_bin = Repository.bin_of_hash hash in
+                  let char0 = hash_bin.[0] in
+                  let char1 = hash_bin.[1] in
+                  let* hash_index_1 =
+                    match Map.Char.find_opt char0 hash_index with
+                      | None ->
+                          ok Map.Char.empty
+                      | Some hash_index_1_hash ->
+                          fetch_or_fail setup T.hash_index_1 hash_index_1_hash
+                  in
+                  let* hash_index_2 =
+                    match Map.Char.find_opt char1 hash_index_1 with
+                      | None ->
+                          ok File_hash_map.empty
+                      | Some hash_index_2_hash ->
+                          fetch_or_fail setup T.hash_index_2 hash_index_2_hash
+                  in
+                  let set =
+                    match File_hash_map.find_opt hash hash_index_2 with
+                      | None ->
+                          File_path_set.empty
+                      | Some set ->
+                          set
+                  in
+                  let new_set = File_path_set.remove path set in
+                  let new_hash_index_2 =
+                    if File_path_set.is_empty new_set then
+                      File_hash_map.remove hash hash_index_2
+                    else
+                      File_hash_map.add hash new_set hash_index_2
+                  in
+                  let* new_hash_index_1 =
+                    if File_hash_map.is_empty new_hash_index_2 then
+                      ok (Map.Char.remove char1 hash_index_1)
+                    else
+                      let* new_hash_index_2_hash =
+                        store_later setup T.hash_index_2 new_hash_index_2
+                      in
+                      ok (Map.Char.add char1 new_hash_index_2_hash hash_index_1)
+                  in
+                  if Map.Char.is_empty new_hash_index_1 then
+                    ok (Map.Char.remove char0 hash_index)
+                  else
+                    let* new_hash_index_1_hash =
+                      store_later setup T.hash_index_1 new_hash_index_1
+                    in
+                    ok (Map.Char.add char0 new_hash_index_1_hash hash_index)
+                in
+                let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
+                ok (
+                  Non_empty {
+                    root_dir = root.root_dir;
+                    hash_index = new_hash_index_hash;
+                  }
+                )
+        in
+        Repository.store_root setup root
