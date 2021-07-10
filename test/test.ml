@@ -76,6 +76,10 @@ let rm path =
   echo "$ rm %s" (Filename.quote_if_needed path);
   Unix.unlink path
 
+let mv a b =
+  echo "$ mv %s %s" (Filename.quote_if_needed a) (Filename.quote_if_needed b);
+  Unix.rename a b
+
 let mkdir path =
   echo "$ mkdir %s" (Filename.quote_if_needed path);
   Unix.mkdir path 0o750
@@ -139,7 +143,7 @@ struct
     run ?v ?dry_run ?color ("check" :: list_of_option path)
 
   let tree ?v ?dry_run ?color ?depth ?(only_dirs = false) ?(size = false) ?(count = false)
-      ?(duplicates = false) ?path () =
+      ?(duplicates = false) ?(cache = false) ?path () =
     run ?v ?dry_run ?color (
       "tree"
       :: list_of_option ~name: "--depth" (Option.map string_of_int depth)
@@ -148,6 +152,7 @@ struct
       @ flag size "--size"
       @ flag count "--count"
       @ flag duplicates "--duplicates"
+      @ flag cache "--cache"
     )
 
   let prune ?v ?dry_run ?color () =
@@ -404,5 +409,11 @@ let () =
   Clone.prune ();
   Clone.check ();
   Clone.tree ();
+
+  comment "Check that the main repository is not read with --cache.";
+  mv main (main ^ ".backup");
+  Clone.tree ();
+  Clone.tree ~cache: true ();
+  mv (main ^ ".backup") main;
 
   ()

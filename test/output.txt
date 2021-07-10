@@ -902,3 +902,24 @@ $ main.exe --no-color tree
 ├── titi
 ├── toto
 └── tutu
+# Check that the main repository is not read with --cache.
+$ mv /tmp/filou-test/main /tmp/filou-test/main.backup
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+Error:
+  failed to fetch root:
+  no such file: /tmp/filou-test/main/root
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --cache
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ mv /tmp/filou-test/main.backup /tmp/filou-test/main

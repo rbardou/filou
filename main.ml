@@ -85,6 +85,15 @@ let () =
              the total number of copies."
           false
       in
+      let cache =
+        Clap.flag
+          ~set_long: "cache"
+          ~set_short: 'C'
+          ~description:
+            "Only read from the clone repository cache, not the main \
+             repository. Output may not be up-to-date."
+          false
+      in
       let path =
         Clap.default_string
           ~description: "Path to the directory to print."
@@ -93,7 +102,7 @@ let () =
       in
       (
         path, max_depth, only_main, only_dirs, print_size, print_file_count,
-        print_duplicates
+        print_duplicates, cache
       )
     in
     Clap.subcommand [
@@ -243,14 +252,14 @@ let () =
           Controller.clone ~main_location ~clone_location
       | `tree (
           path, max_depth, only_main, only_dirs, print_size, print_file_count,
-          print_duplicates
+          print_duplicates, cache
         ) ->
-          let* setup = find_local_clone () in
+          let* setup = find_local_clone ~clone_only: cache () in
           let* path = Device.parse_path (Clone.clone setup) path in
           Controller.tree ~color ~max_depth ~only_main ~only_dirs ~print_size
             ~print_file_count ~print_duplicates setup path
       | `push paths ->
-          let* setup = find_local_clone () in
+          let* setup = find_local_clone ~clone_only: false () in
           let paths =
             match paths with
               | [] -> [ "." ]
@@ -259,7 +268,7 @@ let () =
           let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
           Controller.push ~verbose setup paths
       | `pull paths ->
-          let* setup = find_local_clone () in
+          let* setup = find_local_clone ~clone_only: false () in
           let paths =
             match paths with
               | [] -> [ "." ]
@@ -268,14 +277,16 @@ let () =
           let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
           Controller.pull ~verbose setup paths
       | `rm (paths, recursive) ->
-          let* setup = find_local_clone () in
+          let* setup = find_local_clone ~clone_only: false () in
           let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
           Controller.remove ~recursive setup paths
       | `check location ->
+          (* TODO: be able to check the clone cache *)
           let* location = parse_location location in
           Controller.check location
       | `prune ->
-          let* setup = find_local_clone () in
+          (* TODO: be able to prune the clone cache *)
+          let* setup = find_local_clone ~clone_only: false () in
           Controller.prune setup
       | `log ->
           assert false (* TODO *)

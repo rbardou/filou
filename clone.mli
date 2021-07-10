@@ -1,7 +1,7 @@
 type setup
 
-val setup: main: Device.location -> clone: Device.location -> setup
-val main: setup -> Device.location
+val setup: main: Device.location option -> clone: Device.location -> setup
+val main: setup -> Device.location option
 
 (** Returns the location given to [setup], i.e. not [.filou]. *)
 val clone: setup -> Device.location

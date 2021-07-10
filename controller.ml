@@ -41,12 +41,18 @@ let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
   (* Initialize the clone. *)
   write_clone_config ~clone_location { main_location }
 
-let find_local_clone mode =
+let find_local_clone ~clone_only mode =
   let rec find current =
     let clone_location = Device.Local (mode, current) in
     match read_clone_config ~clone_location with
       | OK config ->
-          OK (Clone.setup ~main: config.main_location ~clone: clone_location)
+          let main =
+            if clone_only then
+              None
+            else
+              Some config.main_location
+          in
+          OK (Clone.setup ~main ~clone: clone_location)
       | ERROR { code = (`no_such_file | `failed); _ } ->
           match Path.parent current with
             | None -> failed [ "not in a clone repository" ]
