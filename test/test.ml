@@ -76,6 +76,11 @@ let rm path =
   echo "$ rm %s" (Filename.quote_if_needed path);
   Unix.unlink path
 
+let rm_rf path =
+  if Filename.is_relative path then
+    invalid_arg "rm_rf: path must be absolute to avoid mistakes";
+  cmd "rm" [ "-r"; "-f"; path ]
+
 let mv a b =
   echo "$ mv %s %s" (Filename.quote_if_needed a) (Filename.quote_if_needed b);
   Unix.rename a b
@@ -157,6 +162,9 @@ struct
 
   let prune ?v ?dry_run ?color () =
     run ?v ?dry_run ?color [ "prune" ]
+
+  let update ?v ?dry_run ?color () =
+    run ?v ?dry_run ?color [ "update" ]
 end
 
 module Main = Make_filou (struct let path = Some main end)
@@ -169,9 +177,9 @@ let main_tree () =
   cd main;
   tree ()
 
-(* let clone_tree () = *)
-(*   cd clone; *)
-(*   tree () *)
+let clone_tree () =
+  cd clone;
+  tree ()
 
 (* let trees () = *)
 (*   main_tree (); *)
@@ -402,6 +410,25 @@ let () =
   Clone.pull [];
   cat "bla/bli/plouf";
 
+  comment "Test update.";
+  Clone.update ();
+  cd clone;
+  explore ".filou/root";
+  rm ".filou/12/f4/12f41d5b6b1957d3b926019b508f08521e1614c9dff595500dc15b11cb13cd7b";
+  Clone.update ();
+  Clone.update ();
+  rm ".filou/12/f4/12f41d5b6b1957d3b926019b508f08521e1614c9dff595500dc15b11cb13cd7b";
+  rm ".filou/d1/0f/d10fb33ec821d25bc7ba85a23553a73e1f4d936a7eaf5632c559485c32f50512";
+  Clone.update ();
+  Clone.update ();
+  rm_rf (clone // ".filou");
+  Filou.clone ~main ~clone ();
+  clone_tree ();
+  Clone.update ();
+  clone_tree ();
+  Clone.check ~cache: true ();
+  Clone.tree ~cache: true ();
+
   comment "Check what prune removes.";
   Clone.prune ();
   Clone.check ();
@@ -412,5 +439,9 @@ let () =
   Clone.tree ();
   Clone.tree ~cache: true ();
   mv (main ^ ".backup") main;
+
+  (* TODO: Check that with two clones A and B, if A pushes stuff, then if B reads
+     this new stuff (e.g. with "tree"), the new objects are put in its cache,
+     unless read-only mode (--dry-run) is active. *)
 
   ()

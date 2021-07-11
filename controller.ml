@@ -917,6 +917,24 @@ let remove ~recursive setup (paths: Device.path list) =
         in
         Repository.store_root setup root
 
+let update setup =
+  echo "Computing reachable object set...";
+  let* count =
+    with_progress @@ fun () ->
+    let on_availability_check_progress ~checked ~count =
+      Progress_bar.set "Checking availability (%d / %d) (%d%%)" checked count
+        (checked * 100 / count)
+    in
+    let on_copy_progress ~transferred ~count =
+      Progress_bar.set "Copying (%d / %d) (%d%%)" transferred count
+        (transferred * 100 / count)
+    in
+    Repository.update ~on_availability_check_progress ~on_copy_progress setup
+  in
+  echo "Copied %d objects." count;
+  echo "Clone is up-to-date.";
+  unit
+
 let prune setup =
   let* (count, size) = State.Repository.garbage_collect setup in
   echo "Removed %d objects totalling %s." count (show_size size);

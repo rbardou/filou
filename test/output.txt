@@ -848,6 +848,142 @@ $ main.exe --no-color pull
 Pulled: bla/bli/plouf
 $ cat bla/bli/plouf
 plaf%
+# Test update.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color update
+Computing reachable object set...
+Copied 0 objects.
+Clone is up-to-date.
+$ cd /tmp/filou-test/clone
+$ explore .filou/root
+{ Non_empty = {
+    root_dir = 12f41d5b6b1957d3b926019b508f08521e1614c9dff595500dc15b11cb13cd7b;
+    hash_index = d10fb33ec821d25bc7ba85a23553a73e1f4d936a7eaf5632c559485c32f50512;
+  } }
+$ rm .filou/12/f4/12f41d5b6b1957d3b926019b508f08521e1614c9dff595500dc15b11cb13cd7b
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color update
+Computing reachable object set...
+Copied 1 objects.
+Clone is up-to-date.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color update
+Computing reachable object set...
+Copied 0 objects.
+Clone is up-to-date.
+$ rm .filou/12/f4/12f41d5b6b1957d3b926019b508f08521e1614c9dff595500dc15b11cb13cd7b
+$ rm .filou/d1/0f/d10fb33ec821d25bc7ba85a23553a73e1f4d936a7eaf5632c559485c32f50512
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color update
+Computing reachable object set...
+Copied 2 objects.
+Clone is up-to-date.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color update
+Computing reachable object set...
+Copied 0 objects.
+Clone is up-to-date.
+$ rm -r -f /tmp/filou-test/clone/.filou
+$ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
+$ cd /tmp/filou-test/clone
+$ tree -a -s -F
+.
+├── [       4096]  bla/
+│   ├── [       4096]  bli/
+│   │   └── [          4]  plouf
+│   └── [       4096]  blo/
+│       └── [          4]  plouf
+├── [       4096]  .filou/
+│   └── [         44]  config
+├── [          4]  plif
+├── [          6]  titi
+├── [          9]  toto
+└── [          3]  tutu
+
+4 directories, 7 files
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color update
+Computing reachable object set...
+Copied 15 objects.
+Clone is up-to-date.
+$ cd /tmp/filou-test/clone
+$ tree -a -s -F
+.
+├── [       4096]  bla/
+│   ├── [       4096]  bli/
+│   │   └── [          4]  plouf
+│   └── [       4096]  blo/
+│       └── [          4]  plouf
+├── [       4096]  .filou/
+│   ├── [       4096]  12/
+│   │   └── [       4096]  f4/
+│   │       └── [        297]  12f41d5b6b1957d3b926019b508f08521e1614c9dff595500dc15b11cb13cd7b
+│   ├── [       4096]  16/
+│   │   └── [       4096]  f9/
+│   │       └── [         66]  16f9bc83ff1d4b5d0e2eb8103a96306a56d7eb51d4ea4897a607c73f34a013f5
+│   ├── [       4096]  20/
+│   │   └── [       4096]  33/
+│   │       └── [         88]  2033c6bb1c0c456ea5efd5686b22a6352f2dae1ea1b88f0af3bc88abe73d0c5d
+│   ├── [       4096]  2c/
+│   │   └── [       4096]  fc/
+│   │       └── [         75]  2cfc473aa14551ae622808a0d0358fd3be8b0aad379a0d7e18ae717c39159afb
+│   ├── [       4096]  39/
+│   │   └── [       4096]  8e/
+│   │       └── [        146]  398eed8a0400cdd3e770526ce450d0c74e0fae443954d584f286f3ecd1d81e7b
+│   ├── [       4096]  4c/
+│   │   └── [       4096]  01/
+│   │       └── [         66]  4c01e5bd112c84edf07488c55d62586f32397a09cf1b430aa7c6a283830d55a1
+│   ├── [       4096]  5b/
+│   │   └── [       4096]  10/
+│   │       └── [         75]  5b10d7558d2a2a4c40e18d69350b4c743144266b965a7d20647a8aab170458d4
+│   ├── [       4096]  78/
+│   │   └── [       4096]  45/
+│   │       └── [         66]  7845fdcb260234f5ac916785b7fcd1eddd6f505f26d01229abe1fc9f6bf118da
+│   ├── [       4096]  84/
+│   │   └── [       4096]  51/
+│   │       └── [         94]  8451f677ac647686b69d25b226beecaf4b46ee0cb8d16b5141e4631a754c0ff1
+│   ├── [       4096]  a6/
+│   │   └── [       4096]  e7/
+│   │       └── [         66]  a6e7d0f2cde27696d38a96e560caeb57ce260da86331d3d3d2593cf264952dd2
+│   ├── [       4096]  c0/
+│   │   └── [       4096]  aa/
+│   │       └── [         88]  c0aa227497dd0303120b031c72c1eb0a7311bbc105c61b2fb7d328154a8e4494
+│   ├── [       4096]  c4/
+│   │   ├── [       4096]  69/
+│   │   │   └── [         87]  c46957ea6037751759d7b5be20b78f9b480d832918d91aab7b87fe4d5c3b29d7
+│   │   └── [       4096]  ba/
+│   │       └── [         75]  c4bade70daca8d2550981dac069120ff13b3ee30675b736d65379dceab7ac9cc
+│   ├── [       4096]  c6/
+│   │   └── [       4096]  7c/
+│   │       └── [         66]  c67c6a1ca9141e67fd1cce2e4515d5e30d4fcb6e74a4ea9ca38ca2a0a89a8f47
+│   ├── [         44]  config
+│   ├── [       4096]  d1/
+│   │   └── [       4096]  0f/
+│   │       └── [        226]  d10fb33ec821d25bc7ba85a23553a73e1f4d936a7eaf5632c559485c32f50512
+│   └── [        122]  root
+├── [          4]  plif
+├── [          6]  titi
+├── [          9]  toto
+└── [          3]  tutu
+
+33 directories, 23 files
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check --cache
+Directory structure looks ok (total size: 30, file count: 6).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --cache
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
 # Check what prune removes.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color prune

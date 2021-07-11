@@ -104,6 +104,8 @@ sig
 
   val set_read_only: unit -> unit
 
+  val is_read_only: unit -> bool
+
   val store_now: t -> 'a Protype.t -> 'a ->
     ('a hash, [> `failed ]) r
 
@@ -131,19 +133,32 @@ sig
   val fetch_root: t ->
     (root, [> `failed ]) r
 
+  val reachable: ?files: bool -> t -> (Hash_set.t, [> `failed ]) r
+
   val garbage_collect: t -> (int * int, [> `failed ]) r
+
+  val available: t -> Hash.t -> (bool, [> `failed ]) r
+
+  val transfer: ?on_progress: (int -> unit) -> source: t -> target: t -> Hash.t ->
+    (unit, [> `failed | `not_available ]) r
+
+  val transfer_root: ?on_progress: (int -> unit) -> source: t -> target: t -> unit ->
+    (unit, [> `failed ]) r
 end
 
 exception Failed_to_store_later of string list
 
 module Make (Root: ROOT): S with type root = Root.t and type t = Device.location =
 struct
+
   type t = Device.location
   type root = Root.t
 
   let read_only = ref false
 
   let set_read_only () = read_only := true
+
+  let is_read_only () = !read_only
 
   (* As encoding hashes can raise [Failed_to_store_later], we need to catch it. *)
   let encode ~trigger_hash_storing typ value =
@@ -353,17 +368,17 @@ struct
     else
       actually_fetch_root ()
 
-  let direct_value_dependencies typ value =
+  let direct_value_dependencies ~files typ value =
     let equal: 'a. 'a -> 'a Protype.annotation -> packed_hash option =
       fun (type a) (x: a) (annotation: a Protype.annotation): packed_hash option ->
         match annotation with
           | Hash _ -> Some (H x)
-          | File_hash -> Some (H x)
+          | File_hash -> if files then Some (H x) else None
           | _ -> None
     in
     Protype.find_all { equal } typ value
 
-  let direct_hash_dependencies (type a) location (hash: a hash) =
+  let direct_hash_dependencies (type a) ~files location (hash: a hash) =
     match hash with
       | File_hash _ | File_hash_with_size _ ->
           ok []
@@ -372,29 +387,29 @@ struct
             | ERROR { code = (`failed | `not_available); msg } ->
                 failed msg
             | OK value ->
-                ok (direct_value_dependencies typ value)
+                ok (direct_value_dependencies ~files typ value)
 
-  let rec reachable_hashes_from_hash: 'a. _ -> _ -> 'a hash -> _ =
-    fun (type a) acc location (hash: a hash) ->
+  let rec reachable_hashes_from_hash: 'a. files: bool -> _ -> _ -> 'a hash -> _ =
+    fun (type a) ~files acc location (hash: a hash) ->
     let h = hash_of_hash hash in
     if Hash_set.mem h acc then
       ok acc
     else
       let acc = Hash_set.add h acc in
-      let* direct_deps = direct_hash_dependencies location hash in
+      let* direct_deps = direct_hash_dependencies ~files location hash in
       list_fold_e acc direct_deps @@ fun acc (H dep_hash) ->
-      reachable_hashes_from_hash acc location dep_hash
+      reachable_hashes_from_hash ~files acc location dep_hash
 
-  let reachable_hashes_from_root location =
+  let reachable ?(files = true) location =
     let* root = fetch_root location in
-    let direct_deps = direct_value_dependencies Root.typ root in
+    let direct_deps = direct_value_dependencies ~files Root.typ root in
     list_fold_e Hash_set.empty direct_deps @@ fun acc (H dep_hash) ->
-    reachable_hashes_from_hash acc location dep_hash
+    reachable_hashes_from_hash ~files acc location dep_hash
 
   let garbage_collect location =
     let removed_object_count = ref 0 in
     let removed_object_total_size = ref 0 in
-    let* reachable = reachable_hashes_from_root location in
+    let* reachable = reachable location in
     match
       let rec garbage_collect_dir dir_path =
         Device.iter_read_dir location dir_path @@ fun filename ->
@@ -446,4 +461,47 @@ struct
           failed msg
       | OK _ as x ->
           x
+
+  let available location hash =
+    let path = file_path_of_hash hash in
+    match Device.stat location (Device.path_of_file_path path) with
+      | ERROR { code = `no_such_file; _ } ->
+          ok false
+      | ERROR { code = `failed; _ } as x ->
+          x
+      | OK Dir ->
+          failed [ sf "%s is a directory" (Device.show_file_path path) ]
+      | OK (File _) ->
+          ok true
+
+  let transfer ?(on_progress = fun _ -> ()) ~source ~target (hash: Hash.t) =
+    let* available = available target hash in
+    if available || !read_only then
+      unit
+    else
+      let path = file_path_of_hash hash in
+      match
+        Device.copy_file ~on_progress ~source: (source, path) ~target: (target, path)
+      with
+        | ERROR { code = `no_such_file; msg } ->
+            error `not_available (
+              ("object is not available: " ^ Hash.to_hex hash) ::
+              msg
+            )
+        | ERROR { code = `failed; _ } | OK () as x ->
+            x
+
+  let transfer_root ?(on_progress = fun _ -> ()) ~source ~target () =
+    if !read_only then
+      unit
+    else
+      match
+        Device.copy_file ~source: (source, root_path) ~target: (target, root_path)
+          ~on_progress
+      with
+        | ERROR { code = (`no_such_file | `failed); msg } ->
+            failed msg
+        | OK () as x ->
+            x
+
 end

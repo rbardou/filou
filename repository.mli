@@ -6,14 +6,9 @@ val hash_type: 'a Protype.t -> 'a hash Protype.t
 val hex_of_hash: _ hash -> string
 val bin_of_hash: _ hash -> string
 val compare_hashes: _ hash -> _ hash -> int
+val hash_of_hash: _ hash -> Hash.t
 
-(* module Raw_hash_set: *)
-(* sig *)
-(*   type t *)
-(*   val empty: t *)
-(*   val add: _ hash -> t -> t *)
-(*   val mem: _ hash -> t -> bool *)
-(* end *)
+module Hash_set: Set.S with type elt = Hash.t
 
 type file
 
@@ -56,6 +51,9 @@ sig
       most read accesses that would occur when storing objects or files
       still occur even if they are not necessary. *)
   val set_read_only: unit -> unit
+
+  (** Return whether [set_read_only] was called. *)
+  val is_read_only: unit -> bool
 
   (** Encode an object, store it, and return its hash. *)
   val store_now: t -> 'a Protype.t -> 'a ->
@@ -102,11 +100,29 @@ sig
   val fetch_root: t ->
     (root, [> `failed ]) r
 
+  (** Get the set of objects that are reachable from the root.
+
+      If [files] is [false], do not return file hashes. Default is [true]. *)
+  val reachable: ?files: bool -> t -> (Hash_set.t, [> `failed ]) r
+
   (** Remove unreachable objects.
 
       Return [(count, size)] where [count] is the number of objects that were
       removed and [size] is the sum of the size of those objects. *)
   val garbage_collect: t -> (int * int, [> `failed ]) r
+
+  (** Return whether an object is available. *)
+  val available: t -> Hash.t -> (bool, [> `failed ]) r
+
+  (** Copy an object from a repository to another.
+
+      Does nothing if the object is already available in [target]. *)
+  val transfer: ?on_progress: (int -> unit) -> source: t -> target: t -> Hash.t ->
+    (unit, [> `failed | `not_available ]) r
+
+  (** Copy the root from a repository to another. *)
+  val transfer_root: ?on_progress: (int -> unit) -> source: t -> target: t -> unit ->
+    (unit, [> `failed ]) r
 end
 
 module Make (Root: ROOT): S with type root = Root.t and type t = Device.location

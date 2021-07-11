@@ -236,6 +236,19 @@ let () =
       (
         Clap.case
           ~description:
+            "Update the clone cache.\n\
+             \n\
+             This copies all reachable non-file objects from the main \
+             repository to the .filou directory of the clone. This \
+             makes sure that read-only operations such as 'tree' have \
+             up-to-date information when used with --cache."
+          "update"
+        @@ fun () ->
+        `update
+      );
+      (
+        Clap.case
+          ~description:
             "Delete unreachable objects. This can take a while.\n\
              \n\
              Unreachable objects are no longer relevant for the \
@@ -246,6 +259,68 @@ let () =
           "prune"
         @@ fun () ->
         `prune
+      );
+      (
+        Clap.case
+          ~description:
+            "Undo last operations.\n\
+             \n\
+             'undo' itself can be undone with 'redo', but only until a \
+             new operation is done, at which point the redo list is \
+             cleared."
+          "undo"
+        @@ fun () ->
+        let count =
+          (* TODO: modify Clap so that it parses negative numbers as numbers
+             and not as option names? (then search for \\\\ here to fix the doc) *)
+          Clap.default_int
+            ~description:
+              "How many operations to undo. If 0, do nothing. If \
+               negative, redo instead.\n\
+               \n\
+               The minus sign in front of negative numbers must be \
+               escaped using a backslack, which itself must be quoted \
+               or escaped in most shells. For instance, write \\\\-1 \
+               or '\\-1'. It may be easier to use 'redo' instead \
+               though.\n\
+               \n\
+               Use 'log' to see the redo-list and undo-list. It \
+               displays the value to give to COUNT next to each entry \
+               to restore them using 'undo'."
+            ~placeholder: "COUNT"
+            1
+        in
+        `undo count
+      );
+      (
+        Clap.case
+          ~description:
+            "Redo operations that were undone with 'undo'.\n\
+             \n\
+             'redo' is equivalent to 'undo \\\\-1' and 'redo N' is \
+             equivalent to 'undo \\\\-N'."
+          "redo"
+        @@ fun () ->
+        let count =
+          Clap.default_int
+            ~description:
+              "How many operations to redo. If 0, do nothing. If \
+               negative, undo instead.\n\
+               \n\
+               The minus sign in front of negative numbers must be \
+               escaped using a backslack, which itself must be quoted \
+               or escaped in most shells. For instance, write \\\\-1 \
+               or '\\-1'. It may be easier to use 'redo' instead \
+               though.\n\
+               \n\
+               Use 'log' to see the redo-list and undo-list. It \
+               displays the value to give to COUNT next to each entry \
+               to restore them using 'undo'. Negate this value to give \
+               it to 'redo'."
+            ~placeholder: "COUNT"
+            1
+        in
+        `redo count
       );
     ]
   in
@@ -304,16 +379,20 @@ let () =
           (* TODO: --metadata-hash for reachable non-file hashes and --hash for all hashes *)
           let* setup = find_local_clone ~clone_only: cache () in
           Controller.check ~clone_only: cache setup
+      | `update ->
+          let* setup = find_local_clone ~clone_only: false () in
+          Controller.update setup
       | `prune ->
           (* TODO: show progress "Deleted X objects totalling X bytes." *)
           (* TODO: be able to prune the clone cache *)
+          (* TODO: --cache could make sense too here *)
           let* setup = find_local_clone ~clone_only: false () in
           Controller.prune setup
       | `log ->
           assert false (* TODO *)
-      | `undo ->
+      | `undo _count ->
           assert false (* TODO *)
-      | `redo ->
+      | `redo _count ->
           assert false (* TODO *)
   with
     | OK () ->

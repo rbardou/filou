@@ -46,6 +46,17 @@ let rec list_fold_e acc l f =
         let* acc = f acc head in
         list_fold_e acc tail f
 
+let rec list_filter_e ?(acc = []) l f =
+  match l with
+    | [] ->
+        ok (List.rev acc)
+    | head :: tail ->
+        let* keep = f head in
+        if keep then
+          list_filter_e ~acc: (head :: acc) tail f
+        else
+          list_filter_e ~acc tail f
+
 let trace error_message = function
   | OK _ as x -> x
   | ERROR { code; msg } -> ERROR { code; msg = error_message :: msg }

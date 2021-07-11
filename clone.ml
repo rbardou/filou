@@ -20,14 +20,29 @@ let setup ~main ~clone =
 let main { main; _ } = main
 let clone { clone_root; _ } = clone_root
 
-module Make (R: Repository.S with type t = Device.location): Repository.S
+module type S =
+sig
+  include Repository.S
+
+  (** Transfer all reachable objects from main to clone, as well as the root. *)
+  val update:
+    on_availability_check_progress: (checked: int -> count: int -> unit) ->
+    on_copy_progress: (transferred: int -> count: int -> unit) ->
+    t -> (int, [> `failed ]) r
+end
+
+module Make (R: Repository.S with type t = Device.location): S
   with type root = R.root and type t = setup =
 struct
+
   type root = R.root
   type t = setup
 
   let set_read_only () =
     R.set_read_only ()
+
+  let is_read_only () =
+    R.is_read_only ()
 
   (* TODO: we encode and hash twice, this is unnecessary. *)
   let store_now setup typ value =
@@ -116,6 +131,13 @@ struct
               main
           )
 
+  let reachable ?files setup =
+    match setup.main with
+      | None ->
+          R.reachable ?files setup.clone_dot_filou
+      | Some main ->
+          R.reachable ?files main
+
   let garbage_collect setup =
     (* TODO: also GC the clone *)
     match setup.main with
@@ -123,4 +145,62 @@ struct
           ok (0, 0)
       | Some main ->
           R.garbage_collect main
+
+  let available setup hash =
+    let* available = R.available setup.clone_dot_filou hash in
+    if available then
+      ok true
+    else
+      match setup.main with
+        | None ->
+            ok false
+        | Some main ->
+            R.available main hash
+
+  let transfer ?on_progress: _ ~source: _ ~target: _ _hash =
+    (* Would we want to transfer to target.main or target.clone_dot_filou? *)
+    failed [ "Clone.transfer is not implemented" ]
+
+  let transfer_root ?on_progress: _ ~source: _ ~target: _ () =
+    (* Would we want to transfer to target.main or target.clone_dot_filou? *)
+    failed [ "Clone.transfer is not implemented" ]
+
+  (* TODO: not very efficient: we read once to decode and compute dependencies,
+     and then we read again to copy. We could have R.iter_reachable instead
+     for instance. *)
+  let update ~on_availability_check_progress ~on_copy_progress setup =
+    match setup.main with
+      | None ->
+          failed [ "cannot update in clone-only mode" ]
+      | Some main ->
+          let* hashes = R.reachable ~files: false main in
+          let hashes = Repository.Hash_set.elements hashes in
+          let count = List.length hashes in
+          let index = ref 0 in
+          let* hashes =
+            list_filter_e hashes @@ fun hash ->
+            let* available = R.available setup.clone_dot_filou hash in
+            incr index;
+            on_availability_check_progress ~checked: !index ~count;
+            ok (not available)
+          in
+          let count = List.length hashes in
+          index := 0;
+          let* () =
+            list_iter_e hashes @@ fun hash ->
+            let* () =
+              trace (sf "failed to copy %s" (Hash.to_hex hash)) @@
+              match R.transfer ~source: main ~target: setup.clone_dot_filou hash with
+              | ERROR { code = (`not_available | `failed); msg } ->
+                  failed msg
+              | OK () as x ->
+                  x
+            in
+            incr index;
+            on_copy_progress ~transferred: !index ~count;
+            unit
+          in
+          let* () = R.transfer_root ~source: main ~target: setup.clone_dot_filou () in
+          ok count
+
 end
