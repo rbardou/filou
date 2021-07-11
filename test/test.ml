@@ -440,6 +440,13 @@ let () =
   Clone.tree ~cache: true ();
   mv (main ^ ".backup") main;
 
+  comment "Check that needed objects are copied in the clone cache when fetching.";
+  rm_rf (clone // ".filou");
+  Filou.clone ~main ~clone ();
+  Clone.tree ~path: "bla/bli" ();
+  clone_tree ();
+  Clone.update ();
+
   (* TODO: Check that with two clones A and B, if A pushes stuff, then if B reads
      this new stuff (e.g. with "tree"), the new objects are put in its cache,
      unless read-only mode (--dry-run) is active. *)

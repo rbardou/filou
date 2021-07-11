@@ -79,7 +79,11 @@ struct
               | None ->
                   error
               | Some main ->
-                  R.fetch main hash
+                  let* () =
+                    R.transfer ~source: main ~target: setup.clone_dot_filou
+                      (Repository.hash_of_hash hash)
+                  in
+                  R.fetch setup.clone_dot_filou hash
           )
       | ERROR { code = `failed; _ } as x ->
           x
@@ -120,16 +124,17 @@ struct
           unit
 
   let fetch_root setup =
-    match setup.main with
-      | None ->
-          R.fetch_root setup.clone_dot_filou
-      | Some main ->
-          R.fetch_root (
+    let* () =
+      match setup.main with
+        | None ->
+            unit
+        | Some main ->
             if setup.clone_root_is_up_to_date then
-              setup.clone_dot_filou
+              unit
             else
-              main
-          )
+              R.transfer_root ~source: main ~target: setup.clone_dot_filou ()
+    in
+    R.fetch_root setup.clone_dot_filou
 
   let reachable ?files setup =
     match setup.main with

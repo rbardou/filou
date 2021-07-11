@@ -475,6 +475,7 @@ struct
           ok true
 
   let transfer ?(on_progress = fun _ -> ()) ~source ~target (hash: Hash.t) =
+    trace ("failed to fetch object with hash " ^ Hash.to_hex hash) @@
     let* available = available target hash in
     if available || !read_only then
       unit
@@ -484,14 +485,12 @@ struct
         Device.copy_file ~on_progress ~source: (source, path) ~target: (target, path)
       with
         | ERROR { code = `no_such_file; msg } ->
-            error `not_available (
-              ("object is not available: " ^ Hash.to_hex hash) ::
-              msg
-            )
+            error `not_available msg
         | ERROR { code = `failed; _ } | OK () as x ->
             x
 
   let transfer_root ?(on_progress = fun _ -> ()) ~source ~target () =
+    trace "failed to fetch root" @@
     if !read_only then
       unit
     else
