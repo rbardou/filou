@@ -190,7 +190,13 @@ let () =
       );
       (
         Clap.case
-          ~description: "Remove files." (* TODO: explain that they stay in the clone, and in the inventory until prune *)
+          ~description:
+            "Remove files.\n\
+             \n\
+             Only metadata is removed. Files are still present in the \
+             main repository but are unreachable and will be deleted \
+             by 'prune'. In the clone, no file will be deleted outside \
+             of the .filou directory."
           "rm"
         @@ fun () ->
         let recursive =
@@ -223,7 +229,14 @@ let () =
       );
       (
         Clap.case
-          ~description: "Delete unreachable objects. This can take a while." (* TODO: explain what this means *)
+          ~description:
+            "Delete unreachable objects. This can take a while.\n\
+             \n\
+             Unreachable objects are no longer relevant for the \
+             repository. They can be old metadata or actual files that \
+             were removed using 'rm'. Unreachable objects can safely \
+             be deleted if 'tree' shows you all the files that are \
+             supposed to be here, even if you did not pull all of them."
           "prune"
         @@ fun () ->
         `prune
