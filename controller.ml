@@ -76,11 +76,10 @@ let fetch_hash_index setup (root: root) =
     | Non_empty root ->
         fetch_or_fail setup root.hash_index
 
-(* Recursively check sizes, file counts,
-   and whether reachable files are available. *)
-let rec check_dir ~all_files_must_be_available expected_hash_index
-    (location: Device.location) (path: Device.path) (dir: dir hash) =
-  let* dir = Bare.fetch location dir in
+(* Recursively check sizes, file counts, and whether reachable files are available. *)
+let rec check_dir ~all_files_must_be_available expected_hash_index setup
+    (path: Device.path) (dir: dir hash) =
+  let* dir = fetch_or_fail setup dir in
   let path_size = ref 0 in
   let path_file_count = ref 0 in
   let* () =
@@ -90,7 +89,7 @@ let rec check_dir ~all_files_must_be_available expected_hash_index
       | Dir { hash; total_size = expected_size; total_file_count = expected_file_count } ->
           let* size, file_count =
             check_dir ~all_files_must_be_available expected_hash_index
-              location entry_path hash
+              setup entry_path hash
           in
           if size <> expected_size then
             failed [
@@ -123,7 +122,7 @@ let rec check_dir ~all_files_must_be_available expected_hash_index
             );
             unit
           in
-          match Bare.get_file_size location hash with
+          match Repository.get_file_size setup hash with
             | ERROR { code = `not_available; msg } ->
                 if all_files_must_be_available then
                   failed (
@@ -148,20 +147,9 @@ let rec check_dir ~all_files_must_be_available expected_hash_index
   ok (!path_size, !path_file_count)
 
 (* TODO: check whether we kept empty Dir nodes (same in hash index). *)
-(* TODO: check hashes of all files (if --hash?) *)
 (* TODO: also check the cloned repository (but here we only need to check hashes) *)
-let check (location: Device.location) =
-  let* location =
-    match read_clone_config ~clone_location: location with
-      | OK config ->
-          ok config.main_location
-      | ERROR { code = `no_such_file; _ } ->
-          ok location
-      | ERROR { code = `failed; _ } as x ->
-          x
-  in
-  echo "Checking main repository at: %s" (Device.show_location location);
-  let* root = Bare.fetch_root location in
+let check setup =
+  let* root = Repository.fetch_root setup in
   match root with
     | Empty ->
         echo "Repository is empty.";
@@ -170,18 +158,18 @@ let check (location: Device.location) =
         let expected_hash_index = ref File_hash_map.empty in
         let* size, count =
           check_dir ~all_files_must_be_available: true expected_hash_index
-            location [] root.root_dir
+            setup [] root.root_dir
         in
         let expected_hash_index = !expected_hash_index in
         echo "Directory structure looks ok (total size: %d, file count: %d)." size count;
         echo "All files are available.";
         let actual_hash_index = ref File_hash_map.empty in
         let* () =
-          let* hash_index = Bare.fetch location root.hash_index in
+          let* hash_index = fetch_or_fail setup root.hash_index in
           list_iter_e (Map.Char.bindings hash_index) @@ fun (_, hash_index_1_hash) ->
-          let* hash_index_1 = Bare.fetch location hash_index_1_hash in
+          let* hash_index_1 = fetch_or_fail setup hash_index_1_hash in
           list_iter_e (Map.Char.bindings hash_index_1) @@ fun (_, hash_index_2_hash) ->
-          let* hash_index_2 = Bare.fetch location hash_index_2_hash in
+          let* hash_index_2 = fetch_or_fail setup hash_index_2_hash in
           list_iter_e (File_hash_map.bindings hash_index_2) @@ fun (hash, paths) ->
           actual_hash_index := File_hash_map.add hash paths !actual_hash_index;
           unit

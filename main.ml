@@ -219,13 +219,7 @@ let () =
           ~description: "Check for potential corruptions."
           "check"
         @@ fun () ->
-        let location =
-          Clap.default_string
-            ~description: "Location of the repository to check."
-            ~placeholder: "LOCATION"
-            "."
-        in
-        `check location
+        `check
       );
       (
         Clap.case
@@ -290,14 +284,17 @@ let () =
           let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
           Controller.pull ~verbose setup paths
       | `rm (paths, recursive) ->
+          (* TODO: show progress "Deleted X files." *)
           let* setup = find_local_clone ~clone_only: false () in
           let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
           Controller.remove ~recursive setup paths
-      | `check location ->
-          (* TODO: be able to check the clone cache *)
-          let* location = parse_location location in
-          Controller.check location
+      | `check ->
+          (* TODO: would --cache make sense? *)
+          (* TODO: --metadata-hash for reachable non-file hashes and --hash for all hashes *)
+          let* setup = find_local_clone ~clone_only: false () in
+          Controller.check setup
       | `prune ->
+          (* TODO: show progress "Deleted X objects totalling X bytes." *)
           (* TODO: be able to prune the clone cache *)
           let* setup = find_local_clone ~clone_only: false () in
           Controller.prune setup

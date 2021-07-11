@@ -209,7 +209,6 @@ let () =
   Filou.clone ~main ~clone ();
   explore_clone "config";
   Clone.check ();
-  Main.check ();
   Clone.tree ();
 
   comment "Add a file.";
@@ -229,7 +228,6 @@ let () =
   create_file "tutu" "blu";
   create_file "titi" "blibli";
   Clone.push [ "tutu"; "titi" ];
-  Main.check ();
   Clone.check ();
   Clone.tree ();
 
@@ -243,7 +241,6 @@ let () =
   Clone.push ~dry_run: true [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
-  Main.check ();
   Clone.check ();
 
   comment "Test tree.";
