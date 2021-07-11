@@ -80,6 +80,9 @@ let fetch_hash_index setup (root: root) =
 let rec check_dir ~clone_only expected_hash_index setup
     (path: Device.path) (dir: dir hash) =
   let* dir = fetch_or_fail setup dir in
+  if Filename_map.is_empty dir then
+    warn "directory %s is empty, it should just not exist"
+      (Device.show_path path);
   let path_size = ref 0 in
   let path_file_count = ref 0 in
   let* () =
@@ -146,8 +149,6 @@ let rec check_dir ~clone_only expected_hash_index setup
   in
   ok (!path_size, !path_file_count)
 
-(* TODO: check whether we kept empty Dir nodes (same in hash index). *)
-(* TODO: also check the cloned repository (but here we only need to check hashes) *)
 let check ~clone_only setup =
   let* root = Repository.fetch_root setup in
   match root with
@@ -163,11 +164,23 @@ let check ~clone_only setup =
         let actual_hash_index = ref File_hash_map.empty in
         let* () =
           let* hash_index = fetch_or_fail setup root.hash_index in
-          list_iter_e (Map.Char.bindings hash_index) @@ fun (_, hash_index_1_hash) ->
+          if Map.Char.is_empty hash_index then
+            warn "hash index is empty for, it should just not exist";
+          list_iter_e (Map.Char.bindings hash_index) @@ fun (char0, hash_index_1_hash) ->
           let* hash_index_1 = fetch_or_fail setup hash_index_1_hash in
-          list_iter_e (Map.Char.bindings hash_index_1) @@ fun (_, hash_index_2_hash) ->
+          if Map.Char.is_empty hash_index_1 then
+            warn "hash index is empty for %s, it should just not exist"
+              (Hash.hex_of_string (String.make 1 char0));
+          list_iter_e (Map.Char.bindings hash_index_1) @@ fun (char1, hash_index_2_hash) ->
           let* hash_index_2 = fetch_or_fail setup hash_index_2_hash in
+          if File_hash_map.is_empty hash_index_2 then
+            warn "hash index is empty for %s%s, it should just not exist"
+              (Hash.hex_of_string (String.make 1 char0))
+              (Hash.hex_of_string (String.make 1 char1));
           list_iter_e (File_hash_map.bindings hash_index_2) @@ fun (hash, paths) ->
+          if File_path_set.is_empty paths then
+            warn "Hash index is empty for %s, it should just not exist."
+              (Repository.hex_of_hash hash);
           actual_hash_index := File_hash_map.add hash paths !actual_hash_index;
           unit
         in

@@ -15,3 +15,5 @@ val of_bin: string -> t option
 val compare: t -> t -> int
 
 val string: string -> t
+
+val hex_of_string: string -> string

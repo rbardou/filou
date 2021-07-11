@@ -61,3 +61,5 @@ let decode_robin_string typ string =
         ok value
     | Error error ->
         failed [ Protype_robin.Decode.show_error error ]
+
+let warn x = Printf.ksprintf (echo "Warning: %s") x
