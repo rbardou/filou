@@ -108,8 +108,12 @@ sig
   (** Remove unreachable objects.
 
       Return [(count, size)] where [count] is the number of objects that were
-      removed and [size] is the sum of the size of those objects. *)
-  val garbage_collect: t -> (int * int, [> `failed ]) r
+      removed and [size] is the sum of the size of those objects.
+
+      If [reachable] is specified, assume that it is the set of reachable
+      objects. This can be given to avoid recomputing it if you already
+      computed it with [reachable] and did not modify anything in-between. *)
+  val garbage_collect: ?reachable: Hash_set.t -> t -> (int * int, [> `failed ]) r
 
   (** Return whether an object is available. *)
   val available: t -> Hash.t -> (bool, [> `failed ]) r

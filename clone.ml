@@ -143,14 +143,6 @@ struct
       | Some main ->
           R.reachable ?files main
 
-  let garbage_collect setup =
-    (* TODO: also GC the clone *)
-    match setup.main with
-      | None ->
-          ok (0, 0)
-      | Some main ->
-          R.garbage_collect main
-
   let available setup hash =
     let* available = R.available setup.clone_dot_filou hash in
     if available then
@@ -207,5 +199,25 @@ struct
           in
           let* () = R.transfer_root ~source: main ~target: setup.clone_dot_filou () in
           ok count
+
+  let garbage_collect ?reachable setup =
+    match setup.main with
+      | None ->
+          R.garbage_collect ?reachable setup.clone_dot_filou
+      | Some main ->
+          let* reachable =
+            match reachable with
+              | None ->
+                  R.reachable main
+              | Some set ->
+                  ok set
+          in
+          let* (main_count, main_size) =
+            R.garbage_collect ~reachable main
+          in
+          let* (clone_count, clone_size) =
+            R.garbage_collect ~reachable setup.clone_dot_filou
+          in
+          ok (main_count + clone_count, main_size + clone_size)
 
 end

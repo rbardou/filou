@@ -135,7 +135,7 @@ sig
 
   val reachable: ?files: bool -> t -> (Hash_set.t, [> `failed ]) r
 
-  val garbage_collect: t -> (int * int, [> `failed ]) r
+  val garbage_collect: ?reachable: Hash_set.t -> t -> (int * int, [> `failed ]) r
 
   val available: t -> Hash.t -> (bool, [> `failed ]) r
 
@@ -406,10 +406,16 @@ struct
     list_fold_e Hash_set.empty direct_deps @@ fun acc (H dep_hash) ->
     reachable_hashes_from_hash ~files acc location dep_hash
 
-  let garbage_collect location =
+  let garbage_collect ?reachable: reachable_set location =
     let removed_object_count = ref 0 in
     let removed_object_total_size = ref 0 in
-    let* reachable = reachable location in
+    let* reachable =
+      match reachable_set with
+        | None ->
+            reachable location
+        | Some set ->
+            ok set
+    in
     match
       let rec garbage_collect_dir dir_path =
         Device.iter_read_dir location dir_path @@ fun filename ->
