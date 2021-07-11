@@ -139,8 +139,8 @@ struct
   let rm ?v ?dry_run ?color ?(r = false) paths =
     run ?v ?dry_run ?color ("rm" :: flag r "-r" @ paths)
 
-  let check ?v ?dry_run ?color ?path () =
-    run ?v ?dry_run ?color ("check" :: list_of_option path)
+  let check ?v ?dry_run ?color ?path ?(cache = false) () =
+    run ?v ?dry_run ?color ("check" :: flag cache "--cache" @ list_of_option path)
 
   let tree ?v ?dry_run ?color ?depth ?(only_dirs = false) ?(size = false) ?(count = false)
       ?(duplicates = false) ?(cache = false) ?path () =
@@ -241,7 +241,7 @@ let () =
   Clone.push ~dry_run: true [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
-  Clone.check ();
+  Clone.check ~cache: true ();
 
   comment "Test tree.";
   Clone.tree ();

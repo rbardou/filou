@@ -77,7 +77,7 @@ let fetch_hash_index setup (root: root) =
         fetch_or_fail setup root.hash_index
 
 (* Recursively check sizes, file counts, and whether reachable files are available. *)
-let rec check_dir ~all_files_must_be_available expected_hash_index setup
+let rec check_dir ~clone_only expected_hash_index setup
     (path: Device.path) (dir: dir hash) =
   let* dir = fetch_or_fail setup dir in
   let path_size = ref 0 in
@@ -88,8 +88,7 @@ let rec check_dir ~all_files_must_be_available expected_hash_index setup
     match dir_entry with
       | Dir { hash; total_size = expected_size; total_file_count = expected_file_count } ->
           let* size, file_count =
-            check_dir ~all_files_must_be_available expected_hash_index
-              setup entry_path hash
+            check_dir ~clone_only expected_hash_index setup entry_path hash
           in
           if size <> expected_size then
             failed [
@@ -109,29 +108,19 @@ let rec check_dir ~all_files_must_be_available expected_hash_index setup
             unit
           )
       | File { hash; size = expected_size } ->
-          let good () =
-            path_size := !path_size + expected_size;
-            path_file_count := !path_file_count + 1;
-            expected_hash_index := (
-              let previous =
-                File_hash_map.find_opt hash !expected_hash_index
-                |> default File_path_set.empty
-              in
-              File_hash_map.add hash (File_path_set.add (path, filename) previous)
-                !expected_hash_index
-            );
-            unit
-          in
-          match Repository.get_file_size setup hash with
+          match
+            if clone_only then
+              (* Cannot get file sizes in clone-only mode. *)
+              ok expected_size
+            else
+              Repository.get_file_size setup hash
+          with
             | ERROR { code = `not_available; msg } ->
-                if all_files_must_be_available then
-                  failed (
-                    sf "file %s (%s) is unvailable"
-                      (Device.show_path entry_path) (Repository.hex_of_hash hash) ::
-                    msg
-                  )
-                else
-                  good ()
+                failed (
+                  sf "file %s (%s) is unvailable"
+                    (Device.show_path entry_path) (Repository.hex_of_hash hash) ::
+                  msg
+                )
             | ERROR { code = `failed; _ } as x ->
                 x
             | OK size ->
@@ -141,14 +130,25 @@ let rec check_dir ~all_files_must_be_available expected_hash_index setup
                       (Device.show_path entry_path) (Repository.hex_of_hash hash)
                       expected_size size;
                   ]
-                else
-                  good ()
+                else (
+                  path_size := !path_size + expected_size;
+                  path_file_count := !path_file_count + 1;
+                  expected_hash_index := (
+                    let previous =
+                      File_hash_map.find_opt hash !expected_hash_index
+                      |> default File_path_set.empty
+                    in
+                    File_hash_map.add hash (File_path_set.add (path, filename) previous)
+                      !expected_hash_index
+                  );
+                  unit
+                )
   in
   ok (!path_size, !path_file_count)
 
 (* TODO: check whether we kept empty Dir nodes (same in hash index). *)
 (* TODO: also check the cloned repository (but here we only need to check hashes) *)
-let check setup =
+let check ~clone_only setup =
   let* root = Repository.fetch_root setup in
   match root with
     | Empty ->
@@ -156,10 +156,7 @@ let check setup =
         unit
     | Non_empty root ->
         let expected_hash_index = ref File_hash_map.empty in
-        let* size, count =
-          check_dir ~all_files_must_be_available: true expected_hash_index
-            setup [] root.root_dir
-        in
+        let* size, count = check_dir ~clone_only expected_hash_index setup [] root.root_dir in
         let expected_hash_index = !expected_hash_index in
         echo "Directory structure looks ok (total size: %d, file count: %d)." size count;
         echo "All files are available.";

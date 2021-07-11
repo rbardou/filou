@@ -74,7 +74,7 @@ Pushed: bla/blo/plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color push bla/bli/plouf bla/blo/plouf
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color check
+$ main.exe --no-color check --cache
 Directory structure looks ok (total size: 26, file count: 5).
 All files are available.
 Hash index is consistent with the directory structure.

@@ -219,7 +219,19 @@ let () =
           ~description: "Check for potential corruptions."
           "check"
         @@ fun () ->
-        `check
+        let cache =
+          Clap.flag
+            ~set_long: "cache"
+            ~set_short: 'C'
+            ~description:
+              "Only read from the clone repository cache, not the main \
+               repository. If some objects are not available in the \
+               cache, this will result in an error, but it does not \
+               mean that the repository is corrupted, only that the \
+               cache is partial. File sizes will not be checked."
+            false
+        in
+        `check cache
       );
       (
         Clap.case
@@ -288,11 +300,10 @@ let () =
           let* setup = find_local_clone ~clone_only: false () in
           let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
           Controller.remove ~recursive setup paths
-      | `check ->
-          (* TODO: would --cache make sense? *)
+      | `check cache ->
           (* TODO: --metadata-hash for reachable non-file hashes and --hash for all hashes *)
-          let* setup = find_local_clone ~clone_only: false () in
-          Controller.check setup
+          let* setup = find_local_clone ~clone_only: cache () in
+          Controller.check ~clone_only: cache setup
       | `prune ->
           (* TODO: show progress "Deleted X objects totalling X bytes." *)
           (* TODO: be able to prune the clone cache *)
