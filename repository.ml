@@ -36,6 +36,18 @@ type packed_hash = H: 'a hash -> packed_hash
 
 let store_not_stored_hash_when_encoding = ref false
 
+let with_store_not_stored_hash_when_encoding value f =
+  let old_value = !store_not_stored_hash_when_encoding in
+  (* If the flag was already set, we must keep it. *)
+  store_not_stored_hash_when_encoding := old_value || value;
+  try
+    let r = f () in
+    store_not_stored_hash_when_encoding := old_value;
+    r
+  with exn ->
+    store_not_stored_hash_when_encoding := old_value;
+    raise exn
+
 type _ Protype.annotation +=
   | Hash: 'a Protype.t -> 'a hash Protype.annotation
   | File_hash: file hash Protype.annotation
@@ -162,20 +174,12 @@ struct
 
   (* As encoding hashes can raise [Failed_to_store_later], we need to catch it. *)
   let encode ~trigger_hash_storing typ value =
-    store_not_stored_hash_when_encoding := trigger_hash_storing;
+    with_store_not_stored_hash_when_encoding trigger_hash_storing @@ fun () ->
     try
-      let encoded = Protype_robin.Encode.to_string ~version: Root.version typ value in
-      (* Set back to [false] in case the user uses [hash_type] to encode a hash.
-         We only need to make sure that [on_encode] is triggered when storing data on disk. *)
-      store_not_stored_hash_when_encoding := false;
-      ok encoded
+      ok (Protype_robin.Encode.to_string ~version: Root.version typ value)
     with
       | Failed_to_store_later msg ->
-          store_not_stored_hash_when_encoding := false;
           failed msg
-      | exn ->
-          store_not_stored_hash_when_encoding := false;
-          raise exn
 
   let hash_part_length = 2
 

@@ -288,7 +288,12 @@ let tree ~color ~max_depth ~only_main ~only_dirs
             | Some (File _) ->
                 failed [ sf "%s is a file" (Device.show_path (List.rev dir_path_rev)) ]
             | Some (Dir { hash; _ }) ->
-                let* subdir = fetch_or_fail setup hash in
+                let* subdir =
+                  trace
+                    (sf "failed to fetch directory object %s" (Repository.hex_of_hash hash))
+                  @@
+                  fetch_or_fail setup hash
+                in
                 find_dir dir_path_rev subdir tail
     in
     find_dir [] root_dir dir_path
@@ -472,7 +477,11 @@ let tree ~color ~max_depth ~only_main ~only_dirs
           print_newline ();
         in
         let recurse hash =
-          let* dir = fetch_or_fail setup hash in
+          let* dir =
+            let subdir_path = List.rev_append dir_path_rev [ filename ] in
+            trace (sf "failed to recurse into %s" (Device.show_path subdir_path)) @@
+            fetch_or_fail setup hash
+          in
           tree_dir (if last then prefix ^ "    " else prefix ^ "│   ") (dir_depth + 1)
             (filename :: dir_path_rev) dir
         in
