@@ -168,6 +168,12 @@ struct
 
   let log ?v ?dry_run ?color () =
     run ?v ?dry_run ?color [ "log" ]
+
+  let undo ?v ?dry_run ?color ?count () =
+    run ?v ?dry_run ?color ("undo" :: list_of_option (Option.map string_of_int count))
+
+  let redo ?v ?dry_run ?color ?count () =
+    run ?v ?dry_run ?color ("redo" :: list_of_option (Option.map string_of_int count))
 end
 
 module Main = Make_filou (struct let path = Some main end)
@@ -457,6 +463,27 @@ let () =
   Clone.check ~cache: true ();
   Clone.tree ~cache: true ();
   Clone.log ();
+
+  comment "Play with undo / redo.";
+  Clone.undo ();
+  Clone.log ();
+  Clone.tree ();
+  Clone.undo ();
+  Clone.log ();
+  Clone.tree ();
+  Clone.undo ~count: 3 ();
+  Clone.log ();
+  Clone.tree ();
+  Clone.redo ~count: 4 ();
+  Clone.log ();
+  Clone.tree ();
+  Clone.push [ "bla" ];
+  Clone.log ();
+  Clone.tree ();
+  Clone.redo ();
+  Clone.push [];
+  Clone.log ();
+  Clone.tree ();
 
   comment "Check what prune removes.";
   Clone.prune ();

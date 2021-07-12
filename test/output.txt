@@ -1372,10 +1372,230 @@ $ main.exe --no-color log
     17 push .
     18 push toto
     19 init
+# Play with undo / redo.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+    -1 push .
+-->  0 rm -r .
+     1 push .
+     2 rm -r bla
+     3 push .
+     4 rm -r plif bla/bli
+     5 push .
+     6 rm plif bla/bli/plouf bla/blo/plouf
+     7 push .
+     8 rm bla/blo/plouf
+     9 rm bla/bli/plouf
+    10 rm titi toto tutu
+    11 rm plif
+    12 push .
+    13 push bla/bli/plouf bla/blo/plouf
+    14 push bla/bli/plouf bla/blo/plouf
+    15 push tutu titi
+    16 push .
+    17 push toto
+    18 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├++ bla/
+├++ plif
+├++ titi
+├++ toto
+└++ tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+    -2 push .
+    -1 rm -r .
+-->  0 push .
+     1 rm -r bla
+     2 push .
+     3 rm -r plif bla/bli
+     4 push .
+     5 rm plif bla/bli/plouf bla/blo/plouf
+     6 push .
+     7 rm bla/blo/plouf
+     8 rm bla/bli/plouf
+     9 rm titi toto tutu
+    10 rm plif
+    11 push .
+    12 push bla/bli/plouf bla/blo/plouf
+    13 push bla/bli/plouf bla/blo/plouf
+    14 push tutu titi
+    15 push .
+    16 push toto
+    17 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo 3
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+    -5 push .
+    -4 rm -r .
+    -3 push .
+    -2 rm -r bla
+    -1 push .
+-->  0 rm -r plif bla/bli
+     1 push .
+     2 rm plif bla/bli/plouf bla/blo/plouf
+     3 push .
+     4 rm bla/blo/plouf
+     5 rm bla/bli/plouf
+     6 rm titi toto tutu
+     7 rm plif
+     8 push .
+     9 push bla/bli/plouf bla/blo/plouf
+    10 push bla/bli/plouf bla/blo/plouf
+    11 push tutu titi
+    12 push .
+    13 push toto
+    14 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├++ bli/
+│   └── blo/
+│       └── plouf
+├++ plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color redo 4
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+    -1 push .
+-->  0 rm -r .
+     1 push .
+     2 rm -r bla
+     3 push .
+     4 rm -r plif bla/bli
+     5 push .
+     6 rm plif bla/bli/plouf bla/blo/plouf
+     7 push .
+     8 rm bla/blo/plouf
+     9 rm bla/bli/plouf
+    10 rm titi toto tutu
+    11 rm plif
+    12 push .
+    13 push bla/bli/plouf bla/blo/plouf
+    14 push bla/bli/plouf bla/blo/plouf
+    15 push tutu titi
+    16 push .
+    17 push toto
+    18 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├++ bla/
+├++ plif
+├++ titi
+├++ toto
+└++ tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push bla
+Pushed: bla/blo/plouf
+Pushed: bla/bli/plouf
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push bla
+     1 rm -r .
+     2 push .
+     3 rm -r bla
+     4 push .
+     5 rm -r plif bla/bli
+     6 push .
+     7 rm plif bla/bli/plouf bla/blo/plouf
+     8 push .
+     9 rm bla/blo/plouf
+    10 rm bla/bli/plouf
+    11 rm titi toto tutu
+    12 rm plif
+    13 push .
+    14 push bla/bli/plouf bla/blo/plouf
+    15 push bla/bli/plouf bla/blo/plouf
+    16 push tutu titi
+    17 push .
+    18 push toto
+    19 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├++ plif
+├++ titi
+├++ toto
+└++ tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color redo
+Error:
+  journal has less than 1 redo entries
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Pushed: titi
+Pushed: toto
+Pushed: tutu
+Pushed: plif (duplicate of: bla/blo/plouf)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
+     1 push bla
+     2 rm -r .
+     3 push .
+     4 rm -r bla
+     5 push .
+     6 rm -r plif bla/bli
+     7 push .
+     8 rm plif bla/bli/plouf bla/blo/plouf
+     9 push .
+    10 rm bla/blo/plouf
+    11 rm bla/bli/plouf
+    12 rm titi toto tutu
+    13 rm plif
+    14 push .
+    15 push bla/bli/plouf bla/blo/plouf
+    16 push bla/bli/plouf bla/blo/plouf
+    17 push tutu titi
+    18 push .
+    19 push toto
+    20 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   └── plouf
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
 # Check what prune removes.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color prune
-Removed 50 objects totalling 6.91 kB.
+Removed 52 objects totalling 7.11 kB.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 30, file count: 6).

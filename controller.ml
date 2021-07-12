@@ -979,3 +979,58 @@ let log setup =
     echo "    %2d %s" (i + 1) command
   );
   unit
+
+let undo setup ~count =
+  let undo count =
+    let* journal = Repository.fetch_root setup in
+    if List.compare_length_with journal.undo count < 0 then
+      failed [ sf "journal has less than %d undo entries" count ]
+    else
+      let rec undo journal count =
+        if count > 0 then
+          match journal.undo with
+            | [] ->
+                assert false (* we checked lengths above *)
+            | head :: tail ->
+                let journal =
+                  {
+                    redo = journal.head :: journal.redo;
+                    head;
+                    undo = tail;
+                  }
+                in
+                undo journal (count - 1)
+        else
+          journal
+      in
+      let journal = undo journal count in
+      Repository.store_root setup journal
+  in
+  let redo count =
+    let* journal = Repository.fetch_root setup in
+    if List.compare_length_with journal.redo count < 0 then
+      failed [ sf "journal has less than %d redo entries" count ]
+    else
+      let rec redo journal count =
+        if count > 0 then
+          match journal.redo with
+            | [] ->
+                assert false (* we checked lengths above *)
+            | head :: tail ->
+                let journal =
+                  {
+                    redo = tail;
+                    head;
+                    undo = journal.head :: journal.undo;
+                  }
+                in
+                redo journal (count - 1)
+        else
+          journal
+      in
+      let journal = redo journal count in
+      Repository.store_root setup journal
+  in
+  if count > 0 then undo count else
+  if count < 0 then redo (- count) else
+    unit

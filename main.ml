@@ -385,11 +385,12 @@ let () =
       | `log ->
           let* setup = find_local_clone ~clone_only: false () in
           Controller.log setup
-      | `undo _count ->
-          echo "count = %d, verbose = %b" _count verbose;
-          assert false (* TODO *)
-      | `redo _count ->
-          assert false (* TODO *)
+      | `undo count ->
+          let* setup = find_local_clone ~clone_only: false () in
+          Controller.undo setup ~count
+      | `redo count ->
+          let* setup = find_local_clone ~clone_only: false () in
+          Controller.undo setup ~count: (- count)
   with
     | OK () ->
         ()
