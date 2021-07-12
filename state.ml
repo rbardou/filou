@@ -42,6 +42,19 @@ type root =
   | Empty
   | Non_empty of non_empty_root
 
+type journal_entry =
+  {
+    command: string;
+    root: root;
+  }
+
+type journal =
+  {
+    redo: journal_entry list; (* from oldest to newest *)
+    head: journal_entry;
+    undo: journal_entry list; (* from newest to oldest *)
+  }
+
 type clone_config =
   {
     main_location: Device.location;
@@ -65,7 +78,7 @@ struct
       let dir_record =
         record @@
         ("name", filename, fun (x, _, _, _) -> x) @
-        ("hash", hash dir, fun (_, x, _, _) -> x) @ (* TODO *)
+        ("hash", hash dir, fun (_, x, _, _) -> x) @
         ("size", int, fun (_, _, x, _) -> x) @
         ("count", int, fun (_, _, _, x) -> x) @:
         fun name hash size count -> name, hash, size, count
@@ -153,6 +166,19 @@ struct
     variant [ Case empty; Case non_empty ] @@
     function Empty -> value empty () | Non_empty x -> value non_empty x
 
+  let journal_entry: journal_entry t =
+    record @@
+    ("command", string, fun x -> x.command) @
+    ("root", root, fun x -> x.root) @:
+    fun command root -> { command; root }
+
+  let journal: journal t =
+    record @@
+    ("redo", list journal_entry, fun x -> x.redo) @
+    ("head", journal_entry, fun x -> x.head) @
+    ("undo", list journal_entry, fun x -> x.undo) @:
+    fun redo head undo -> { redo; head; undo }
+
   let location: Device.location t =
     convert_partial string
       ~encode: Device.show_location
@@ -173,13 +199,13 @@ end
 
 module Root =
 struct
-  type t = root
+  type t = journal
 
   (* We use version numbers starting from 0xF1100, which is supposed to look like "FILOU".
      This acts as a kind of magic number. *)
   let version = 0xF1100
 
-  let typ = T.root
+  let typ = T.journal
 end
 
 module Bare = Repository.Make (Root)

@@ -426,10 +426,10 @@ let () =
   Clone.update ();
   cd clone;
   explore ".filou/root";
-  rm ".filou/12/f4/12f41d5b6b1957d3b926019b508f08521e1614c9dff595500dc15b11cb13cd7b";
+  rm ".filou/06/80/068078c68210224ad43efdbeed879fbfdfbbb69e072b4b9655b09beb75f4c92e";
   Clone.update ();
   Clone.update ();
-  rm ".filou/12/f4/12f41d5b6b1957d3b926019b508f08521e1614c9dff595500dc15b11cb13cd7b";
+  rm ".filou/06/80/068078c68210224ad43efdbeed879fbfdfbbb69e072b4b9655b09beb75f4c92e";
   rm ".filou/d1/0f/d10fb33ec821d25bc7ba85a23553a73e1f4d936a7eaf5632c559485c32f50512";
   Clone.update ();
   Clone.update ();
@@ -490,7 +490,6 @@ let () =
   Clone.update ();
   comment "Check that if more objects exist in the clone than in the main, they are removed.";
   cd clone;
-  mkdir ".filou/01";
   mkdir ".filou/01/23";
   create_file
     ".filou/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859"

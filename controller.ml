@@ -24,7 +24,11 @@ let on_copy_progress prefix ~bytes ~size =
   Progress_bar.set "%s (%d / %d) (%d%%)" prefix bytes size (bytes * 100 / size)
 
 let init (location: Device.location) =
-  Bare.store_root location Empty
+  Bare.store_root location {
+    redo = [];
+    head = { command = "init"; root = Empty };
+    undo = [];
+  }
 
 let write_clone_config ~clone_location config =
   Device.write_file clone_location dot_filou_config
@@ -61,6 +65,22 @@ let find_local_clone ~clone_only mode =
   find (Path.get_cwd ())
 
 let store_later = Repository.store_later
+
+let fetch_root setup =
+  let* journal = Repository.fetch_root setup in
+  ok journal.head.root
+
+let store_root setup root command =
+  (* TODO: store journal in memory to avoid re-reading it *)
+  let* journal = Repository.fetch_root setup in
+  let new_journal =
+    {
+      redo = [];
+      head = { command; root };
+      undo = journal.head :: journal.undo;
+    }
+  in
+  Repository.store_root setup new_journal
 
 let fetch_root_dir setup (root: root) =
   match root with
@@ -150,7 +170,7 @@ let rec check_dir ~clone_only expected_hash_index setup
   ok (!path_size, !path_file_count)
 
 let check ~clone_only setup =
-  let* root = Repository.fetch_root setup in
+  let* root = fetch_root setup in
   match root with
     | Empty ->
         echo "Repository is empty.";
@@ -252,7 +272,7 @@ let show_size size =
 let tree ~color ~max_depth ~only_main ~only_dirs
     ~print_size ~print_file_count ~print_duplicates
     (setup: Clone.setup) (dir_path: Device.path) =
-  let* root = Repository.fetch_root setup in
+  let* root = fetch_root setup in
   let* root_dir = fetch_root_dir setup root in
   let* dir =
     let rec find_dir dir_path_rev dir = function
@@ -662,9 +682,9 @@ let push ~verbose setup (paths: Device.path list) =
             in
             ok !new_root
   in
-  let* root = Repository.fetch_root setup in
+  let* root = fetch_root setup in
   let* root = list_fold_e root paths push in
-  Repository.store_root setup root
+  store_root setup root (String.concat " " ("push" :: List.map Device.show_path paths))
 
 let pull ~verbose setup (paths: Device.path list) =
   let rec pull (dir: dir) dir_path_rev (path: Device.path) =
@@ -712,7 +732,7 @@ let pull ~verbose setup (paths: Device.path list) =
                             echo "Pulled: %s" (Device.show_file_path target_path);
                             unit
   in
-  let* root = Repository.fetch_root setup in
+  let* root = fetch_root setup in
   let* root_dir = fetch_root_dir setup root in
   list_iter_e paths (pull root_dir [])
 
@@ -825,7 +845,7 @@ let remove ~recursive setup (paths: Device.path list) =
                           }
                         )
   in
-  let* root = Repository.fetch_root setup in
+  let* root = fetch_root setup in
   match root, paths with
     | Empty, [] ->
         unit
@@ -915,7 +935,10 @@ let remove ~recursive setup (paths: Device.path list) =
                   }
                 )
         in
-        Repository.store_root setup root
+        store_root setup root @@
+        String.concat " " (
+          "rm" :: (if recursive then [ "-r" ] else []) @ List.map Device.show_path paths
+        )
 
 let update setup =
   echo "Computing reachable object set...";
@@ -936,6 +959,10 @@ let update setup =
   unit
 
 let prune setup =
-  let* (count, size) = State.Repository.garbage_collect setup in
+  (* TODO: whether to prune the journal and by how much should be a parameter *)
+  let* journal = Repository.fetch_root setup in
+  let journal = { redo = []; head = journal.head; undo = [] } in
+  let* () = Repository.store_root setup journal in
+  let* (count, size) = Repository.garbage_collect setup in
   echo "Removed %d objects totalling %s." count (show_size size);
   unit

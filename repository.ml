@@ -338,7 +338,6 @@ struct
 
   let current_root = ref None
 
-  (* TODO: read-only mode *)
   let store_root location root =
     trace "failed to store root" @@
     let* encoded_root = encode ~trigger_hash_storing: true Root.typ root in
