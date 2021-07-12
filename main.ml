@@ -271,18 +271,10 @@ let () =
           "undo"
         @@ fun () ->
         let count =
-          (* TODO: modify Clap so that it parses negative numbers as numbers
-             and not as option names? (then search for \\\\ here to fix the doc) *)
           Clap.default_int
             ~description:
               "How many operations to undo. If 0, do nothing. If \
                negative, redo instead.\n\
-               \n\
-               The minus sign in front of negative numbers must be \
-               escaped using a backslack, which itself must be quoted \
-               or escaped in most shells. For instance, write \\\\-1 \
-               or '\\-1'. It may be easier to use 'redo' instead \
-               though.\n\
                \n\
                Use 'log' to see the redo-list and undo-list. It \
                displays the value to give to COUNT next to each entry \
@@ -297,8 +289,8 @@ let () =
           ~description:
             "Redo operations that were undone with 'undo'.\n\
              \n\
-             'redo' is equivalent to 'undo \\\\-1' and 'redo N' is \
-             equivalent to 'undo \\\\-N'."
+             'redo' is equivalent to 'undo -1' and 'redo N' is \
+             equivalent to 'undo -N'."
           "redo"
         @@ fun () ->
         let count =
@@ -306,12 +298,6 @@ let () =
             ~description:
               "How many operations to redo. If 0, do nothing. If \
                negative, undo instead.\n\
-               \n\
-               The minus sign in front of negative numbers must be \
-               escaped using a backslack, which itself must be quoted \
-               or escaped in most shells. For instance, write \\\\-1 \
-               or '\\-1'. It may be easier to use 'redo' instead \
-               though.\n\
                \n\
                Use 'log' to see the redo-list and undo-list. It \
                displays the value to give to COUNT next to each entry \
@@ -391,6 +377,7 @@ let () =
       | `log ->
           assert false (* TODO *)
       | `undo _count ->
+          echo "count = %d, verbose = %b" _count verbose;
           assert false (* TODO *)
       | `redo _count ->
           assert false (* TODO *)
