@@ -959,10 +959,23 @@ let update setup =
   unit
 
 let prune setup =
-  (* TODO: whether to prune the journal and by how much should be a parameter *)
   let* journal = Repository.fetch_root setup in
   let journal = { redo = []; head = journal.head; undo = [] } in
   let* () = Repository.store_root setup journal in
   let* (count, size) = Repository.garbage_collect setup in
   echo "Removed %d objects totalling %s." count (show_size size);
+  unit
+
+let log setup =
+  let* { redo; head; undo } = Repository.fetch_root setup in
+  let redo = List.mapi (fun i x -> - i - 1, x) redo in
+  (
+    List.iter' (List.rev redo) @@ fun (i, { command; _ }) ->
+    echo "    %2d %s" i command;
+  );
+  echo "-->  0 %s" head.command;
+  (
+    List.iteri' undo @@ fun i { command; _ } ->
+    echo "    %2d %s" (i + 1) command
+  );
   unit

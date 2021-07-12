@@ -10,6 +10,9 @@ Repository is empty.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 .
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 init
 # Add a file.
 $ cd /tmp/filou-test/clone
 $ echo blablabla > toto
@@ -25,6 +28,10 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 .
 └── toto
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push toto
+     1 init
 # Add the file again.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color push
@@ -37,6 +44,11 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 .
 └── toto
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
+     1 push toto
+     2 init
 # Add several files.
 $ cd /tmp/filou-test/clone
 $ echo blu > tutu
@@ -56,6 +68,12 @@ $ main.exe --no-color tree
 ├── titi
 ├── toto
 └── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push tutu titi
+     1 push .
+     2 push toto
+     3 init
 # Add files in subdirectories.
 $ cd /tmp/filou-test/clone
 $ mkdir bla
@@ -78,6 +96,14 @@ $ main.exe --no-color check --cache
 Directory structure looks ok (total size: 26, file count: 5).
 All files are available.
 Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push bla/bli/plouf bla/blo/plouf
+     1 push bla/bli/plouf bla/blo/plouf
+     2 push tutu titi
+     3 push .
+     4 push toto
+     5 init
 # Test tree.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
@@ -208,6 +234,14 @@ $ main.exe --no-color tree --size --count
 ├── titi (6 B)
 ├── toto (9 B)
 └── tutu (3 B)
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push bla/bli/plouf bla/blo/plouf
+     1 push bla/bli/plouf bla/blo/plouf
+     2 push tutu titi
+     3 push .
+     4 push toto
+     5 init
 # Test duplicates.
 $ echo plif > plif
 $ cd /tmp/filou-test/clone
@@ -252,6 +286,15 @@ $ main.exe --no-color tree --duplicates
 ├── titi
 ├── toto
 └── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
+     1 push bla/bli/plouf bla/blo/plouf
+     2 push bla/bli/plouf bla/blo/plouf
+     3 push tutu titi
+     4 push .
+     5 push toto
+     6 init
 # Try to pull files.
 $ rm titi
 $ rm tutu
@@ -467,6 +510,15 @@ $ cat toto
 blablabla%
 $ cat tutu
 blu%
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
+     1 push bla/bli/plouf bla/blo/plouf
+     2 push bla/bli/plouf bla/blo/plouf
+     3 push tutu titi
+     4 push .
+     5 push toto
+     6 init
 # Remove files.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
@@ -726,6 +778,28 @@ $ main.exe --no-color tree
 ├── titi
 ├── toto
 └── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
+     1 rm -r .
+     2 push .
+     3 rm -r bla
+     4 push .
+     5 rm -r plif bla/bli
+     6 push .
+     7 rm plif bla/bli/plouf bla/blo/plouf
+     8 push .
+     9 rm bla/blo/plouf
+    10 rm bla/bli/plouf
+    11 rm titi toto tutu
+    12 rm plif
+    13 push .
+    14 push bla/bli/plouf bla/blo/plouf
+    15 push bla/bli/plouf bla/blo/plouf
+    16 push tutu titi
+    17 push .
+    18 push toto
+    19 init
 # Try to push a directory while a file already exists with the same name.
 $ rm toto
 $ mkdir toto
@@ -771,6 +845,28 @@ $ main.exe --no-color pull
 Pulled: toto
 $ cat toto
 blablabla%
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
+     1 rm -r .
+     2 push .
+     3 rm -r bla
+     4 push .
+     5 rm -r plif bla/bli
+     6 push .
+     7 rm plif bla/bli/plouf bla/blo/plouf
+     8 push .
+     9 rm bla/blo/plouf
+    10 rm bla/bli/plouf
+    11 rm titi toto tutu
+    12 rm plif
+    13 push .
+    14 push bla/bli/plouf bla/blo/plouf
+    15 push bla/bli/plouf bla/blo/plouf
+    16 push tutu titi
+    17 push .
+    18 push toto
+    19 init
 # Same, but with a deeper directory.
 $ rm toto
 $ mkdir toto
@@ -790,6 +886,28 @@ $ main.exe --no-color pull
 Pulled: toto
 $ cat toto
 blablabla%
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
+     1 rm -r .
+     2 push .
+     3 rm -r bla
+     4 push .
+     5 rm -r plif bla/bli
+     6 push .
+     7 rm plif bla/bli/plouf bla/blo/plouf
+     8 push .
+     9 rm bla/blo/plouf
+    10 rm bla/bli/plouf
+    11 rm titi toto tutu
+    12 rm plif
+    13 push .
+    14 push bla/bli/plouf bla/blo/plouf
+    15 push bla/bli/plouf bla/blo/plouf
+    16 push tutu titi
+    17 push .
+    18 push toto
+    19 init
 # Same, but with a deeper directory but the first directory exists.
 $ rm bla/bli/plouf
 $ mkdir bla/bli/plouf
@@ -821,6 +939,28 @@ $ main.exe --no-color tree
 ├── titi
 ├── toto
 └── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
+     1 rm -r .
+     2 push .
+     3 rm -r bla
+     4 push .
+     5 rm -r plif bla/bli
+     6 push .
+     7 rm plif bla/bli/plouf bla/blo/plouf
+     8 push .
+     9 rm bla/blo/plouf
+    10 rm bla/bli/plouf
+    11 rm titi toto tutu
+    12 rm plif
+    13 push .
+    14 push bla/bli/plouf bla/blo/plouf
+    15 push bla/bli/plouf bla/blo/plouf
+    16 push tutu titi
+    17 push .
+    18 push toto
+    19 init
 # Try to push a file while a directory already exists for one of its parent.
 $ rm bla/bli/plouf
 $ rmdir bla/bli
@@ -848,6 +988,28 @@ $ main.exe --no-color pull
 Pulled: bla/bli/plouf
 $ cat bla/bli/plouf
 plaf%
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
+     1 rm -r .
+     2 push .
+     3 rm -r bla
+     4 push .
+     5 rm -r plif bla/bli
+     6 push .
+     7 rm plif bla/bli/plouf bla/blo/plouf
+     8 push .
+     9 rm bla/blo/plouf
+    10 rm bla/bli/plouf
+    11 rm titi toto tutu
+    12 rm plif
+    13 push .
+    14 push bla/bli/plouf bla/blo/plouf
+    15 push bla/bli/plouf bla/blo/plouf
+    16 push tutu titi
+    17 push .
+    18 push toto
+    19 init
 # Test update.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color update
@@ -1188,6 +1350,28 @@ $ main.exe --no-color tree --cache
 ├── titi
 ├── toto
 └── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
+     1 rm -r .
+     2 push .
+     3 rm -r bla
+     4 push .
+     5 rm -r plif bla/bli
+     6 push .
+     7 rm plif bla/bli/plouf bla/blo/plouf
+     8 push .
+     9 rm bla/blo/plouf
+    10 rm bla/bli/plouf
+    11 rm titi toto tutu
+    12 rm plif
+    13 push .
+    14 push bla/bli/plouf bla/blo/plouf
+    15 push bla/bli/plouf bla/blo/plouf
+    16 push tutu titi
+    17 push .
+    18 push toto
+    19 init
 # Check what prune removes.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color prune
@@ -1209,6 +1393,9 @@ $ main.exe --no-color tree
 ├── titi
 ├── toto
 └── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
 # Check that the main repository is not read with --cache.
 $ mv /tmp/filou-test/main /tmp/filou-test/main.backup
 $ cd /tmp/filou-test/clone
@@ -1230,6 +1417,9 @@ $ main.exe --no-color tree --cache
 ├── toto
 └── tutu
 $ mv /tmp/filou-test/main.backup /tmp/filou-test/main
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
 # Check that needed objects are copied in the clone cache when fetching.
 $ rm -r -f /tmp/filou-test/clone/.filou
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
@@ -1268,6 +1458,9 @@ $ main.exe --no-color update
 Computing reachable object set...
 Copied 12 objects.
 Clone is up-to-date.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push .
 # Test prune on the clone.
 $ echo 'this is a truc' > bla/bli/truc
 $ cd /tmp/filou-test/clone
@@ -1329,3 +1522,6 @@ Removed 1 objects totalling 12 B.
 # Clone: diff should show one removed file:
 - /tmp/filou-test/clone/.filou/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
 # Main: diff should be empty:
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push bla/bli

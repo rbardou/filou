@@ -262,6 +262,13 @@ let () =
       );
       (
         Clap.case
+          ~description: "Show operation history."
+          "log"
+        @@ fun () ->
+        `log
+      );
+      (
+        Clap.case
           ~description:
             "Undo last operations.\n\
              \n\
@@ -372,10 +379,12 @@ let () =
           (* TODO: show progress "Deleted X objects totalling X bytes." *)
           (* TODO: be able to prune the clone cache *)
           (* TODO: --cache could make sense too here *)
+          (* TODO: whether to prune the journal and by how much should be a parameter *)
           let* setup = find_local_clone ~clone_only: false () in
           Controller.prune setup
       | `log ->
-          assert false (* TODO *)
+          let* setup = find_local_clone ~clone_only: false () in
+          Controller.log setup
       | `undo _count ->
           echo "count = %d, verbose = %b" _count verbose;
           assert false (* TODO *)

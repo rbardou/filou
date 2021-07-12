@@ -165,6 +165,9 @@ struct
 
   let update ?v ?dry_run ?color () =
     run ?v ?dry_run ?color [ "update" ]
+
+  let log ?v ?dry_run ?color () =
+    run ?v ?dry_run ?color [ "log" ]
 end
 
 module Main = Make_filou (struct let path = Some main end)
@@ -230,6 +233,7 @@ let () =
   explore_clone "config";
   Clone.check ();
   Clone.tree ();
+  Clone.log ();
 
   comment "Add a file.";
   cd clone;
@@ -237,11 +241,13 @@ let () =
   Clone.push [ "toto" ];
   Clone.check ();
   Clone.tree ();
+  Clone.log ();
 
   comment "Add the file again.";
   Clone.push [];
   Clone.check ();
   Clone.tree ();
+  Clone.log ();
 
   comment "Add several files.";
   cd clone;
@@ -250,6 +256,7 @@ let () =
   Clone.push [ "tutu"; "titi" ];
   Clone.check ();
   Clone.tree ();
+  Clone.log ();
 
   comment "Add files in subdirectories.";
   cd clone;
@@ -262,6 +269,7 @@ let () =
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.check ~cache: true ();
+  Clone.log ();
 
   comment "Test tree.";
   Clone.tree ();
@@ -284,6 +292,7 @@ let () =
   Clone.tree ~size: true ();
   Clone.tree ~count: true ();
   Clone.tree ~size: true ~count: true ();
+  Clone.log ();
 
   comment "Test duplicates.";
   create_file "plif" "plif";
@@ -291,6 +300,7 @@ let () =
   Clone.tree ~duplicates: true ();
   Clone.push ~v: true [];
   Clone.tree ~duplicates: true ();
+  Clone.log ();
 
   comment "Try to pull files.";
   rm "titi";
@@ -333,6 +343,7 @@ let () =
   cat "titi";
   cat "toto";
   cat "tutu";
+  Clone.log ();
 
   comment "Remove files.";
   Clone.tree ~size: true ~count: true ();
@@ -374,6 +385,7 @@ let () =
   Clone.tree ~size: true ~count: true ();
   Clone.push [];
   Clone.tree ();
+  Clone.log ();
 
   comment "Try to push a directory while a file already exists with the same name.";
   rm "toto";
@@ -386,6 +398,7 @@ let () =
   Clone.tree ~duplicates: true ();
   Clone.pull [];
   cat "toto";
+  Clone.log ();
 
   comment "Same, but with a deeper directory.";
   rm "toto";
@@ -398,6 +411,7 @@ let () =
   rmdir "toto";
   Clone.pull [];
   cat "toto";
+  Clone.log ();
 
   comment "Same, but with a deeper directory but the first directory exists.";
   rm "bla/bli/plouf";
@@ -411,6 +425,7 @@ let () =
   Clone.pull [];
   cat "bla/bli/plouf";
   Clone.tree ();
+  Clone.log ();
 
   comment "Try to push a file while a directory already exists for one of its parent.";
   rm "bla/bli/plouf";
@@ -421,6 +436,7 @@ let () =
   rm "bla/bli";
   Clone.pull [];
   cat "bla/bli/plouf";
+  Clone.log ();
 
   comment "Test update.";
   Clone.update ();
@@ -440,17 +456,20 @@ let () =
   clone_tree ();
   Clone.check ~cache: true ();
   Clone.tree ~cache: true ();
+  Clone.log ();
 
   comment "Check what prune removes.";
   Clone.prune ();
   Clone.check ();
   Clone.tree ();
+  Clone.log ();
 
   comment "Check that the main repository is not read with --cache.";
   mv main (main ^ ".backup");
   Clone.tree ();
   Clone.tree ~cache: true ();
   mv (main ^ ".backup") main;
+  Clone.log ();
 
   comment "Check that needed objects are copied in the clone cache when fetching.";
   rm_rf (clone // ".filou");
@@ -458,6 +477,7 @@ let () =
   Clone.tree ~path: "bla/bli" ();
   clone_tree ();
   Clone.update ();
+  Clone.log ();
 
   comment "Test prune on the clone.";
   create_file "bla/bli/truc" "this is a truc";
@@ -503,4 +523,5 @@ let () =
   diff_string_sets clone_files_1 clone_files_2;
   comment "Main: diff should be empty:";
   diff_string_sets main_files_1 main_files_2;
+  Clone.log ();
   ()
