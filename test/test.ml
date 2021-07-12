@@ -211,6 +211,18 @@ let explore_main_hash hash =
 (*   cd clone; *)
 (*   explore_hash hash *)
 
+let rec find_files ?(acc = Set.String.empty) path =
+  if not (Sys.is_directory path) then
+    Set.String.add path acc
+  else
+    let contents = Sys.readdir path |> Array.to_list in
+    List.fold_left' acc contents @@ fun acc filename ->
+    find_files ~acc (path // filename)
+
+let diff_string_sets a b =
+  Set.String.diff a b |> Set.String.iter (echo "- %s");
+  Set.String.diff b a |> Set.String.iter (echo "+ %s")
+
 let () =
   comment "Initialize a main repository and a clone.";
   Filou.init ~main ();
@@ -447,6 +459,49 @@ let () =
   clone_tree ();
   Clone.update ();
 
-  (* TODO: check that prune also GCs the clone *)
-
+  comment "Test prune on the clone.";
+  create_file "bla/bli/truc" "this is a truc";
+  Clone.push [ "bla/bli" ];
+  let clone_files_1 = find_files clone in
+  let main_files_1 = find_files main in
+  Clone.prune ();
+  let clone_files_2 = find_files clone in
+  let main_files_2 = find_files main in
+  comment "Clone: some objects should have been removed, no files should have been added:";
+  diff_string_sets clone_files_1 clone_files_2;
+  comment "Main: should be the same diff:";
+  diff_string_sets main_files_1 main_files_2;
+  Clone.check ();
+  Clone.tree ();
+  comment "Check that if some files are missing from the cache, they are not added.";
+  cd clone;
+  rm ".filou/ea/34/ea34ea54fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859";
+  rm ".filou/a6/e7/a6e7d0f2cde27696d38a96e560caeb57ce260da86331d3d3d2593cf264952dd2";
+  let clone_files_1 = find_files clone in
+  let main_files_1 = find_files main in
+  Clone.prune ();
+  let clone_files_2 = find_files clone in
+  let main_files_2 = find_files main in
+  comment "Clone: diff should be empty:";
+  diff_string_sets clone_files_1 clone_files_2;
+  comment "Main: diff should also be empty:";
+  diff_string_sets main_files_1 main_files_2;
+  comment "Updating should restore 2 objects:";
+  Clone.update ();
+  comment "Check that if more objects exist in the clone than in the main, they are removed.";
+  cd clone;
+  mkdir ".filou/01";
+  mkdir ".filou/01/23";
+  create_file
+    ".filou/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859"
+    "dummy object";
+  let clone_files_1 = find_files clone in
+  let main_files_1 = find_files main in
+  Clone.prune ();
+  let clone_files_2 = find_files clone in
+  let main_files_2 = find_files main in
+  comment "Clone: diff should show one removed file:";
+  diff_string_sets clone_files_1 clone_files_2;
+  comment "Main: diff should be empty:";
+  diff_string_sets main_files_1 main_files_2;
   ()

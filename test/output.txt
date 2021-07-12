@@ -1064,3 +1064,65 @@ $ main.exe --no-color update
 Computing reachable object set...
 Copied 12 objects.
 Clone is up-to-date.
+# Test prune on the clone.
+$ echo 'this is a truc' > bla/bli/truc
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push bla/bli
+Pushed: bla/bli/truc
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color prune
+Removed 8 objects totalling 1.51 kB.
+# Clone: some objects should have been removed, no files should have been added:
+- /tmp/filou-test/clone/.filou/12/f4/12f41d5b6b1957d3b926019b508f08521e1614c9dff595500dc15b11cb13cd7b
+- /tmp/filou-test/clone/.filou/39/8e/398eed8a0400cdd3e770526ce450d0c74e0fae443954d584f286f3ecd1d81e7b
+- /tmp/filou-test/clone/.filou/c0/aa/c0aa227497dd0303120b031c72c1eb0a7311bbc105c61b2fb7d328154a8e4494
+- /tmp/filou-test/clone/.filou/d1/0f/d10fb33ec821d25bc7ba85a23553a73e1f4d936a7eaf5632c559485c32f50512
+# Main: should be the same diff:
+- /tmp/filou-test/main/12/f4/12f41d5b6b1957d3b926019b508f08521e1614c9dff595500dc15b11cb13cd7b
+- /tmp/filou-test/main/39/8e/398eed8a0400cdd3e770526ce450d0c74e0fae443954d584f286f3ecd1d81e7b
+- /tmp/filou-test/main/c0/aa/c0aa227497dd0303120b031c72c1eb0a7311bbc105c61b2fb7d328154a8e4494
+- /tmp/filou-test/main/d1/0f/d10fb33ec821d25bc7ba85a23553a73e1f4d936a7eaf5632c559485c32f50512
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 44, file count: 7).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+.
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+# Check that if some files are missing from the cache, they are not added.
+$ cd /tmp/filou-test/clone
+$ rm .filou/ea/34/ea34ea54fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
+$ rm .filou/a6/e7/a6e7d0f2cde27696d38a96e560caeb57ce260da86331d3d3d2593cf264952dd2
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color prune
+Removed 0 objects totalling 0 B.
+# Clone: diff should be empty:
+# Main: diff should also be empty:
+# Updating should restore 2 objects:
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color update
+Computing reachable object set...
+Copied 2 objects.
+Clone is up-to-date.
+# Check that if more objects exist in the clone than in the main, they are removed.
+$ cd /tmp/filou-test/clone
+$ mkdir .filou/01
+$ mkdir .filou/01/23
+$ echo 'dummy object' > .filou/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color prune
+Removed 1 objects totalling 12 B.
+# Clone: diff should show one removed file:
+- /tmp/filou-test/clone/.filou/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
+# Main: diff should be empty:
