@@ -123,7 +123,8 @@ val file_exists: location -> file_path -> (bool, [> `failed ]) r
 
 val dir_exists: location -> path -> (bool, [> `failed ]) r
 
-val hash: location -> file_path -> (Hash.t, [> `failed ]) r
+(** Also returns the size. *)
+val hash: location -> file_path -> (Hash.t * int, [> `no_such_file | `failed ]) r
 
 (** Copy a file.
 

@@ -220,4 +220,18 @@ struct
           in
           ok (main_count + clone_count, main_size + clone_size)
 
+  let check_hash setup hash =
+    let* () =
+      match setup.main with
+        | None ->
+            unit
+        | Some main ->
+            R.check_hash main hash
+    in
+    match R.check_hash setup.clone_dot_filou hash with
+      | ERROR { code = `not_available; _ } ->
+          unit
+      | x ->
+          x
+
 end

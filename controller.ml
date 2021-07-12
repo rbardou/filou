@@ -169,7 +169,35 @@ let rec check_dir ~clone_only expected_hash_index setup
   in
   ok (!path_size, !path_file_count)
 
-let check ~clone_only setup =
+let check ~clone_only ~hash setup =
+  let* () =
+    match hash with
+      | `no ->
+          unit
+      | `metadata | `all as x ->
+          let files = match x with `metadata -> false | `all -> true in
+          let count = ref 0 in
+          let* () =
+            with_progress @@ fun () ->
+            Progress_bar.set "Checking hashes: computing the set of reachable objects...";
+            let* hashes = Repository.reachable ~files setup in
+            let hashes = Repository.Hash_set.elements hashes in
+            count := List.length hashes;
+            let index = ref 0 in
+            let progress () =
+              Progress_bar.set "Checking hashes (%d / %d) (%d%%)"
+                !index !count (!index * 100 / !count)
+            in
+            progress ();
+            list_iter_e hashes @@ fun hash ->
+            let* () = Repository.check_hash setup hash in
+            incr index;
+            progress ();
+            unit
+          in
+          echo "No reachable object is corrupted (object count: %d)." !count;
+          unit
+  in
   let* root = fetch_root setup in
   match root with
     | Empty ->

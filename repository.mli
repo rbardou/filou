@@ -127,6 +127,9 @@ sig
   (** Copy the root from a repository to another. *)
   val transfer_root: ?on_progress: (int -> unit) -> source: t -> target: t -> unit ->
     (unit, [> `failed ]) r
+
+  (** Check whether an object is corrupted. *)
+  val check_hash: t -> Hash.t -> (unit, [> `failed | `corrupted | `not_available ]) r
 end
 
 module Make (Root: ROOT): S with type root = Root.t and type t = Device.location

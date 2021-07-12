@@ -231,7 +231,23 @@ let () =
                cache is partial. File sizes will not be checked."
             false
         in
-        `check cache
+        let hash_all =
+          Clap.flag
+            ~set_long: "hash"
+            ~set_short: 'h'
+            ~description:
+              "Check hashes of all objects, including file \
+               objects. Implies --metadata-hash."
+            false
+        in
+        let hash_metadata =
+          Clap.flag
+            ~set_long: "metadata-hash"
+            ~set_short: 'm'
+            ~description: "Check hashes of metadata objects (but not file objects)."
+            false
+        in
+        `check (cache, hash_all, hash_metadata)
       );
       (
         Clap.case
@@ -368,10 +384,14 @@ let () =
           let* setup = find_local_clone ~clone_only: false () in
           let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
           Controller.remove ~recursive setup paths
-      | `check cache ->
-          (* TODO: --metadata-hash for reachable non-file hashes and --hash for all hashes *)
+      | `check (cache, hash_all, hash_metadata) ->
           let* setup = find_local_clone ~clone_only: cache () in
-          Controller.check ~clone_only: cache setup
+          let hash =
+            if hash_all then `all else
+            if hash_metadata then `metadata else
+              `no
+          in
+          Controller.check ~clone_only: cache ~hash setup
       | `update ->
           let* setup = find_local_clone ~clone_only: false () in
           Controller.update setup
