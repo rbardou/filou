@@ -161,7 +161,7 @@ struct
     )
 
   let prune ?v ?dry_run ?color () =
-    run ?v ?dry_run ?color [ "prune" ]
+    run ?v ?dry_run ?color [ "prune"; "--yes" ]
 
   let update ?v ?dry_run ?color () =
     run ?v ?dry_run ?color [ "update" ]

@@ -265,16 +265,25 @@ let () =
       (
         Clap.case
           ~description:
-            "Delete unreachable objects. This can take a while.\n\
+            "Clear operation history, keeping only the current \
+             state.\n\
              \n\
-             Unreachable objects are no longer relevant for the \
-             repository. They can be old metadata or actual files that \
-             were removed using 'rm'. Unreachable objects can safely \
-             be deleted if 'tree' shows you all the files that are \
-             supposed to be here, even if you did not pull all of them."
+             THIS OPERATION CANNOT BE UNDONE. After 'prune', the undo \
+             list and the redo list will be empty.\n\
+             \n\
+             Pruning deletes files deleted with 'rm' and can thus be \
+             used to gain space. Pruning doesn't delete files in the \
+             work directory, it only deletes objects in the main \
+             repository and in the .filou directory of the clone."
           "prune"
         @@ fun () ->
-        `prune
+        let yes =
+          Clap.flag
+            ~set_long: "yes"
+            ~description: "Do not prompt for confirmation."
+            false
+        in
+        `prune yes
       );
       (
         Clap.case
@@ -395,13 +404,37 @@ let () =
       | `update ->
           let* setup = find_local_clone ~clone_only: false () in
           Controller.update setup
-      | `prune ->
-          (* TODO: show progress "Deleted X objects totalling X bytes." *)
-          (* TODO: be able to prune the clone cache *)
+      | `prune yes ->
           (* TODO: --cache could make sense too here *)
           (* TODO: whether to prune the journal and by how much should be a parameter *)
           let* setup = find_local_clone ~clone_only: false () in
-          Controller.prune setup
+          let* yes =
+            if yes then
+              ok true
+            else (
+              echo "/!\\ THIS OPERATION CANNOT BE UNDONE /!\\";
+              echo "After this, the undo list and the redo list will be empty.";
+              echo "";
+              (
+                Option.iter' (Clone.main setup) @@ fun location ->
+                echo "  Main repository: %s" (Device.show_location location);
+              );
+              echo "            Clone: %s" (Device.show_location (Clone.clone setup));
+              echo "";
+              print_string "Prune main repository and its clone? [y/N] ";
+              flush stdout;
+              let response = read_line () in
+              match String.lowercase_ascii response with
+                | "y" | "yes" ->
+                    ok true
+                | "n" | "no" | "" ->
+                    echo "Operation was canceled.";
+                    ok false
+                | _ ->
+                    failed [ "please answer yes or no" ]
+            )
+          in
+          if yes then Controller.prune setup else unit
       | `log ->
           let* setup = find_local_clone ~clone_only: false () in
           Controller.log setup

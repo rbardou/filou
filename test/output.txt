@@ -1594,7 +1594,7 @@ $ main.exe --no-color tree
 └── tutu
 # Check what prune removes.
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color prune
+$ main.exe --no-color prune --yes
 Removed 52 objects totalling 7.11 kB.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
@@ -1687,7 +1687,7 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color push bla/bli
 Pushed: bla/bli/truc
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color prune
+$ main.exe --no-color prune --yes
 Removed 8 objects totalling 1.51 kB.
 # Clone: some objects should have been removed, no files should have been added:
 - /tmp/filou-test/clone/.filou/06/80/068078c68210224ad43efdbeed879fbfdfbbb69e072b4b9655b09beb75f4c92e
@@ -1722,7 +1722,7 @@ $ cd /tmp/filou-test/clone
 $ rm .filou/ea/34/ea34ea54fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
 $ rm .filou/a6/e7/a6e7d0f2cde27696d38a96e560caeb57ce260da86331d3d3d2593cf264952dd2
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color prune
+$ main.exe --no-color prune --yes
 Removed 0 objects totalling 0 B.
 # Clone: diff should be empty:
 # Main: diff should also be empty:
@@ -1737,7 +1737,7 @@ $ cd /tmp/filou-test/clone
 $ mkdir .filou/01/23
 $ echo 'dummy object' > .filou/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color prune
+$ main.exe --no-color prune --yes
 Removed 1 objects totalling 12 B.
 # Clone: diff should show one removed file:
 - /tmp/filou-test/clone/.filou/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
