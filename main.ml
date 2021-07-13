@@ -283,7 +283,34 @@ let () =
             ~description: "Do not prompt for confirmation."
             false
         in
-        `prune yes
+        let keep_undo =
+          Clap.default_int
+            ~long: "keep-undo"
+            ~placeholder: "COUNT"
+            ~description:
+              "Keep COUNT items from the undo list. If the undo list \
+               contains less than COUNT items, keep all of them."
+            0
+        in
+        let keep_redo =
+          Clap.default_int
+            ~long: "keep-redo"
+            ~placeholder: "COUNT"
+            ~description:
+              "Keep COUNT items from the redo list. If the redo list \
+               contains less than COUNT items, keep all of them."
+            0
+        in
+        let keep =
+          Clap.default_int
+            ~placeholder: "COUNT"
+            ~description:
+              "Keep COUNT items from the redo and the undo list. If \
+               --keep-undo or --keep-redo are also specified, the \
+               highest value is used."
+            0
+        in
+        `prune (yes, keep_undo, keep_redo, keep)
       );
       (
         Clap.case
@@ -404,37 +431,11 @@ let () =
       | `update ->
           let* setup = find_local_clone ~clone_only: false () in
           Controller.update setup
-      | `prune yes ->
-          (* TODO: --cache could make sense too here *)
-          (* TODO: whether to prune the journal and by how much should be a parameter *)
+      | `prune (yes, keep_undo, keep_redo, keep) ->
+          let keep_undo = max keep_undo keep in
+          let keep_redo = max keep_redo keep in
           let* setup = find_local_clone ~clone_only: false () in
-          let* yes =
-            if yes then
-              ok true
-            else (
-              echo "/!\\ THIS OPERATION CANNOT BE UNDONE /!\\";
-              echo "After this, the undo list and the redo list will be empty.";
-              echo "";
-              (
-                Option.iter' (Clone.main setup) @@ fun location ->
-                echo "  Main repository: %s" (Device.show_location location);
-              );
-              echo "            Clone: %s" (Device.show_location (Clone.clone setup));
-              echo "";
-              print_string "Prune main repository and its clone? [y/N] ";
-              flush stdout;
-              let response = read_line () in
-              match String.lowercase_ascii response with
-                | "y" | "yes" ->
-                    ok true
-                | "n" | "no" | "" ->
-                    echo "Operation was canceled.";
-                    ok false
-                | _ ->
-                    failed [ "please answer yes or no" ]
-            )
-          in
-          if yes then Controller.prune setup else unit
+          Controller.prune ~yes ~keep_undo ~keep_redo setup
       | `log ->
           let* setup = find_local_clone ~clone_only: false () in
           Controller.log setup

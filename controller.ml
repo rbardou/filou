@@ -995,26 +995,66 @@ let update setup =
   echo "Clone is up-to-date.";
   unit
 
-let prune setup =
-  let* journal = Repository.fetch_root setup in
-  let journal = { redo = []; head = journal.head; undo = [] } in
-  let* () = Repository.store_root setup journal in
-  let* (count, size) = Repository.garbage_collect setup in
-  echo "Removed %d objects totalling %s." count (show_size size);
-  unit
-
-let log setup =
-  let* { redo; head; undo } = Repository.fetch_root setup in
+let print_journal { redo; head; undo } =
   let redo = List.mapi (fun i x -> - i - 1, x) redo in
   (
     List.iter' (List.rev redo) @@ fun (i, { command; _ }) ->
     echo "    %2d %s" i command;
   );
   echo "-->  0 %s" head.command;
-  (
-    List.iteri' undo @@ fun i { command; _ } ->
-    echo "    %2d %s" (i + 1) command
-  );
+  List.iteri' undo @@ fun i { command; _ } ->
+  echo "    %2d %s" (i + 1) command
+
+let prune ~yes ~keep_undo ~keep_redo setup =
+  let* journal = Repository.fetch_root setup in
+  let new_journal =
+    {
+      redo = list_take keep_redo journal.redo;
+      head = journal.head;
+      undo = list_take keep_undo journal.undo;
+    }
+  in
+  let* yes =
+    if yes then
+      ok true
+    else (
+      echo "/!\\ THIS OPERATION CANNOT BE UNDONE /!\\";
+      echo "After this, the history will look like this:";
+      echo "";
+      print_journal new_journal;
+      echo "";
+      echo "Repositories:";
+      echo "";
+      (
+        Option.iter' (Clone.main setup) @@ fun location ->
+        echo "  Main repository: %s" (Device.show_location location);
+      );
+      echo "            Clone: %s" (Device.show_location (Clone.clone setup));
+      echo "";
+      print_string "Prune main repository and its clone? [y/N] ";
+      flush stdout;
+      let response = read_line () in
+      match String.lowercase_ascii response with
+        | "y" | "yes" ->
+            ok true
+        | "n" | "no" | "" ->
+            echo "Operation was canceled.";
+            ok false
+        | _ ->
+            failed [ "please answer yes or no" ]
+    )
+  in
+  if not yes then
+    unit
+  else
+    let* () = Repository.store_root setup new_journal in
+    let* (count, size) = Repository.garbage_collect setup in
+    echo "Removed %d objects totalling %s." count (show_size size);
+    unit
+
+let log setup =
+  let* journal = Repository.fetch_root setup in
+  print_journal journal;
   unit
 
 let undo setup ~count =

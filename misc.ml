@@ -74,3 +74,13 @@ let decode_robin_string typ string =
         failed [ Protype_robin.Decode.show_error error ]
 
 let warn x = Printf.ksprintf (echo "Warning: %s") x
+
+let rec list_take ?(acc = []) n l =
+  if n <= 0 then
+    List.rev acc
+  else
+    match l with
+      | [] ->
+          List.rev acc
+      | head :: tail ->
+          list_take ~acc: (head :: acc) (n - 1) tail
