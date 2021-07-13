@@ -70,4 +70,12 @@ let of_bin s =
 
 let compare = String.compare
 
-let string s = Digestif.SHA256.(digest_string s |> to_raw_string)
+let string s = Digestif.SHA256.digest_string s |> Digestif.SHA256.to_raw_string
+
+type partial = Digestif.SHA256.ctx
+
+let start = Digestif.SHA256.init
+
+let feed_bytes partial string off len = Digestif.SHA256.feed_bytes ~off ~len partial string
+
+let finish partial = Digestif.SHA256.get partial |> Digestif.SHA256.to_raw_string

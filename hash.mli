@@ -14,6 +14,14 @@ val of_bin: string -> t option
 
 val compare: t -> t -> int
 
+val hex_of_string: string -> string
+
 val string: string -> t
 
-val hex_of_string: string -> string
+type partial
+
+val start: unit -> partial
+
+val feed_bytes: partial -> bytes -> int -> int -> partial
+
+val finish: partial -> t

@@ -454,62 +454,18 @@ let dir_exists location (path: path) =
     | OK (File _) ->
         ok false
 
-let run_and_read command arguments =
-  match Process.run_and_read command arguments with
-    | exception Unix.Unix_error (error, _, _) ->
-        failed [
-          "failed to run " ^ command;
-          Unix.error_message error;
-        ]
-    | stdout, stderr, WEXITED 0 ->
-        ok (stdout, stderr)
-    | _, stderr, status ->
-        let status_msg =
-          match status, stderr with
-            | WEXITED n, "" -> sf "exited with code %d" n
-            | WEXITED n, _ -> sf "exited with code %d: %S" n stderr
-            | WSIGNALED n, _ -> sf "killed by signal %d" n
-            | WSTOPPED n, _ -> sf "stopped by signal %d" n
-        in
-        failed [
-          "failed to run " ^ command;
-          status_msg;
-        ]
-
-let hash location (path: file_path) =
-  match stat location (path_of_file_path path) with
-    | ERROR { code = (`no_such_file | `failed); _ } as x ->
-        x
-    | OK Dir ->
-        failed [ sf "cannot hash %s, it is a directory" (show_file_path path) ]
-    | OK (File { size; _ }) ->
-        match location with
-          | Local (_, device_path) ->
-              let full_path = local_file_path device_path path in
-              let full_path_string = Path.show full_path in
-              let failed msg = failed (("failed to hash: " ^ full_path_string) :: msg) in
-              let* stdout, _ = run_and_read "sha256sum" [ "-b"; full_path_string ] in
-              if String.length stdout < Hash.hex_length then
-                failed [ sf "sha256sum output is too small: %S" stdout ]
-              else
-                let* hash_string =
-                  if String.length stdout = Hash.hex_length then
-                    OK stdout
-                  else if stdout.[Hash.hex_length] <> ' ' then
-                    failed [
-                      sf "sha256sum output does not contain a space at position %d: %S"
-                        Hash.hex_length stdout;
-                    ]
-                  else
-                    OK (String.sub stdout 0 Hash.hex_length)
-                in
-                (
-                  match Hash.of_hex hash_string with
-                    | None ->
-                        failed [ "sha256sum returned an invalid hash: " ^ stdout ]
-                    | Some hash ->
-                        OK (hash, size)
-                )
+let hash location path =
+  read_file_incrementally location path @@ fun read ->
+  let bytes = Bytes.create 4096 in
+  let rec loop partial total_length =
+    let* len = read bytes 0 4096 in
+    let total_length = total_length + len in
+    if len <= 0 then
+      ok (Hash.finish partial, total_length)
+    else
+      loop (Hash.feed_bytes partial bytes 0 len) total_length
+  in
+  loop (Hash.start ()) 0
 
 let copy_file
     ~on_progress

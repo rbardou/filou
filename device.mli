@@ -101,7 +101,8 @@ val read_file: location -> file_path -> (string, [> `no_such_file | `failed ]) r
 
     Usage: [read_file_incrementally location file_path read_contents]
 
-    [read_contents] will be called with a function that it can call to read contents.
+    [read_contents] will be called with a function [read_bytes]
+    that it can call to read contents. Function [read_bytes] returns [0] for end of file.
     If [read_contents] raises an exception, it is caught and [read_file_incrementally]
     returns [`failed]. *)
 val read_file_incrementally: location -> file_path ->
