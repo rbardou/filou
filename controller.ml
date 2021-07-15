@@ -305,9 +305,10 @@ let show_size size =
 
 let tree ~color ~max_depth ~only_main ~only_dirs
     ~print_size ~print_file_count ~print_duplicates ~full_dir_paths
-    (setup: Clone.setup) (dir_path: Device.path) =
+    (setup: Clone.setup) (paths: Device.path list) =
   let* root = fetch_root setup in
   let* root_dir = fetch_root_dir setup root in
+  list_iter_e paths @@ fun path ->
   let* dir =
     let rec find_dir dir_path_rev dir = function
       | [] ->
@@ -330,7 +331,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
                 in
                 find_dir dir_path_rev subdir tail
     in
-    find_dir [] root_dir dir_path
+    find_dir [] root_dir path
   in
   (
     let total_size =
@@ -357,7 +358,11 @@ let tree ~color ~max_depth ~only_main ~only_dirs
       else
         ""
     in
-    echo "%s%s%s" (Device.show_path dir_path) total_size total_file_count;
+    echo "%s%s%s%s%s"
+      (if color then "\027[1m\027[34m" else "")
+      (Device.show_path path)
+      (if color then "\027[0m" else "")
+      total_size total_file_count;
   );
   let rec tree_dir prefix dir_depth dir_path_rev dir =
     if
@@ -592,7 +597,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
             let* () = list_iter_e (List.rev tail) print_entry in
             print_entry ~last: true head
   in
-  tree_dir "" 0 (List.rev dir_path) dir
+  tree_dir "" 0 (List.rev path) dir
 
 let push_file ~verbose (setup: Clone.setup) (root: root)
     (((dir_path, filename) as path): Device.file_path) =

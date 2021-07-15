@@ -101,14 +101,16 @@ let () =
           ~description: "Show full directory paths. Useful for large trees."
           false
       in
-      let path =
-        Clap.default_string
-          ~description: "Path to the directory to print."
-          ~placeholder: "DIR"
-          "."
+      let paths =
+        Clap.list_string
+          ~description:
+            "Paths of the directories and/or files to display. If no \
+             PATH is specified, display the current directory."
+          ~placeholder: "PATH"
+          ()
       in
       (
-        path, max_depth, only_main, only_dirs, print_size, print_file_count,
+        paths, max_depth, only_main, only_dirs, print_size, print_file_count,
         print_duplicates, cache, full_dir_paths
       )
     in
@@ -397,13 +399,18 @@ let () =
           let* clone_location = parse_location clone_location in
           Controller.clone ~main_location ~clone_location
       | `tree (
-          path, max_depth, only_main, only_dirs, print_size, print_file_count,
+          paths, max_depth, only_main, only_dirs, print_size, print_file_count,
           print_duplicates, cache, full_dir_paths
         ) ->
           let* setup = find_local_clone ~clone_only: cache () in
-          let* path = Device.parse_path (Clone.clone setup) path in
+          let paths =
+            match paths with
+              | [] -> [ "." ]
+              | _ -> paths
+          in
+          let* paths = list_map_e paths (Device.parse_path (Clone.clone setup)) in
           Controller.tree ~color ~max_depth ~only_main ~only_dirs ~print_size
-            ~print_file_count ~print_duplicates ~full_dir_paths setup path
+            ~print_file_count ~print_duplicates ~full_dir_paths setup paths
       | `push paths ->
           let* setup = find_local_clone ~clone_only: false () in
           let paths =
