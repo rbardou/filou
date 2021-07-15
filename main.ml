@@ -34,7 +34,7 @@ let () =
           | `tree ->
               Clap.optional_int
                 ~long: "depth"
-                ~short: 'D'
+                ~short: 'r'
                 ~description:
                   "Maximum depth to print. 0 prints only DIR itself and not its contents."
                 ()
@@ -42,7 +42,7 @@ let () =
               Some (
                 Clap.default_int
                   ~long: "depth"
-                  ~short: 'D'
+                  ~short: 'r'
                   ~description:
                     "Maximum depth to print. 0 prints only DIR itself and not its contents."
                   1
@@ -79,7 +79,7 @@ let () =
       let print_duplicates =
         Clap.flag
           ~set_long: "duplicates"
-          ~set_short: 'p'
+          ~set_short: 'D'
           ~description:
             "For files that have copies in other directories, print \
              the total number of copies."
@@ -94,6 +94,13 @@ let () =
              repository. Output may not be up-to-date."
           false
       in
+      let full_dir_paths =
+        Clap.flag
+          ~set_long: "full-dir-paths"
+          ~set_short: 'p'
+          ~description: "Show full directory paths. Useful for large trees."
+          false
+      in
       let path =
         Clap.default_string
           ~description: "Path to the directory to print."
@@ -102,7 +109,7 @@ let () =
       in
       (
         path, max_depth, only_main, only_dirs, print_size, print_file_count,
-        print_duplicates, cache
+        print_duplicates, cache, full_dir_paths
       )
     in
     Clap.subcommand [
@@ -391,12 +398,12 @@ let () =
           Controller.clone ~main_location ~clone_location
       | `tree (
           path, max_depth, only_main, only_dirs, print_size, print_file_count,
-          print_duplicates, cache
+          print_duplicates, cache, full_dir_paths
         ) ->
           let* setup = find_local_clone ~clone_only: cache () in
           let* path = Device.parse_path (Clone.clone setup) path in
           Controller.tree ~color ~max_depth ~only_main ~only_dirs ~print_size
-            ~print_file_count ~print_duplicates setup path
+            ~print_file_count ~print_duplicates ~full_dir_paths setup path
       | `push paths ->
           let* setup = find_local_clone ~clone_only: false () in
           let paths =

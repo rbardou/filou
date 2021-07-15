@@ -1,6 +1,12 @@
 open Misc
 open State
 
+(* TODO: use [Device.with_lock] for read-write operations?
+   Note that the damage that can be done if we don't is not terrible:
+   it just means that if there are multiple concurrent accesses, the last
+   one wins, but the repository is not corrupted: it only contains some
+   unreachable objects. *)
+
 let empty_dir: dir = Filename_map.empty
 
 let fetch_or_fail setup hash =
@@ -298,7 +304,7 @@ let show_size size =
       Printf.sprintf "%d TB" (size / 1_000_000_000_000)
 
 let tree ~color ~max_depth ~only_main ~only_dirs
-    ~print_size ~print_file_count ~print_duplicates
+    ~print_size ~print_file_count ~print_duplicates ~full_dir_paths
     (setup: Clone.setup) (dir_path: Device.path) =
   let* root = fetch_root setup in
   let* root_dir = fetch_root_dir setup root in
@@ -441,7 +447,14 @@ let tree ~color ~max_depth ~only_main ~only_dirs
               | `file_not_pushed -> print_string "\027[31m"; true
               | `inconsistent -> print_string "\027[1m\027[35m"; true
           in
-          print_string (Path.Filename.show filename);
+          print_string (
+            match kind, full_dir_paths with
+              | (`dir | `dir_not_pulled | `dir_not_pushed), true ->
+                  Device.show_file_path (List.rev dir_path_rev, filename)
+              | (`file | `file_not_pulled | `file_not_pushed | `inconsistent), true
+              | _, false ->
+                  Path.Filename.show filename
+          );
           if need_to_reset_color then print_string "\027[0m";
           match kind with
             | `dir | `dir_not_pulled | `dir_not_pushed ->
