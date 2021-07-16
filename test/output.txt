@@ -9,7 +9,7 @@ $ main.exe --no-color check
 Repository is empty.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
 -->  0 init
@@ -26,7 +26,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 └── toto
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
@@ -42,7 +42,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 └── toto
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
@@ -64,7 +64,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── titi
 ├── toto
 └── tutu
@@ -107,7 +107,7 @@ $ main.exe --no-color log
 # Test tree.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -118,47 +118,44 @@ $ main.exe --no-color tree
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree bla
-bla
-├── bli/
-│   └── plouf
-└── blo/
-    └── plouf
+└── bla/
+    ├── bli/
+    │   └── plouf
+    └── blo/
+        └── plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree bla/blo
-bla/blo
-└── plouf
+└── bla/blo/
+    └── plouf
 $ cd /tmp/filou-test/clone/bla/bli
 $ main.exe --no-color tree
-bla/bli
-└── plouf
+└── bla/bli/
+    └── plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree bla/blo/blu/ble
-Error:
-  no such directory: bla/blo/blu
-Exit code: 1
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree bla/blo/plouf/ble
 Error:
-  bla/blo/plouf is a file
+  failed to get path type for bla/blo/plouf/ble in /tmp/filou-test/clone/:
+  failed to read file: /tmp/filou-test/clone/bla/blo/plouf/ble:
+  Not a directory
 Exit code: 1
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree bla/blo/plouf
-Error:
-  bla/blo/plouf is a file
-Exit code: 1
+└── bla/blo/plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --depth 0
-.
+./
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --depth 1
-.
+./
 ├── bla/
 ├── titi
 ├── toto
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --depth 2
-.
+./
 ├── bla/
 │   ├── bli/
 │   └── blo/
@@ -167,7 +164,7 @@ $ main.exe --no-color tree --depth 2
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --depth 3
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -178,32 +175,32 @@ $ main.exe --no-color tree --depth 3
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --depth 0 bla
-bla
+└── bla/
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --depth 1 bla
-bla
-├── bli/
-└── blo/
+└── bla/
+    ├── bli/
+    └── blo/
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --depth 2 bla
-bla
-├── bli/
-│   └── plouf
-└── blo/
-    └── plouf
+└── bla/
+    ├── bli/
+    │   └── plouf
+    └── blo/
+        └── plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --only-dirs
-.
+./
 └── bla/
     ├── bli/
     └── blo/
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --depth 1 --only-dirs
-.
+./
 └── bla/
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size
-. (26 B)
+./ (26 B)
 ├── bla/ (8 B)
 │   ├── bli/ (4 B)
 │   │   └── plouf (4 B)
@@ -214,7 +211,7 @@ $ main.exe --no-color tree --size
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --count
-. (5 files)
+./ (5 files)
 ├── bla/ (2 files)
 │   ├── bli/ (1 file)
 │   │   └── plouf
@@ -225,7 +222,7 @@ $ main.exe --no-color tree --count
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (26 B) (5 files)
+./ (26 B) (5 files)
 ├── bla/ (8 B) (2 files)
 │   ├── bli/ (4 B) (1 file)
 │   │   └── plouf (4 B)
@@ -254,7 +251,7 @@ Already exists: tutu
 Pushed: plif (duplicate of: bla/blo/plouf)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --duplicates
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -274,7 +271,7 @@ Already exists: tutu
 Pushed: plif (duplicate of: bla/blo/plouf)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --duplicates
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -300,7 +297,7 @@ $ rm titi
 $ rm tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -315,7 +312,7 @@ $ main.exe --no-color pull titi
 Pulled: titi
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -330,7 +327,7 @@ $ main.exe --no-color pull tutu
 Pulled: tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -344,7 +341,7 @@ $ rm titi
 $ rm tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -360,7 +357,7 @@ Pulled: titi
 Pulled: tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -373,7 +370,7 @@ $ main.exe --no-color tree
 $ rm tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -388,7 +385,7 @@ $ main.exe --no-color pull titi tutu
 Pulled: tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -404,7 +401,7 @@ $ rm plif
 $ rm toto
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├-- bli/
 │   │   └-- plouf
@@ -419,7 +416,7 @@ $ main.exe -v --no-color pull bla/bli
 Pulled: bla/bli/plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -433,7 +430,7 @@ $ rm bla/bli/plouf
 $ rmdir bla/bli
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├-- bli/
 │   │   └-- plouf
@@ -449,7 +446,7 @@ Pulled: bla/bli/plouf
 Already exists: bla/blo/plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -463,7 +460,7 @@ $ rm bla/bli/plouf
 $ rmdir bla/bli
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├-- bli/
 │   │   └-- plouf
@@ -483,7 +480,7 @@ Pulled: toto
 Already exists: tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -522,7 +519,7 @@ $ main.exe --no-color log
 # Remove files.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (30 B) (6 files)
+./ (30 B) (6 files)
 ├── bla/ (8 B) (2 files)
 │   ├── bli/ (4 B) (1 file)
 │   │   └── plouf (4 B)
@@ -541,7 +538,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (26 B) (5 files)
+./ (26 B) (5 files)
 ├── bla/ (8 B) (2 files)
 │   ├── bli/ (4 B) (1 file)
 │   │   └── plouf (4 B)
@@ -560,7 +557,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (8 B) (2 files)
+./ (8 B) (2 files)
 ├── bla/ (8 B) (2 files)
 │   ├── bli/ (4 B) (1 file)
 │   │   └── plouf (4 B)
@@ -579,7 +576,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (4 B) (1 files)
+./ (4 B) (1 file)
 ├── bla/ (4 B) (1 file)
 │   ├++ bli/
 │   └── blo/ (4 B) (1 file)
@@ -595,7 +592,7 @@ $ main.exe --no-color check
 Repository is empty.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (0 B) (0 files)
+./ (0 B) (0 files)
 ├++ bla/
 ├++ plif (4 B)
 ├++ titi (6 B)
@@ -611,7 +608,7 @@ Pushed: tutu
 Pushed: plif (duplicate of: bla/blo/plouf)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (30 B) (6 files)
+./ (30 B) (6 files)
 ├── bla/ (8 B) (2 files)
 │   ├── bli/ (4 B) (1 file)
 │   │   └── plouf (4 B)
@@ -630,7 +627,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (18 B) (3 files)
+./ (18 B) (3 files)
 ├++ bla/
 ├++ plif (4 B)
 ├── titi (6 B)
@@ -648,7 +645,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (30 B) (6 files)
+./ (30 B) (6 files)
 ├── bla/ (8 B) (2 files)
 │   ├── bli/ (4 B) (1 file)
 │   │   └── plouf (4 B)
@@ -670,7 +667,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (30 B) (6 files)
+./ (30 B) (6 files)
 ├── bla/ (8 B) (2 files)
 │   ├── bli/ (4 B) (1 file)
 │   │   └── plouf (4 B)
@@ -689,7 +686,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (22 B) (4 files)
+./ (22 B) (4 files)
 ├── bla/ (4 B) (1 file)
 │   ├++ bli/
 │   └── blo/ (4 B) (1 file)
@@ -704,7 +701,7 @@ Pushed: bla/bli/plouf
 Pushed: plif (duplicate of: bla/blo/plouf)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -723,7 +720,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (22 B) (4 files)
+./ (22 B) (4 files)
 ├++ bla/
 ├── plif (4 B)
 ├── titi (6 B)
@@ -735,7 +732,7 @@ Pushed: bla/blo/plouf (duplicate of: plif)
 Pushed: bla/bli/plouf
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -752,7 +749,7 @@ $ main.exe --no-color check
 Repository is empty.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
-. (0 B) (0 files)
+./ (0 B) (0 files)
 ├++ bla/
 ├++ plif (4 B)
 ├++ titi (6 B)
@@ -768,7 +765,7 @@ Pushed: tutu
 Pushed: plif (duplicate of: bla/blo/plouf)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -812,7 +809,7 @@ Error:
 Exit code: 1
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --duplicates
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -828,7 +825,7 @@ $ rm toto/wrong
 $ rmdir toto
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --duplicates
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -929,7 +926,7 @@ $ cat bla/bli/plouf
 plaf%
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -973,7 +970,7 @@ Error:
 Exit code: 1
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli?
 │   └── blo/
@@ -1340,7 +1337,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --cache
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -1399,7 +1396,7 @@ $ main.exe --no-color log
     18 init
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├++ bla/
 ├++ plif
 ├++ titi
@@ -1431,7 +1428,7 @@ $ main.exe --no-color log
     17 init
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -1467,7 +1464,7 @@ $ main.exe --no-color log
     14 init
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├++ bli/
 │   └── blo/
@@ -1502,7 +1499,7 @@ $ main.exe --no-color log
     18 init
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├++ bla/
 ├++ plif
 ├++ titi
@@ -1536,7 +1533,7 @@ $ main.exe --no-color log
     19 init
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -1582,7 +1579,7 @@ $ main.exe --no-color log
     20 init
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -1603,7 +1600,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -1626,7 +1623,7 @@ Error:
 Exit code: 1
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --cache
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   └── plouf
@@ -1645,8 +1642,8 @@ $ rm -r -f /tmp/filou-test/clone/.filou
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree bla/bli
-bla/bli
-└── plouf
+└── bla/bli/
+    └── plouf
 $ cd /tmp/filou-test/clone
 $ tree -a -s -F
 .
@@ -1706,7 +1703,7 @@ All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
-.
+./
 ├── bla/
 │   ├── bli/
 │   │   ├── plouf

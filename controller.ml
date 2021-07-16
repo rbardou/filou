@@ -275,11 +275,6 @@ let check ~clone_only ~hash setup =
         echo "Hash index is consistent with the directory structure.";
         unit
 
-type merged_dir_entry =
-  | MDE_main of State.dir_entry
-  | MDE_clone of Device.stat
-  | MDE_both of State.dir_entry * Device.stat
-
 let show_size size =
   (* By using string_of_int instead of divisions and modulos we
      are more compatible with 32bit architectures. *)
@@ -303,68 +298,293 @@ let show_size size =
     if len <= 14 then with_unit "TB" else
       Printf.sprintf "%d TB" (size / 1_000_000_000_000)
 
+type merged_dir_entry =
+  | MDE_main of State.dir_entry
+  | MDE_clone of Device.stat
+  | MDE_both of State.dir_entry * Device.stat
+
+type tree_entry_name =
+  | TEN_path of Device.path
+  | TEN_filename of Path.Filename.t
+
 let tree ~color ~max_depth ~only_main ~only_dirs
     ~print_size ~print_file_count ~print_duplicates ~full_dir_paths
     (setup: Clone.setup) (paths: Device.path list) =
+  let clone_location = Clone.clone setup in
   let* root = fetch_root setup in
   let* root_dir = fetch_root_dir setup root in
-  list_iter_e paths @@ fun path ->
-  let* dir =
-    let rec find_dir dir_path_rev dir = function
-      | [] ->
-          ok dir
-      | head :: tail ->
-          let dir_path_rev = head :: dir_path_rev in
-          match Filename_map.find_opt head dir with
-            | None ->
-                failed [
-                  sf "no such directory: %s" (Device.show_path (List.rev dir_path_rev))
-                ]
-            | Some (File _) ->
-                failed [ sf "%s is a file" (Device.show_path (List.rev dir_path_rev)) ]
-            | Some (Dir { hash; _ }) ->
-                let* subdir =
-                  trace
-                    (sf "failed to fetch directory object %s" (Repository.hex_of_hash hash))
-                  @@
-                  fetch_or_fail setup hash
-                in
-                find_dir dir_path_rev subdir tail
+  let find_path path =
+    let* dir_entry =
+      match root with
+        | Empty ->
+            ok None
+        | Non_empty root ->
+            let rec find dir = function
+              | [] ->
+                  (* [dir = root_dir], we have to compute its stats. *)
+                  let total_size =
+                    Filename_map.fold' dir 0 @@ fun _ dir_entry acc ->
+                    match dir_entry with
+                      | Dir { total_size; _ } -> acc + total_size
+                      | File { size; _ } -> acc + size
+                  in
+                  let total_file_count =
+                    Filename_map.fold' dir 0 @@ fun _ dir_entry acc ->
+                    match dir_entry with
+                      | Dir { total_file_count; _ } -> acc + total_file_count
+                      | File _ -> acc + 1
+                  in
+                  ok (Some (Dir { hash = root.root_dir; total_size; total_file_count }))
+              | head :: tail ->
+                  match Filename_map.find_opt head dir with
+                    | None ->
+                        ok None
+                    | Some (File _) as dir_entry ->
+                        (
+                          match tail with
+                            | [] ->
+                                ok dir_entry
+                            | _ :: _ ->
+                                (* [tail] is not empty, but [head] is a file:
+                                   [path] does not exist. *)
+                                ok None
+                        )
+                    | Some (Dir { hash; _ }) as dir_entry ->
+                        match tail with
+                          | [] ->
+                              ok dir_entry
+                          | _ :: _ ->
+                              let* subdir =
+                                trace (
+                                  sf "failed to fetch directory object %s"
+                                    (Repository.hex_of_hash hash)
+                                ) @@
+                                fetch_or_fail setup hash
+                              in
+                              find subdir tail
+            in
+            find root_dir path
     in
-    find_dir [] root_dir path
+    let* stat =
+      match Device.stat clone_location path with
+        | ERROR { code = `failed; msg } ->
+            failed (
+              sf "failed to get path type for %s in %s"
+                (Device.show_path path)
+                (Device.show_location clone_location)
+              :: msg
+            )
+        | ERROR { code = `no_such_file; _ } ->
+            ok None
+        | OK stat ->
+            ok (Some stat)
+    in
+    ok (path, dir_entry, stat)
   in
-  (
-    let total_size =
+  (* [filename] is [None] for root entries (for which we print [path] itself). *)
+  let rec print_entry prefix ~last ~is_root dir_path dir_depth entry_name
+      merged_dir_entry =
+    let print_prefix kind =
+      if not is_root then (
+        print_string prefix;
+        print_string (if last then "└"  else "├");
+        match kind with
+          | `dir | `file | `inconsistent ->
+              print_string "── ";
+          | `dir_not_pulled | `file_not_pulled ->
+              print_string "-- "
+          | `dir_not_pushed | `file_not_pushed ->
+              print_string "++ "
+      )
+    in
+    let print_prefix_and_filename kind =
+      print_prefix kind;
+      let need_to_reset_color =
+        color && match kind with
+          | `dir -> print_string "\027[1m\027[34m"; true
+          | `dir_not_pulled -> print_string "\027[1m\027[33m"; true
+          | `dir_not_pushed -> print_string "\027[1m\027[31m"; true
+          | `file -> false
+          | `file_not_pulled -> print_string "\027[33m"; true
+          | `file_not_pushed -> print_string "\027[31m"; true
+          | `inconsistent -> print_string "\027[1m\027[35m"; true
+      in
+      print_string (
+        match entry_name with
+          | TEN_path path ->
+              Device.show_path path
+          | TEN_filename filename ->
+              match kind, full_dir_paths with
+                | (`dir | `dir_not_pulled | `dir_not_pushed), true ->
+                    Device.show_file_path (dir_path, filename)
+                | (`file | `file_not_pulled | `file_not_pushed | `inconsistent), true
+                | _, false ->
+                    Path.Filename.show filename
+      );
+      if need_to_reset_color then print_string "\027[0m";
+      match kind with
+        | `dir | `dir_not_pulled | `dir_not_pushed ->
+            print_char '/'
+        | `file | `file_not_pulled | `file_not_pushed ->
+            ()
+        | `inconsistent ->
+            print_char '?'
+    in
+    let print_size size =
       if print_size then
-        let size =
-          Filename_map.fold' dir 0 @@ fun _ dir_entry acc ->
-          match dir_entry with
-            | Dir { total_size; _ } -> acc + total_size
-            | File { size; _ } -> acc + size
-        in
-        sf " (%d B)" size
-      else
-        ""
+        Printf.printf " (%s)" (show_size size)
     in
-    let total_file_count =
+    let print_file_count count =
       if print_file_count then
-        let size =
-          Filename_map.fold' dir 0 @@ fun _ dir_entry acc ->
-          match dir_entry with
-            | Dir { total_file_count; _ } -> acc + total_file_count
-            | File _ -> acc + 1
-        in
-        sf " (%d files)" size
-      else
-        ""
+        if count = 1 then
+          print_string " (1 file)"
+        else
+          Printf.printf " (%d files)" count
     in
-    echo "%s%s%s%s%s"
-      (if color then "\027[1m\027[34m" else "")
-      (Device.show_path path)
-      (if color then "\027[0m" else "")
-      total_size total_file_count;
-  );
-  let rec tree_dir prefix dir_depth dir_path_rev dir =
+    let duplicates hash =
+      if not print_duplicates then
+        ok File_path_set.empty
+      else
+        let file_path =
+          match entry_name with
+            | TEN_path path ->
+                Device.file_path_of_path path
+            | TEN_filename filename ->
+                Some (dir_path, filename)
+        in
+        match file_path with
+          | None ->
+              (* Root path: not a file. *)
+              ok File_path_set.empty
+          | Some file_path ->
+              trace (
+                sf "failed to look up duplicates for %s" (Device.show_file_path file_path)
+              ) @@
+              let hash_bin = Repository.bin_of_hash hash in
+              let char0 = hash_bin.[0] in
+              let char1 = hash_bin.[1] in
+              let* hash_index = fetch_hash_index setup root in
+              let* hash_index_1 =
+                match Map.Char.find_opt char0 hash_index with
+                  | None ->
+                      ok Map.Char.empty
+                  | Some hash_index_1_hash ->
+                      fetch_or_fail setup hash_index_1_hash
+              in
+              let* hash_index_2 =
+                match Map.Char.find_opt char1 hash_index_1 with
+                  | None ->
+                      ok File_hash_map.empty
+                  | Some hash_index_2_hash ->
+                      fetch_or_fail setup hash_index_2_hash
+              in
+              match File_hash_map.find_opt hash hash_index_2 with
+                | None ->
+                    failed [ "%s is missing from the hash index"; ]
+                | Some set ->
+                    ok (File_path_set.remove file_path set)
+    in
+    let print_duplicate_paths duplicates =
+      File_path_set.iter' duplicates @@ fun duplicate_path ->
+      print_string prefix;
+      if last then
+        print_string "    = /"
+      else
+        print_string "│   = /";
+      print_string (Device.show_file_path duplicate_path);
+      print_newline ();
+    in
+    let recurse hash =
+      let subdir_path =
+        match entry_name with
+          | TEN_path path ->
+              path
+          | TEN_filename filename ->
+              dir_path @ [ filename ]
+      in
+      let* dir =
+        match hash with
+          | None ->
+              ok Filename_map.empty
+          | Some hash ->
+              trace (sf "failed to recurse into %s" (Device.show_path subdir_path)) @@
+              fetch_or_fail setup hash
+      in
+      tree_dir
+        (if is_root then "" else if last then prefix ^ "    " else prefix ^ "│   ")
+        (dir_depth + 1)
+        subdir_path dir
+    in
+    let* () =
+      match merged_dir_entry with
+        | MDE_main (File { hash; size }) ->
+            print_prefix_and_filename `file_not_pulled;
+            print_size size;
+            let* duplicates = duplicates hash in
+            print_newline ();
+            print_duplicate_paths duplicates;
+            unit
+        | MDE_clone (File { size; _ }) ->
+            if only_main then unit else (
+              print_prefix_and_filename `file_not_pushed;
+              print_size size;
+              print_newline ();
+              unit
+            )
+        | MDE_both (File { hash; size }, File { size = clone_size; _ }) ->
+            (* TODO: also check hash *)
+            if size = clone_size then
+              (
+                print_prefix_and_filename `file;
+                print_size size;
+                let* duplicates = duplicates hash in
+                print_newline ();
+                print_duplicate_paths duplicates;
+                unit
+              )
+            else
+              (
+                print_prefix_and_filename `inconsistent;
+                print_newline ();
+                unit
+              )
+        | MDE_main (Dir { hash; total_size; total_file_count }) ->
+            print_prefix_and_filename `dir_not_pulled;
+            print_size total_size;
+            print_file_count total_file_count;
+            print_newline ();
+            recurse (Some hash)
+        | MDE_clone Dir ->
+            if only_main then unit else
+            if is_root then
+              (
+                (* Consider "." to always be part of the main repository. *)
+                print_prefix_and_filename `dir;
+                print_size 0;
+                print_file_count 0;
+                print_newline ();
+                recurse None
+              )
+            else
+              (
+                print_prefix_and_filename `dir_not_pushed;
+                print_newline ();
+                unit
+              )
+        | MDE_both (Dir { hash; total_size; total_file_count }, Dir) ->
+            print_prefix_and_filename `dir;
+            print_size total_size;
+            print_file_count total_file_count;
+            print_newline ();
+            recurse (Some hash)
+        | MDE_both (Dir _, File _)
+        | MDE_both (File _, Dir) ->
+            print_prefix_and_filename `inconsistent;
+            print_newline ();
+            unit
+    in
+    unit
+  and tree_dir prefix dir_depth dir_path dir =
     if
       match max_depth with
         | None ->
@@ -375,8 +595,6 @@ let tree ~color ~max_depth ~only_main ~only_dirs
       unit
     else
       let* work_dir =
-        let clone_location = Clone.clone setup in
-        let dir_path = List.rev dir_path_rev in
         let* filenames =
           match Device.read_dir clone_location dir_path with
             | ERROR { code = `failed; _ } | OK _ as x ->
@@ -428,176 +646,42 @@ let tree ~color ~max_depth ~only_main ~only_dirs
         else
           merged_dir
       in
-      let print_entry ?(last = false) (filename, merged_dir_entry) =
-        let print_prefix kind =
-          print_string prefix;
-          print_string (if last then "└"  else "├");
-          match kind with
-            | `dir | `file | `inconsistent ->
-                print_string "── ";
-            | `dir_not_pulled | `file_not_pulled ->
-                print_string "-- "
-            | `dir_not_pushed | `file_not_pushed ->
-                print_string "++ "
-        in
-        let print_prefix_and_filename kind =
-          print_prefix kind;
-          let need_to_reset_color =
-            color && match kind with
-              | `dir -> print_string "\027[1m\027[34m"; true
-              | `dir_not_pulled -> print_string "\027[1m\027[33m"; true
-              | `dir_not_pushed -> print_string "\027[1m\027[31m"; true
-              | `file -> false
-              | `file_not_pulled -> print_string "\027[33m"; true
-              | `file_not_pushed -> print_string "\027[31m"; true
-              | `inconsistent -> print_string "\027[1m\027[35m"; true
-          in
-          print_string (
-            match kind, full_dir_paths with
-              | (`dir | `dir_not_pulled | `dir_not_pushed), true ->
-                  Device.show_file_path (List.rev dir_path_rev, filename)
-              | (`file | `file_not_pulled | `file_not_pushed | `inconsistent), true
-              | _, false ->
-                  Path.Filename.show filename
-          );
-          if need_to_reset_color then print_string "\027[0m";
-          match kind with
-            | `dir | `dir_not_pulled | `dir_not_pushed ->
-                print_char '/'
-            | `file | `file_not_pulled | `file_not_pushed ->
-                ()
-            | `inconsistent ->
-                print_char '?'
-        in
-        let print_size size =
-          if print_size then
-            Printf.printf " (%s)" (show_size size)
-        in
-        let print_file_count count =
-          if print_file_count then
-            if count = 1 then
-              print_string " (1 file)"
-            else
-              Printf.printf " (%d files)" count
-        in
-        let duplicates hash =
-          if not print_duplicates then
-            ok File_path_set.empty
-          else
-            let file_path = List.rev dir_path_rev, filename in
-            trace (
-              sf "failed to look up duplicates for %s" (Device.show_file_path file_path)
-            ) @@
-            let hash_bin = Repository.bin_of_hash hash in
-            let char0 = hash_bin.[0] in
-            let char1 = hash_bin.[1] in
-            let* hash_index = fetch_hash_index setup root in
-            let* hash_index_1 =
-              match Map.Char.find_opt char0 hash_index with
-                | None ->
-                    ok Map.Char.empty
-                | Some hash_index_1_hash ->
-                    fetch_or_fail setup hash_index_1_hash
-            in
-            let* hash_index_2 =
-              match Map.Char.find_opt char1 hash_index_1 with
-                | None ->
-                    ok File_hash_map.empty
-                | Some hash_index_2_hash ->
-                    fetch_or_fail setup hash_index_2_hash
-            in
-            match File_hash_map.find_opt hash hash_index_2 with
-              | None ->
-                  failed [ "%s is missing from the hash index"; ]
-              | Some set ->
-                  ok (File_path_set.remove file_path set)
-        in
-        let print_duplicate_paths duplicates =
-          File_path_set.iter' duplicates @@ fun duplicate_path ->
-          print_string prefix;
-          if last then
-            print_string "    = /"
-          else
-            print_string "│   = /";
-          print_string (Device.show_file_path duplicate_path);
-          print_newline ();
-        in
-        let recurse hash =
-          let* dir =
-            let subdir_path = List.rev_append dir_path_rev [ filename ] in
-            trace (sf "failed to recurse into %s" (Device.show_path subdir_path)) @@
-            fetch_or_fail setup hash
-          in
-          tree_dir (if last then prefix ^ "    " else prefix ^ "│   ") (dir_depth + 1)
-            (filename :: dir_path_rev) dir
-        in
-        let* () =
-          match merged_dir_entry with
-            | MDE_main (File { hash; size }) ->
-                print_prefix_and_filename `file_not_pulled;
-                print_size size;
-                let* duplicates = duplicates hash in
-                print_newline ();
-                print_duplicate_paths duplicates;
-                unit
-            | MDE_clone (File { size; _ }) ->
-                if only_main then unit else (
-                  print_prefix_and_filename `file_not_pushed;
-                  print_size size;
-                  print_newline ();
-                  unit
-                )
-            | MDE_both (File { hash; size }, File { size = clone_size; _ }) ->
-                (* TODO: also check hash *)
-                if size = clone_size then
-                  (
-                    print_prefix_and_filename `file;
-                    print_size size;
-                    let* duplicates = duplicates hash in
-                    print_newline ();
-                    print_duplicate_paths duplicates;
-                    unit
-                  )
-                else
-                  (
-                    print_prefix_and_filename `inconsistent;
-                    print_newline ();
-                    unit
-                  )
-            | MDE_main (Dir { hash; total_size; total_file_count }) ->
-                print_prefix_and_filename `dir_not_pulled;
-                print_size total_size;
-                print_file_count total_file_count;
-                print_newline ();
-                recurse hash
-            | MDE_clone Dir ->
-                if only_main then unit else (
-                  print_prefix_and_filename `dir_not_pushed;
-                  print_newline ();
-                  unit
-                )
-            | MDE_both (Dir { hash; total_size; total_file_count }, Dir) ->
-                print_prefix_and_filename `dir;
-                print_size total_size;
-                print_file_count total_file_count;
-                print_newline ();
-                recurse hash
-            | MDE_both (Dir _, File _)
-            | MDE_both (File _, Dir) ->
-                print_prefix_and_filename `inconsistent;
-                print_newline ();
-                unit
-        in
-        unit
-      in
       match List.rev (Filename_map.bindings filtered_dir) with
         | [] ->
             unit
-        | head :: tail ->
-            let* () = list_iter_e (List.rev tail) print_entry in
-            print_entry ~last: true head
+        | (head_filename, head_entry) :: tail ->
+            let* () =
+              list_iter_e (List.rev tail) @@ fun (filename, entry) ->
+              print_entry prefix ~last: false ~is_root: false dir_path dir_depth
+                (TEN_filename filename) entry
+            in
+            print_entry prefix ~last: true ~is_root: false dir_path dir_depth
+              (TEN_filename head_filename) head_entry
   in
-  tree_dir "" 0 (List.rev path) dir
+  let* found_paths = list_map_e paths find_path in
+  let merged_entries =
+    List.filter_map' found_paths @@ fun (path, dir_entry, stat) ->
+    match dir_entry, stat with
+      | None, None ->
+          None
+      | Some dir_entry, None ->
+          Some (path, MDE_main dir_entry)
+      | None, Some stat ->
+          Some (path, MDE_clone stat)
+      | Some dir_entry, Some stat ->
+          Some (path, MDE_both (dir_entry, stat))
+  in
+  let print_merged_entry ~last (path, merged_dir_entry) =
+    print_entry "" ~last ~is_root: (path = []) [] (-1) (TEN_path path) merged_dir_entry
+  in
+  match List.rev merged_entries with
+    | [] ->
+        unit
+    | head :: tail ->
+        let* () =
+          list_iter_e (List.rev tail) (print_merged_entry ~last: false)
+        in
+        print_merged_entry ~last: true head
 
 let push_file ~verbose (setup: Clone.setup) (root: root)
     (((dir_path, filename) as path): Device.file_path) =
