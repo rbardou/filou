@@ -4,21 +4,21 @@ open Misc
 type setup =
   {
     main: Device.location option;
-    clone_root: Device.location;
+    workdir: Device.location;
     clone_dot_filou: Device.location;
     mutable clone_root_is_up_to_date: bool;
   }
 
-let setup ~main ~clone =
+let setup ~main ~workdir ?clone_dot_filou () =
   {
     main;
-    clone_root = clone;
-    clone_dot_filou = Device.sublocation clone dot_filou;
+    workdir;
+    clone_dot_filou = clone_dot_filou |> default (Device.sublocation workdir dot_filou);
     clone_root_is_up_to_date = false;
   }
 
 let main { main; _ } = main
-let clone { clone_root; _ } = clone_root
+let workdir { workdir; _ } = workdir
 
 module type S =
 sig

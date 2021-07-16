@@ -62,7 +62,7 @@ let find_local_clone ~clone_only mode =
             else
               Some config.main_location
           in
-          OK (Clone.setup ~main ~clone: clone_location)
+          OK (Clone.setup ~main ~workdir: clone_location ())
       | ERROR { code = (`no_such_file | `failed); _ } ->
           match Path.parent current with
             | None -> failed [ "not in a clone repository" ]
@@ -310,7 +310,7 @@ type tree_entry_name =
 let tree ~color ~max_depth ~only_main ~only_dirs
     ~print_size ~print_file_count ~print_duplicates ~full_dir_paths
     (setup: Clone.setup) (paths: Device.path list) =
-  let clone_location = Clone.clone setup in
+  let workdir = Clone.workdir setup in
   let* root = fetch_root setup in
   let* root_dir = fetch_root_dir setup root in
   let find_path path =
@@ -366,12 +366,12 @@ let tree ~color ~max_depth ~only_main ~only_dirs
             find root_dir path
     in
     let* stat =
-      match Device.stat clone_location path with
+      match Device.stat workdir path with
         | ERROR { code = `failed; msg } ->
             failed (
               sf "failed to get path type for %s in %s"
                 (Device.show_path path)
-                (Device.show_location clone_location)
+                (Device.show_location workdir)
               :: msg
             )
         | ERROR { code = `no_such_file; _ } ->
@@ -596,7 +596,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
     else
       let* work_dir =
         let* filenames =
-          match Device.read_dir clone_location dir_path with
+          match Device.read_dir workdir dir_path with
             | ERROR { code = `failed; _ } | OK _ as x ->
                 x
             | ERROR { code = `no_such_file; _ } ->
@@ -605,12 +605,12 @@ let tree ~color ~max_depth ~only_main ~only_dirs
         let* list =
           list_map_e filenames @@ fun filename ->
           let path = dir_path @ [ filename ] in
-          match Device.stat clone_location path with
+          match Device.stat workdir path with
             | ERROR { code = (`no_such_file | `failed); msg } ->
                 failed (
                   sf "failed to get path type for %s in %s"
                     (Device.show_path path)
-                    (Device.show_location clone_location)
+                    (Device.show_location workdir)
                   :: msg
                 )
             | OK stat ->
@@ -732,7 +732,7 @@ let push_file ~verbose (setup: Clone.setup) (root: root)
               let* file_hash, file_size =
                 with_progress @@ fun () ->
                 Repository.store_file
-                  ~source: (Clone.clone setup)
+                  ~source: (Clone.workdir setup)
                   ~source_path: path
                   ~target: setup
                   ~on_progress: (on_copy_progress ("Pushing: " ^ Device.show_file_path path))
@@ -807,14 +807,14 @@ let push ~verbose setup (paths: Device.path list) =
     if Device.same_paths path [ dot_filou ] then
       ok root
     else
-      let* stat = Device.stat (Clone.clone setup) path in
+      let* stat = Device.stat (Clone.workdir setup) path in
       match stat with
         | File { path; _ } ->
             push_file ~verbose setup root path
         | Dir ->
             let new_root = ref root in
             let* () =
-              Device.iter_read_dir (Clone.clone setup) path @@ fun filename ->
+              Device.iter_read_dir (Clone.workdir setup) path @@ fun filename ->
               let* root = push !new_root (path @ [ filename ]) in
               new_root := root;
               unit
@@ -855,7 +855,7 @@ let pull ~verbose setup (paths: Device.path list) =
                       match
                         with_progress @@ fun () ->
                         Repository.fetch_file ~source: setup hash
-                          ~target: (Clone.clone setup)
+                          ~target: (Clone.workdir setup)
                           ~target_path
                           ~on_progress: (
                           on_copy_progress ("Pulling: " ^ Device.show_file_path target_path)
@@ -1131,7 +1131,7 @@ let prune ~yes ~keep_undo ~keep_redo setup =
         Option.iter' (Clone.main setup) @@ fun location ->
         echo "  Main repository: %s" (Device.show_location location);
       );
-      echo "            Clone: %s" (Device.show_location (Clone.clone setup));
+      echo "            Clone: %s" (Device.show_location (Clone.workdir setup));
       echo "";
       print_string "Prune main repository and its clone? [y/N] ";
       flush stdout;

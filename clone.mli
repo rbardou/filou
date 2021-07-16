@@ -2,11 +2,16 @@ open Misc
 
 type setup
 
-val setup: main: Device.location option -> clone: Device.location -> setup
+val setup:
+  main: Device.location option ->
+  workdir: Device.location ->
+  ?clone_dot_filou: Device.location ->
+  unit -> setup
+
 val main: setup -> Device.location option
 
 (** Returns the location given to [setup], i.e. not [.filou]. *)
-val clone: setup -> Device.location
+val workdir: setup -> Device.location
 
 module type S =
 sig
