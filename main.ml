@@ -376,6 +376,31 @@ let () =
         in
         `redo count
       );
+      (
+        Clap.case
+          ~description: "Show the difference between two states in the operation history."
+          "diff"
+        @@ fun () ->
+        let before =
+          Clap.default_int
+            ~description:
+              "Index in the undo list of the old state to compare \
+               with. This corresponds to the number given by 'log'. In \
+               particular it can be 0 to refer to the current \
+               state. Can be negative to refer to a redo item."
+            ~placeholder: "BEFORE"
+            1
+        in
+        let after =
+          Clap.default_int
+            ~description:
+              "Index in the undo list of the new state to compare, \
+               using the same convention as BEFORE."
+            ~placeholder: "AFTER"
+            0
+        in
+        `diff (before, after)
+      );
     ]
   in
   Clap.close ();
@@ -459,6 +484,9 @@ let () =
       | `redo count ->
           let* setup = find_local_clone ~clone_only: false () in
           Controller.undo setup ~count: (- count)
+      | `diff (before, after) ->
+          let* setup = find_local_clone ~clone_only: false () in
+          Controller.diff ~color setup ~before ~after
   with
     | OK () ->
         ()

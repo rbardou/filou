@@ -1213,3 +1213,84 @@ let undo setup ~count =
   if count > 0 then undo count else
   if count < 0 then redo (- count) else
     unit
+
+let diff ~color setup ~before ~after =
+  let* journal = Repository.fetch_root setup in
+  let get_root index =
+    if index > 0 then
+      match List.nth_opt journal.undo (index - 1) with
+        | None ->
+            failed [ sf "journal has less than %d undo entries" index ]
+        | Some root ->
+            ok root
+    else if index < 0 then
+      match List.nth_opt journal.redo (- index - 1) with
+        | None ->
+            failed [ sf "journal has less than %d redo entries" index ]
+        | Some root ->
+            ok root
+    else
+      ok journal.head
+  in
+  let* root_before = get_root before in
+  let* root_after = get_root after in
+  let* dir_before = fetch_root_dir setup root_before.root in
+  let* dir_after = fetch_root_dir setup root_after.root in
+  let rec diff_dirs dir_path (before: dir) (after: dir) =
+    let merged =
+      Filename_map.merge' before after @@ fun _ before after ->
+      match before, after with
+        | None, None -> None
+        | _ -> Some (before, after)
+    in
+    list_iter_e (Filename_map.bindings merged) @@ fun (filename, merged) ->
+    let path = dir_path @ [ filename ] in
+    let status status kind =
+      let text_color =
+        match status with
+          | `removed -> "\027[31m"
+          | `added -> "\027[32m"
+          | `differs -> "\027[35m"
+      in
+      let text_color =
+        match kind with
+          | `file | `inconsistent -> text_color
+          | `dir -> "\027[1m" ^ text_color
+      in
+      echo "%s%s %s%s%s"
+        (if color then text_color else "")
+        (match status with `differs -> "? " | `added -> "+ " | `removed -> "- ")
+        (Device.show_path path)
+        (match kind with `file -> "" | `dir -> "/" | `inconsistent -> "?")
+        (if color then "\027[0m" else "");
+      unit
+    in
+    match merged with
+      | None, None ->
+          unit
+      | Some (File { hash = hash_before; _ }), Some (File { hash = hash_after; _ }) ->
+          if Repository.compare_hashes hash_before hash_after = 0 then
+            unit
+          else
+            status `differs `file
+      | Some (Dir { hash = hash_before; _ }), Some (Dir { hash = hash_after; _ }) ->
+          if Repository.compare_hashes hash_before hash_after = 0 then
+            unit
+          else
+            let* dir_before = fetch_or_fail setup hash_before in
+            let* dir_after = fetch_or_fail setup hash_after in
+            diff_dirs path dir_before dir_after
+      | Some (File _), Some (Dir _) ->
+          status `differs `inconsistent
+      | Some (Dir _), Some (File _) ->
+          status `differs `inconsistent
+      | None, Some (Dir _) ->
+          status `added `dir
+      | None, Some (File _) ->
+          status `added `file
+      | Some (Dir _), None ->
+          status `removed `dir
+      | Some (File _), None ->
+          status `removed `file
+  in
+  diff_dirs [] dir_before dir_after

@@ -32,6 +32,9 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
 -->  0 push toto
      1 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color diff
++  toto
 # Add the file again.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color push
@@ -49,6 +52,8 @@ $ main.exe --no-color log
 -->  0 push .
      1 push toto
      2 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color diff
 # Add several files.
 $ cd /tmp/filou-test/clone
 $ echo blu > tutu
@@ -74,6 +79,10 @@ $ main.exe --no-color log
      1 push .
      2 push toto
      3 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color diff
++  titi
++  tutu
 # Add files in subdirectories.
 $ cd /tmp/filou-test/clone
 $ mkdir bla
@@ -104,6 +113,11 @@ $ main.exe --no-color log
      3 push .
      4 push toto
      5 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color diff 3
++  bla/
++  titi
++  tutu
 # Test tree.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
@@ -292,6 +306,9 @@ $ main.exe --no-color log
      4 push .
      5 push toto
      6 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color diff
++  plif
 # Try to pull files.
 $ rm titi
 $ rm tutu
@@ -797,6 +814,20 @@ $ main.exe --no-color log
     17 push .
     18 push toto
     19 init
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color diff 13 1
+-  bla/
+-  plif
+-  titi
+-  toto
+-  tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color diff
++  bla/
++  plif
++  titi
++  toto
++  tutu
 # Try to push a directory while a file already exists with the same name.
 $ rm toto
 $ mkdir toto

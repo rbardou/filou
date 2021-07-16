@@ -169,6 +169,14 @@ struct
   let log ?v ?dry_run ?color () =
     run ?v ?dry_run ?color [ "log" ]
 
+  let diff ?v ?dry_run ?color ?before ?after () =
+    if after <> None && before = None then invalid_arg "diff";
+    run ?v ?dry_run ?color (
+      "diff"
+      :: list_of_option (Option.map string_of_int before)
+      @ list_of_option (Option.map string_of_int after)
+    )
+
   let undo ?v ?dry_run ?color ?count () =
     run ?v ?dry_run ?color ("undo" :: list_of_option (Option.map string_of_int count))
 
@@ -248,12 +256,14 @@ let () =
   Clone.check ();
   Clone.tree ();
   Clone.log ();
+  Clone.diff ();
 
   comment "Add the file again.";
   Clone.push [];
   Clone.check ();
   Clone.tree ();
   Clone.log ();
+  Clone.diff ();
 
   comment "Add several files.";
   cd clone;
@@ -263,6 +273,7 @@ let () =
   Clone.check ();
   Clone.tree ();
   Clone.log ();
+  Clone.diff ();
 
   comment "Add files in subdirectories.";
   cd clone;
@@ -276,6 +287,7 @@ let () =
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.check ~cache: true ();
   Clone.log ();
+  Clone.diff ~before: 3 ();
 
   comment "Test tree.";
   Clone.tree ();
@@ -307,6 +319,7 @@ let () =
   Clone.push ~v: true [];
   Clone.tree ~duplicates: true ();
   Clone.log ();
+  Clone.diff ();
 
   comment "Try to pull files.";
   rm "titi";
@@ -392,6 +405,8 @@ let () =
   Clone.push [];
   Clone.tree ();
   Clone.log ();
+  Clone.diff ~before: 13 ~after: 1 ();
+  Clone.diff ();
 
   comment "Try to push a directory while a file already exists with the same name.";
   rm "toto";
