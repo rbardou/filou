@@ -1,6 +1,7 @@
 # Initialize a main repository and a clone.
 $ main.exe --no-color init /tmp/filou-test/main
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
+Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone/
 $ cd /tmp/filou-test/clone
 $ explore .filou/config
 { main = "/tmp/filou-test/main/" }
@@ -1207,6 +1208,7 @@ Copied 0 objects.
 Clone is up-to-date.
 $ rm -r -f /tmp/filou-test/clone/.filou
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
+Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone/
 $ cd /tmp/filou-test/clone
 $ tree -a -s -F
 .
@@ -1671,6 +1673,7 @@ $ main.exe --no-color log
 # Check that needed objects are copied in the clone cache when fetching.
 $ rm -r -f /tmp/filou-test/clone/.filou
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
+Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone/
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree bla/bli
 └── bla/bli/

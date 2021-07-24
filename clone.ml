@@ -234,4 +234,15 @@ struct
       | x ->
           x
 
+  let get_object_size setup hash =
+    match R.get_object_size setup.clone_dot_filou hash with
+      | OK _ | ERROR { code = `failed; _ } as x ->
+          x
+      | ERROR { code = `not_available; _ } as not_available ->
+          match setup.main with
+            | None ->
+                not_available
+            | Some main ->
+                R.get_object_size main hash
+
 end

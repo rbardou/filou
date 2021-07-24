@@ -429,6 +429,27 @@ let main () =
         @@ fun () ->
         `listen
       );
+      (
+        Clap.case
+          ~description:
+            "Output some statistics about the disk usage of metadata.\n\
+             \n\
+             Disk usage assumes a block size of 4096."
+          "stats"
+        @@ fun () ->
+        let cache =
+          Clap.flag
+            ~set_long: "cache"
+            ~set_short: 'C'
+            ~description:
+              "Only read from the clone repository cache, not the main \
+               repository. If you do not specify this flag, \
+               unavailable objects will be fetched from the main \
+               repository and added to the cache."
+            false
+        in
+        `stats cache
+      );
     ]
   in
   Clap.close ();
@@ -524,6 +545,9 @@ let main () =
           Controller.diff ~color setup ~before ~after
       | `listen ->
           Listen.run ()
+      | `stats cache ->
+          let* setup = find_local_clone ~clone_only: cache () in
+          Controller.stats setup
   with
     | OK () ->
         ()

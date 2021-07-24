@@ -1,5 +1,24 @@
 open Mysc
 
+let quiet = ref false
+
+let with_quiet f =
+  let old_quiet = !quiet in
+  quiet := true;
+  match f () with
+    | exception exn ->
+        quiet := old_quiet;
+        raise exn
+    | x ->
+        quiet := old_quiet;
+        x
+
+let print_string s = if not !quiet then print_string s
+let print_char c = if not !quiet then print_char c
+let print_newline () = if not !quiet then print_newline ()
+let print_endline s = if not !quiet then print_endline s
+let echo x = Printf.ksprintf print_endline x
+
 let () =
   Clap.description "Run Filou tests"
 
@@ -45,6 +64,12 @@ let cd path =
 let comment s =
   echo "# %s" s
 
+let time name f =
+  let start = Unix.gettimeofday () in
+  f ();
+  let time = Unix.gettimeofday () -. start in
+  echo "time(%s) = %gs" name time
+
 let cmd executable args =
   (* Print command. *)
   print_string "$ ";
@@ -88,6 +113,9 @@ let mv a b =
 let mkdir path =
   echo "$ mkdir %s" (Filename.quote_if_needed path);
   Unix.mkdir path 0o750
+
+let mkdir_p path =
+  cmd "mkdir" [ "-p"; path ]
 
 let rmdir path =
   echo "$ rmdir %s" (Filename.quote_if_needed path);
@@ -182,6 +210,9 @@ struct
 
   let redo ?v ?dry_run ?color ?count () =
     run ?v ?dry_run ?color ("redo" :: list_of_option (Option.map string_of_int count))
+
+  let stats ?v ?dry_run ?color () =
+    run ?v ?dry_run ?color [ "stats" ]
 end
 
 module Main = Make_filou (struct let path = Some main end)
@@ -240,7 +271,7 @@ let diff_string_sets a b =
   Set.String.diff a b |> Set.String.iter (echo "- %s");
   Set.String.diff b a |> Set.String.iter (echo "+ %s")
 
-let () =
+let small_repo () =
   comment "Initialize a main repository and a clone.";
   Filou.init ~main ();
   Filou.clone ~main ~clone ();
@@ -567,4 +598,53 @@ let () =
   comment "Main: diff should be empty:";
   diff_string_sets main_files_1 main_files_2;
   Clone.log ();
+  ()
+
+let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
+  (* Create a random hierarchy of directories. *)
+  Random.init seed;
+  let dirs = Array.make dir_count "" in
+  (* [dirs.(0)] is the root, so we keep it equal to [""]. *)
+  for i = 1 to dir_count - 1 do
+    let name = "dir" ^ string_of_int i in
+    let parent = Random.int i in
+    if parent = 0 then
+      dirs.(i) <- name
+    else
+      dirs.(i) <- dirs.(parent) // name;
+  done;
+
+  (* Fill the hierarchy with files randomly. *)
+  let files = Array.make file_count "" in
+  for i = 0 to file_count - 1 do
+    let name = "file" ^ string_of_int i in
+    let parent = Random.int dir_count in
+    files.(i) <- dirs.(parent) // name;
+  done;
+
+  comment (sf "Create clone with %d directories and %d files." dir_count file_count);
+  (
+    with_quiet @@ fun () ->
+    mkdir_p clone;
+    cd clone;
+    for i = 0 to file_count - 1 do
+      let path = files.(i) in
+      mkdir_p (Filename.dirname path);
+      create_file path ("this is " ^ path ^ ", a test file");
+    done;
+  );
+
+  comment "Initialize main and clone.";
+  Filou.init ~main ();
+  Filou.clone ~main ~clone ();
+  Clone.tree ();
+
+  comment "Push.";
+  (time "push" @@ fun () -> Clone.push []);
+  Clone.stats ();
+  ()
+
+let () =
+  small_repo ();
+(*   large_repo ~files: 1000 ~dirs: 50 (); *)
   ()

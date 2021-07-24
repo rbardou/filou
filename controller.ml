@@ -1302,3 +1302,37 @@ let diff ~color setup ~before ~after =
           status `removed `file
   in
   diff_dirs [] dir_before dir_after
+
+(* Round to the highest multiple of 4096.
+   TODO: Not sure this is very accurate: does a file that is close to 4096 bytes
+   fit in one block, or is there some kind of header? *)
+let disk_usage size =
+  max 4096 (size / 4096 * 4096 + (if size mod 4096 = 0 then 0 else 4096))
+
+let stats setup =
+  with_progress @@ fun () ->
+  Progress_bar.set "Computing the set of reachable objects...";
+  let* hashes = Repository.reachable ~files: false setup in
+  let reachable_count = Repository.Hash_set.cardinal hashes in
+  let total_bytes = ref 0 in
+  let total_disk_usage = ref 0 in
+  let* () =
+    let index = ref 0 in
+    list_iter_e (Repository.Hash_set.elements hashes) @@ fun hash ->
+    incr index;
+    Progress_bar.set "Computing stats... (%d / %d) (%d%%)"
+      !index reachable_count (!index * 100 / reachable_count);
+    match Repository.get_object_size setup hash with
+      | ERROR { code = (`failed | `not_available); _ } as x ->
+          x
+      | OK size ->
+          total_bytes := !total_bytes + size;
+          total_disk_usage := !total_disk_usage + disk_usage size;
+          unit
+  in
+  echo "Reachable object count: %d" reachable_count;
+  echo "Total size of reachable objects: %s" (show_size !total_bytes);
+  echo "Disk usage of reachable objects: %s" (show_size !total_disk_usage);
+  echo "Efficiency (total size / disk usage): %d%%"
+    (!total_bytes * 100 / !total_disk_usage);
+  unit

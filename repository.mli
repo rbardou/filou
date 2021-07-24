@@ -130,6 +130,9 @@ sig
 
   (** Check whether an object is corrupted. *)
   val check_hash: t -> Hash.t -> (unit, [> `failed | `corrupted | `not_available ]) r
+
+  (** Get the size of an object on disk. *)
+  val get_object_size: t -> Hash.t -> (int, [> `failed | `not_available ]) r
 end
 
 module Make (Root: ROOT): S with type root = Root.t and type t = Device.location

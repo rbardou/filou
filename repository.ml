@@ -158,6 +158,8 @@ sig
     (unit, [> `failed ]) r
 
   val check_hash: t -> Hash.t -> (unit, [> `failed | `corrupted | `not_available ]) r
+
+  val get_object_size: t -> Hash.t -> (int, [> `failed | `not_available ]) r
 end
 
 exception Failed_to_store_later of string list
@@ -318,6 +320,7 @@ struct
                   | OK () as x ->
                       x
 
+  (* TODO: share code with [get_object_size]? *)
   let get_file_size location hash =
     trace ("failed to get file size for " ^ hex_of_hash hash) @@
     let hash_path = file_path_of_hash (hash_of_hash hash) in
@@ -537,5 +540,18 @@ struct
       ]
     else
       unit
+
+  let get_object_size location hash =
+    trace ("failed to get object size for " ^ Hash.to_hex hash) @@
+    let hash_path = file_path_of_hash hash in
+    match Device.stat location (Device.path_of_file_path hash_path) with
+      | ERROR { code = `no_such_file; msg } ->
+          error `not_available msg
+      | ERROR { code = `failed; _ } as x ->
+          x
+      | OK Dir ->
+          failed [ Device.show_file_path hash_path ^ " is a directory" ]
+      | OK (File { size; _ }) ->
+          ok size
 
 end
