@@ -104,6 +104,150 @@ let fetch_hash_index setup (root: root) =
     | Non_empty root ->
         fetch_or_fail setup root.hash_index
 
+module Hash_index =
+struct
+
+  (* Read the entire hash index and return a single map containing all of it.
+     One can expect less than 200 bytes per hash, so 200MB for 1M files.
+     It starts to be too big in memory after 10M files? *)
+  let fetch_all setup
+      (hash_index_root: hash_index hash): (File_path_set.t File_hash_map.t, [> `failed ]) r =
+    let actual_hash_index = ref File_hash_map.empty in
+    let* () =
+      let* hash_index = fetch_or_fail setup hash_index_root in
+      if Map.Char.is_empty hash_index then
+        warn "hash index is empty for, it should just not exist";
+      list_iter_e (Map.Char.bindings hash_index) @@ fun (char0, hash_index_1_hash) ->
+      let* hash_index_1 = fetch_or_fail setup hash_index_1_hash in
+      if Map.Char.is_empty hash_index_1 then
+        warn "hash index is empty for %s, it should just not exist"
+          (Hash.hex_of_string (String.make 1 char0));
+      list_iter_e (Map.Char.bindings hash_index_1) @@ fun (char1, hash_index_2_hash) ->
+      let* hash_index_2 = fetch_or_fail setup hash_index_2_hash in
+      if File_hash_map.is_empty hash_index_2 then
+        warn "hash index is empty for %s%s, it should just not exist"
+          (Hash.hex_of_string (String.make 1 char0))
+          (Hash.hex_of_string (String.make 1 char1));
+      list_iter_e (File_hash_map.bindings hash_index_2) @@ fun (hash, paths) ->
+      if File_path_set.is_empty paths then
+        warn "Hash index is empty for %s, it should just not exist."
+          (Repository.hex_of_hash hash);
+      actual_hash_index := File_hash_map.add hash paths !actual_hash_index;
+      unit
+    in
+    ok !actual_hash_index
+
+  let get setup (root: root)
+      (hash: Repository.file hash): (File_path_set.t option, [> `failed ]) r =
+    let hash_bin = Repository.bin_of_hash hash in
+    let char0 = hash_bin.[0] in
+    let char1 = hash_bin.[1] in
+    let* hash_index = fetch_hash_index setup root in
+    let* hash_index_1 =
+      match Map.Char.find_opt char0 hash_index with
+        | None ->
+            ok Map.Char.empty
+        | Some hash_index_1_hash ->
+            fetch_or_fail setup hash_index_1_hash
+    in
+    let* hash_index_2 =
+      match Map.Char.find_opt char1 hash_index_1 with
+        | None ->
+            ok File_hash_map.empty
+        | Some hash_index_2_hash ->
+            fetch_or_fail setup hash_index_2_hash
+    in
+    ok (File_hash_map.find_opt hash hash_index_2)
+
+  (* Also returns the old list of paths that were associated to this hash. *)
+  let add setup (root: root) (added_file_hash: Repository.file hash)
+      (path: Device.file_path): (hash_index hash * File_path_set.t, [> `failed ]) r =
+    let added_file_hash_bin = Repository.bin_of_hash added_file_hash in
+    let char0 = added_file_hash_bin.[0] in
+    let char1 = added_file_hash_bin.[1] in
+    let* hash_index = fetch_hash_index setup root in
+    let* hash_index_1 =
+      match Map.Char.find_opt char0 hash_index with
+        | None ->
+            ok Map.Char.empty
+        | Some hash_index_1_hash ->
+            fetch_or_fail setup hash_index_1_hash
+    in
+    let* hash_index_2 =
+      match Map.Char.find_opt char1 hash_index_1 with
+        | None ->
+            ok File_hash_map.empty
+        | Some hash_index_2_hash ->
+            fetch_or_fail setup hash_index_2_hash
+    in
+    let old_paths =
+      File_hash_map.find_opt added_file_hash hash_index_2
+      |> default File_path_set.empty
+    in
+    let new_hash_index_2 =
+      let new_paths = File_path_set.add path old_paths in
+      File_hash_map.add added_file_hash new_paths hash_index_2
+    in
+    let* new_hash_index_2_hash = store_later setup T.hash_index_2 new_hash_index_2 in
+    let new_hash_index_1 = Map.Char.add char1 new_hash_index_2_hash hash_index_1 in
+    let* new_hash_index_1_hash = store_later setup T.hash_index_1 new_hash_index_1 in
+    let new_hash_index = Map.Char.add char0 new_hash_index_1_hash hash_index in
+    let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
+    ok (new_hash_index_hash, old_paths)
+
+  (* Does not actually store the result so that one can bulk remove. *)
+  let remove setup (hash_index: hash_index) (hash: Repository.file hash)
+      (path: Device.file_path): (hash_index, [> `failed ]) r =
+    let hash_bin = Repository.bin_of_hash hash in
+    let char0 = hash_bin.[0] in
+    let char1 = hash_bin.[1] in
+    let* hash_index_1 =
+      match Map.Char.find_opt char0 hash_index with
+        | None ->
+            ok Map.Char.empty
+        | Some hash_index_1_hash ->
+            fetch_or_fail setup hash_index_1_hash
+    in
+    let* hash_index_2 =
+      match Map.Char.find_opt char1 hash_index_1 with
+        | None ->
+            ok File_hash_map.empty
+        | Some hash_index_2_hash ->
+            fetch_or_fail setup hash_index_2_hash
+    in
+    let set =
+      match File_hash_map.find_opt hash hash_index_2 with
+        | None ->
+            File_path_set.empty
+        | Some set ->
+            set
+    in
+    let new_set = File_path_set.remove path set in
+    let new_hash_index_2 =
+      if File_path_set.is_empty new_set then
+        File_hash_map.remove hash hash_index_2
+      else
+        File_hash_map.add hash new_set hash_index_2
+    in
+    let* new_hash_index_1 =
+      if File_hash_map.is_empty new_hash_index_2 then
+        ok (Map.Char.remove char1 hash_index_1)
+      else
+        let* new_hash_index_2_hash =
+          store_later setup T.hash_index_2 new_hash_index_2
+        in
+        ok (Map.Char.add char1 new_hash_index_2_hash hash_index_1)
+    in
+    if Map.Char.is_empty new_hash_index_1 then
+      ok (Map.Char.remove char0 hash_index)
+    else
+      let* new_hash_index_1_hash =
+        store_later setup T.hash_index_1 new_hash_index_1
+      in
+      ok (Map.Char.add char0 new_hash_index_1_hash hash_index)
+
+end
+
 (* Recursively check sizes, file counts, and whether reachable files are available. *)
 let rec check_dir ~clone_only expected_hash_index setup
     (path: Device.path) (dir: dir hash) =
@@ -217,30 +361,7 @@ let check ~clone_only ~hash setup =
         let expected_hash_index = !expected_hash_index in
         echo "Directory structure looks ok (total size: %d, file count: %d)." size count;
         echo "All files are available.";
-        let actual_hash_index = ref File_hash_map.empty in
-        let* () =
-          let* hash_index = fetch_or_fail setup root.hash_index in
-          if Map.Char.is_empty hash_index then
-            warn "hash index is empty for, it should just not exist";
-          list_iter_e (Map.Char.bindings hash_index) @@ fun (char0, hash_index_1_hash) ->
-          let* hash_index_1 = fetch_or_fail setup hash_index_1_hash in
-          if Map.Char.is_empty hash_index_1 then
-            warn "hash index is empty for %s, it should just not exist"
-              (Hash.hex_of_string (String.make 1 char0));
-          list_iter_e (Map.Char.bindings hash_index_1) @@ fun (char1, hash_index_2_hash) ->
-          let* hash_index_2 = fetch_or_fail setup hash_index_2_hash in
-          if File_hash_map.is_empty hash_index_2 then
-            warn "hash index is empty for %s%s, it should just not exist"
-              (Hash.hex_of_string (String.make 1 char0))
-              (Hash.hex_of_string (String.make 1 char1));
-          list_iter_e (File_hash_map.bindings hash_index_2) @@ fun (hash, paths) ->
-          if File_path_set.is_empty paths then
-            warn "Hash index is empty for %s, it should just not exist."
-              (Repository.hex_of_hash hash);
-          actual_hash_index := File_hash_map.add hash paths !actual_hash_index;
-          unit
-        in
-        let actual_hash_index = !actual_hash_index in
+        let* actual_hash_index = Hash_index.fetch_all setup root.hash_index in
         let* () =
           let exception Inconsistent of string in
           let inconsistent x = Printf.ksprintf (fun s -> raise (Inconsistent s)) x in
@@ -462,25 +583,8 @@ let tree ~color ~max_depth ~only_main ~only_dirs
               trace (
                 sf "failed to look up duplicates for %s" (Device.show_file_path file_path)
               ) @@
-              let hash_bin = Repository.bin_of_hash hash in
-              let char0 = hash_bin.[0] in
-              let char1 = hash_bin.[1] in
-              let* hash_index = fetch_hash_index setup root in
-              let* hash_index_1 =
-                match Map.Char.find_opt char0 hash_index with
-                  | None ->
-                      ok Map.Char.empty
-                  | Some hash_index_1_hash ->
-                      fetch_or_fail setup hash_index_1_hash
-              in
-              let* hash_index_2 =
-                match Map.Char.find_opt char1 hash_index_1 with
-                  | None ->
-                      ok File_hash_map.empty
-                  | Some hash_index_2_hash ->
-                      fetch_or_fail setup hash_index_2_hash
-              in
-              match File_hash_map.find_opt hash hash_index_2 with
+              let* hash_entry = Hash_index.get setup root hash in
+              match hash_entry with
                 | None ->
                     failed [ "%s is missing from the hash index"; ]
                 | Some set ->
@@ -756,38 +860,7 @@ let push_file ~verbose (setup: Clone.setup) (root: root)
         ok root
     | Some (new_root_dir_hash, added_file_hash, _, _) ->
         let* new_hash_index_hash, old_paths =
-          let added_file_hash_bin = Repository.bin_of_hash added_file_hash in
-          let char0 = added_file_hash_bin.[0] in
-          let char1 = added_file_hash_bin.[1] in
-          let* hash_index = fetch_hash_index setup root in
-          let* hash_index_1 =
-            match Map.Char.find_opt char0 hash_index with
-              | None ->
-                  ok Map.Char.empty
-              | Some hash_index_1_hash ->
-                  fetch_or_fail setup hash_index_1_hash
-          in
-          let* hash_index_2 =
-            match Map.Char.find_opt char1 hash_index_1 with
-              | None ->
-                  ok File_hash_map.empty
-              | Some hash_index_2_hash ->
-                  fetch_or_fail setup hash_index_2_hash
-          in
-          let old_paths =
-            File_hash_map.find_opt added_file_hash hash_index_2
-            |> default File_path_set.empty
-          in
-          let new_hash_index_2 =
-            let new_paths = File_path_set.add path old_paths in
-            File_hash_map.add added_file_hash new_paths hash_index_2
-          in
-          let* new_hash_index_2_hash = store_later setup T.hash_index_2 new_hash_index_2 in
-          let new_hash_index_1 = Map.Char.add char1 new_hash_index_2_hash hash_index_1 in
-          let* new_hash_index_1_hash = store_later setup T.hash_index_1 new_hash_index_1 in
-          let new_hash_index = Map.Char.add char0 new_hash_index_1_hash hash_index in
-          let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
-          ok (new_hash_index_hash, old_paths)
+          Hash_index.add setup root added_file_hash path
         in
         if File_path_set.is_empty old_paths then
           echo "Pushed: %s" (Device.show_file_path path)
@@ -1026,53 +1099,7 @@ let remove ~recursive setup (paths: Device.path list) =
                 let* new_hash_index =
                   list_fold_e hash_index !removed_paths @@
                   fun hash_index (hash, path) ->
-                  let hash_bin = Repository.bin_of_hash hash in
-                  let char0 = hash_bin.[0] in
-                  let char1 = hash_bin.[1] in
-                  let* hash_index_1 =
-                    match Map.Char.find_opt char0 hash_index with
-                      | None ->
-                          ok Map.Char.empty
-                      | Some hash_index_1_hash ->
-                          fetch_or_fail setup hash_index_1_hash
-                  in
-                  let* hash_index_2 =
-                    match Map.Char.find_opt char1 hash_index_1 with
-                      | None ->
-                          ok File_hash_map.empty
-                      | Some hash_index_2_hash ->
-                          fetch_or_fail setup hash_index_2_hash
-                  in
-                  let set =
-                    match File_hash_map.find_opt hash hash_index_2 with
-                      | None ->
-                          File_path_set.empty
-                      | Some set ->
-                          set
-                  in
-                  let new_set = File_path_set.remove path set in
-                  let new_hash_index_2 =
-                    if File_path_set.is_empty new_set then
-                      File_hash_map.remove hash hash_index_2
-                    else
-                      File_hash_map.add hash new_set hash_index_2
-                  in
-                  let* new_hash_index_1 =
-                    if File_hash_map.is_empty new_hash_index_2 then
-                      ok (Map.Char.remove char1 hash_index_1)
-                    else
-                      let* new_hash_index_2_hash =
-                        store_later setup T.hash_index_2 new_hash_index_2
-                      in
-                      ok (Map.Char.add char1 new_hash_index_2_hash hash_index_1)
-                  in
-                  if Map.Char.is_empty new_hash_index_1 then
-                    ok (Map.Char.remove char0 hash_index)
-                  else
-                    let* new_hash_index_1_hash =
-                      store_later setup T.hash_index_1 new_hash_index_1
-                    in
-                    ok (Map.Char.add char0 new_hash_index_1_hash hash_index)
+                  Hash_index.remove setup hash_index hash path
                 in
                 let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
                 ok (
