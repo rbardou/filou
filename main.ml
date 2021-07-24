@@ -547,7 +547,7 @@ let main () =
           Listen.run ()
       | `stats cache ->
           let* setup = find_local_clone ~clone_only: cache () in
-          Controller.stats setup
+          Controller.stats ~verbose setup
   with
     | OK () ->
         ()

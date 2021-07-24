@@ -115,7 +115,14 @@ let mkdir path =
   Unix.mkdir path 0o750
 
 let mkdir_p path =
-  cmd "mkdir" [ "-p"; path ]
+  echo "$ mkdir -p %s" (Filename.quote_if_needed path);
+  let rec create path =
+    if not (Sys.file_exists path) then (
+      create (Filename.dirname path);
+      mkdir path;
+    )
+  in
+  create path
 
 let rmdir path =
   echo "$ rmdir %s" (Filename.quote_if_needed path);
@@ -642,7 +649,7 @@ let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
   comment "Push.";
   (time "push" @@ fun () -> Clone.push []);
   Clone.check ();
-  Clone.stats ();
+  Clone.stats ~v ();
   ()
 
 let () =
