@@ -654,5 +654,5 @@ let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
 
 let () =
   small_repo ();
-(*   large_repo ~files: 1000 ~dirs: 50 (); *)
+(*   large_repo ~files: 100000 ~dirs: 3000 (); *)
   ()

@@ -26,7 +26,7 @@ let main () =
       ~unset_long: "no-color"
       true
   in
-  if not color then Progress_bar.disable ();
+  if not color then Progress_bar.not_a_tty ();
   let command =
     let tree_or_ls_args command =
       let max_depth =
@@ -547,7 +547,7 @@ let main () =
           Listen.run ()
       | `stats cache ->
           let* setup = find_local_clone ~clone_only: cache () in
-          Controller.stats ~verbose setup
+          Controller.stats setup
   with
     | OK () ->
         ()

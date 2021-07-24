@@ -16,18 +16,8 @@ let fetch_or_fail setup hash =
     | OK _ as x ->
         x
 
-let with_progress f =
-  Progress_bar.start ();
-  match f () with
-    | exception exn ->
-        Progress_bar.set "";
-        raise exn
-    | result ->
-        Progress_bar.set "";
-        result
-
-let on_copy_progress prefix ~bytes ~size =
-  Progress_bar.set "%s (%d / %d) (%d%%)" prefix bytes size (bytes * 100 / size)
+let on_copy_progress progress prefix ~bytes ~size =
+  progress (fun () -> sf "%s (%d / %d) (%d%%)" prefix bytes size (bytes * 100 / size))
 
 let init (location: Device.location) =
   Bare.store_root location {
@@ -394,15 +384,16 @@ let check ~clone_only ~hash setup =
           let files = match x with `metadata -> false | `all -> true in
           let count = ref 0 in
           let* () =
-            with_progress @@ fun () ->
-            Progress_bar.set "Checking hashes: computing the set of reachable objects...";
+            Progress_bar.run ~quiet: false @@ fun progress ->
+            progress ~major: true
+              (fun () -> "Checking hashes: computing the set of reachable objects...");
             let* hashes = Repository.reachable ~files setup in
             let hashes = Repository.Hash_set.elements hashes in
             count := List.length hashes;
             let index = ref 0 in
             let progress () =
-              Progress_bar.set "Checking hashes (%d / %d) (%d%%)"
-                !index !count (!index * 100 / !count)
+              progress @@ fun () ->
+              sf "Checking hashes (%d / %d) (%d%%)" !index !count (!index * 100 / !count)
             in
             progress ();
             list_iter_e hashes @@ fun hash ->
@@ -896,12 +887,14 @@ let push_file ~verbose (setup: Clone.setup) (root: root)
               ok None
           | None ->
               let* file_hash, file_size =
-                with_progress @@ fun () ->
+                Progress_bar.run ~quiet: false @@ fun progress ->
                 Repository.store_file
                   ~source: (Clone.workdir setup)
                   ~source_path: path
                   ~target: setup
-                  ~on_progress: (on_copy_progress ("Pushing: " ^ Device.show_file_path path))
+                  ~on_progress: (
+                    on_copy_progress progress ("Pushing: " ^ Device.show_file_path path)
+                  )
               in
               let dir_entry =
                 File {
@@ -994,13 +987,14 @@ let pull ~verbose setup (paths: Device.path list) =
                       ]
                   | [] ->
                       match
-                        with_progress @@ fun () ->
+                        Progress_bar.run ~quiet: false @@ fun progress ->
                         Repository.fetch_file ~source: setup hash
                           ~target: (Clone.workdir setup)
                           ~target_path
                           ~on_progress: (
-                          on_copy_progress ("Pulling: " ^ Device.show_file_path target_path)
-                        )
+                            on_copy_progress progress
+                              ("Pulling: " ^ Device.show_file_path target_path)
+                          )
                       with
                         | ERROR { code = `already_exists; _ } ->
                             if verbose then
@@ -1175,16 +1169,16 @@ let remove ~recursive setup (paths: Device.path list) =
         )
 
 let update setup =
-  echo "Computing reachable object set...";
   let* count =
-    with_progress @@ fun () ->
+    Progress_bar.run ~quiet: false @@ fun progress ->
+    progress ~major: true (fun () -> "Computing reachable object set...");
     let on_availability_check_progress ~checked ~count =
-      Progress_bar.set "Checking availability (%d / %d) (%d%%)" checked count
-        (checked * 100 / count)
+      progress @@ fun () ->
+      sf "Checking availability (%d / %d) (%d%%)" checked count (checked * 100 / count)
     in
     let on_copy_progress ~transferred ~count =
-      Progress_bar.set "Copying (%d / %d) (%d%%)" transferred count
-        (transferred * 100 / count)
+      progress @@ fun () ->
+      sf "Copying (%d / %d) (%d%%)" transferred count (transferred * 100 / count)
     in
     Repository.update ~on_availability_check_progress ~on_copy_progress setup
   in
@@ -1396,30 +1390,31 @@ let diff ~color setup ~before ~after =
 let disk_usage size =
   max 4096 (size / 4096 * 4096 + (if size mod 4096 = 0 then 0 else 4096))
 
-let stats ~verbose setup =
-  with_progress @@ fun () ->
-  Progress_bar.set "Computing the set of reachable objects...";
-  let* hashes = Repository.reachable ~files: false setup in
-  let hashes = Repository.Hash_set.elements hashes in
-  let reachable_count = List.length hashes in
-  let* hashes =
-    let index = ref 0 in
-    list_map_e hashes @@ fun hash ->
-    incr index;
-    Progress_bar.set "Computing stats... (%d / %d) (%d%%)"
-      !index reachable_count (!index * 100 / reachable_count);
-    let* size = Repository.get_object_size setup hash in
-    ok (hash, size)
-  in
-  if verbose then (
-    let hashes = List.sort (fun a b -> Int.compare (snd a) (snd b)) hashes in
-    List.iter' hashes @@ fun (hash, size) ->
-    echo "%s %d" (Hash.to_hex hash) size
-  );
-  let total_bytes, total_disk_usage =
-    List.fold_left' (0, 0) hashes @@
-    fun (acc_bytes, acc_disk_usage) (_, size) ->
-    acc_bytes + size, acc_disk_usage + disk_usage size
+let stats setup =
+  let* reachable_count, total_bytes, total_disk_usage =
+    Progress_bar.run ~quiet: false @@ fun progress ->
+    progress ~major: true (fun () -> "Computing the set of reachable objects...");
+    let* hashes = Repository.reachable ~files: false setup in
+    let hashes = Repository.Hash_set.elements hashes in
+    let reachable_count = List.length hashes in
+    let* hashes =
+      let index = ref 0 in
+      list_map_e hashes @@ fun hash ->
+      incr index;
+      (
+        progress @@ fun () ->
+        sf "Computing stats... (%d / %d) (%d%%)"
+          !index reachable_count (!index * 100 / reachable_count)
+      );
+      let* size = Repository.get_object_size setup hash in
+      ok (hash, size)
+    in
+    let total_bytes, total_disk_usage =
+      List.fold_left' (0, 0) hashes @@
+      fun (acc_bytes, acc_disk_usage) (_, size) ->
+      acc_bytes + size, acc_disk_usage + disk_usage size
+    in
+    ok (reachable_count, total_bytes, total_disk_usage)
   in
   echo "Reachable object count: %d" reachable_count;
   echo "Total size of reachable objects: %s" (show_size total_bytes);
