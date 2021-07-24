@@ -3,7 +3,8 @@ open Misc
 type mode = RW | RO
 
 type location =
-  | Local of mode * Path.absolute_dir
+  | Local of mode * Device_local.location
+  | SSH_filou of mode * Device_ssh_filou.location
 
 val parse_location: mode -> string -> (location, [> `failed ]) r
 
@@ -44,9 +45,17 @@ val show_path: path -> string
 (** Convert a path to a string. *)
 val show_file_path: file_path -> string
 
-(** Create a file, do something and ensure the file is then removed.
+type lock
+
+(** Create an empty file.
 
     If the file already exists, return an error. *)
+val lock: location -> file_path -> (lock, [> `failed ]) r
+
+(** Delete a file that was created with [lock]. *)
+val unlock: location -> lock -> (unit, [> `failed ]) r
+
+(** Call [lock], run a function, and ensure [unlock] is than called. *)
 val with_lock: location -> file_path -> (unit -> ('a, [> `failed ] as 'e) r) -> ('a, 'e) r
 
 (** Read a directory.
@@ -108,8 +117,8 @@ val read_file_incrementally: location -> file_path ->
   ) ->
   ('a, 'e) r
 
-type stat =
-  | File of { path: file_path; size: int }
+type stat = Device_common.stat =
+  | File of { size: int }
   | Dir
 
 val stat: location -> path -> (stat, [> `no_such_file | `failed ]) r

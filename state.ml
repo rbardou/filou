@@ -63,14 +63,10 @@ type clone_config =
 module T =
 struct
   open Protype
+  open Device_common.T
 
   let hash = Repository.hash_type
   let file_hash = Repository.file_hash_type
-
-  let filename: Path.Filename.t t =
-    convert_partial string
-      ~encode: Path.Filename.show
-      ~decode: Path.Filename.parse
 
   let dir: dir t =
     recursive @@ fun dir ->
@@ -114,18 +110,6 @@ struct
       )
     in
     Convert { typ = list entry; encode; decode }
-
-  let file_path: Device.file_path t =
-    convert_partial (list filename)
-      ~encode: (fun (dir, file) -> List.append dir [ file ])
-      ~decode: (
-        fun list ->
-          match List.rev list with
-            | [] ->
-                None
-            | file :: dir_rev ->
-                Some (List.rev dir_rev, file)
-      )
 
   let file_path_set =
     convert (list file_path)
@@ -200,11 +184,7 @@ end
 module Root =
 struct
   type t = journal
-
-  (* We use version numbers starting from 0xF1100, which is supposed to look like "FILOU".
-     This acts as a kind of magic number. *)
-  let version = 0xF1100
-
+  let version = protocol_version
   let typ = T.journal
 end
 

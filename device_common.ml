@@ -79,7 +79,7 @@ let same_file_paths a b = same_paths (path_of_file_path a) (path_of_file_path b)
 type mode = RW | RO
 
 type stat =
-  | File of { path: file_path; size: int }
+  | File of { size: int }
   | Dir
 
 let failed_to_read_directory path msg =
@@ -93,3 +93,27 @@ let failed_to_read_file path msg =
 
 let read_only () =
   failed [ "read-only mode is active" ]
+
+module T =
+struct
+  open Protype
+
+  let filename: Path.Filename.t t =
+    convert_partial string
+      ~encode: Path.Filename.show
+      ~decode: Path.Filename.parse
+
+  let path: path t = list filename
+
+  let file_path: file_path t =
+    convert_partial (list filename)
+      ~encode: (fun (dir, file) -> List.append dir [ file ])
+      ~decode: (
+        fun list ->
+          match List.rev list with
+            | [] ->
+                None
+            | file :: dir_rev ->
+                Some (List.rev dir_rev, file)
+      )
+end

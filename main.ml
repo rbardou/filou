@@ -4,7 +4,7 @@ let error message =
   prerr_endline (String.concat ":\n  " ("Error" :: message));
   exit 1
 
-let () =
+let main () =
   Clap.description "FILe Organizer Ultimate";
   let verbose =
     Clap.flag
@@ -137,7 +137,23 @@ let () =
         @@ fun () ->
         let main_location =
           Clap.mandatory_string
-            ~description: "Location of the main repository to clone."
+            ~description:
+              "Location of the main repository to clone.\n\
+               \n\
+               Locations can be of the form:\n\
+               - file://<path> (or just <path>)\n\
+               - ssh+filou://[username@]hostname[:port]/<path>\n\
+               \n\
+               file:// locations are local to the current host. Note \
+               that file://x means ./x, not /x. If you actually mean \
+               /x, specify file:///x (or just /x).\n\
+               \n\
+               ssh+filou:// locations are remote locations accessed \
+               through SSH. Filou must be available in the PATH of the \
+               remote host, as it will executed with 'listen' to \
+               execute remote commands. Note that ssh+filou://host/x \
+               means ./x (in the remote host), not /x. If you actually \
+               mean /x, specify ssh+filou://host//x."
             ~placeholder: "MAIN_LOCATION"
             ()
         in
@@ -401,6 +417,18 @@ let () =
         in
         `diff (before, after)
       );
+      (
+        Clap.case
+          ~description:
+            "Listen for remote queries. This command causes Filou to \
+             read queries on its standard input and to respond to them \
+             on its standard output. You should usually not run this \
+             yourself: Filou runs this command itself through SSH when \
+             it needs to."
+          "listen"
+        @@ fun () ->
+        `listen
+      );
     ]
   in
   Clap.close ();
@@ -418,6 +446,8 @@ let () =
     match Clone.workdir setup with
       | Local (_, root) ->
           Device.parse_local_path root string
+      | SSH_filou _ ->
+          failed [ "cannot operate on the work directory of remote clone repositories" ]
   in
   match
     match command with
@@ -492,8 +522,16 @@ let () =
       | `diff (before, after) ->
           let* setup = find_local_clone ~clone_only: false () in
           Controller.diff ~color setup ~before ~after
+      | `listen ->
+          Listen.run ()
   with
     | OK () ->
         ()
     | ERROR { msg; _ } ->
         error msg
+
+let () =
+  Printexc.record_backtrace true;
+  try main () with exn ->
+    Printexc.print_backtrace stderr;
+    error [ "uncaught exception"; Printexc.to_string exn ]

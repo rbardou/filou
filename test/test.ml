@@ -463,11 +463,11 @@ let () =
   Clone.update ();
   cd clone;
   explore ".filou/root";
-  rm ".filou/06/80/068078c68210224ad43efdbeed879fbfdfbbb69e072b4b9655b09beb75f4c92e";
+  rm ".filou/e8/78/e878aee40659906d5ccb6940f93a28f3730dcf507e467ce2d9bda2c9eeeb9fdc";
   Clone.update ();
   Clone.update ();
-  rm ".filou/06/80/068078c68210224ad43efdbeed879fbfdfbbb69e072b4b9655b09beb75f4c92e";
-  rm ".filou/d1/0f/d10fb33ec821d25bc7ba85a23553a73e1f4d936a7eaf5632c559485c32f50512";
+  rm ".filou/e8/78/e878aee40659906d5ccb6940f93a28f3730dcf507e467ce2d9bda2c9eeeb9fdc";
+  rm ".filou/c1/b8/c1b896190d5906ef0ee8a53cff6e44584674d8f90d74122807eaafe0b5c29632";
   Clone.update ();
   Clone.update ();
   rm_rf (clone // ".filou");
@@ -537,8 +537,8 @@ let () =
   Clone.tree ();
   comment "Check that if some files are missing from the cache, they are not added.";
   cd clone;
-  rm ".filou/ea/34/ea34ea54fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859";
-  rm ".filou/a6/e7/a6e7d0f2cde27696d38a96e560caeb57ce260da86331d3d3d2593cf264952dd2";
+  rm ".filou/00/84/0084fb625c884272e1379698afdc70763959a9eab98f2d96e59ed020fa8ed456";
+  rm ".filou/e7/a7/e7a7dc6d20a44dd7fb3755a97db8c924815571a38d60cfd9fd5748a9b26597e2";
   let clone_files_1 = find_files clone in
   let main_files_1 = find_files main in
   Clone.prune ();
@@ -552,6 +552,7 @@ let () =
   Clone.update ();
   comment "Check that if more objects exist in the clone than in the main, they are removed.";
   cd clone;
+  mkdir ".filou/01";
   mkdir ".filou/01/23";
   create_file
     ".filou/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859"

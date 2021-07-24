@@ -20,10 +20,10 @@ let close_dir fd =
 
 let dot_part (path: (_, Path.file) Path.t) = Path.show path ^ ".part"
 
-let with_lock (mode: mode) (location: location) (path: file_path) f =
+let lock (mode: mode) (location: location) (path: file_path) =
   match mode with
     | RO ->
-        f ()
+        unit
     | RW ->
         let full_path = local_file_path location path in
         let full_path_string = Path.show full_path in
@@ -48,19 +48,23 @@ let with_lock (mode: mode) (location: location) (path: file_path) f =
               ]
           | fd ->
               close fd;
-              let unlock () =
-                try
-                  Unix.unlink full_path_string
-                with Unix.Unix_error _ ->
-                  ()
-              in
-              match f () with
-                | exception exn ->
-                    unlock ();
-                    raise exn
-                | result ->
-                    unlock ();
-                    result
+              unit
+
+let unlock (mode: mode) (location: location) (path: file_path) =
+  match mode with
+    | RO ->
+        unit
+    | RW ->
+        let full_path = local_file_path location path in
+        let full_path_string = Path.show full_path in
+        match Unix.unlink full_path_string with
+          | exception Unix.Unix_error (error, _, _) ->
+              failed [
+                "failed to unlock: " ^ full_path_string;
+                Unix.error_message error;
+              ]
+          | () ->
+              unit
 
 let iter_read_dir (location: location) (path: path) f =
   let full_path = local_dir_path location path in
@@ -252,7 +256,7 @@ let stat (location: location) (path: path) =
           | { st_kind = S_DIR; _ } ->
               OK Dir
           | { st_kind = S_REG; st_size; _ } ->
-              OK (File { path = file_path; size = st_size })
+              OK (File { size = st_size })
           | { st_kind = (S_CHR | S_BLK | S_LNK | S_FIFO | S_SOCK); _ } ->
               failed [ "not a regular file or a directory: " ^ full_path_string ]
 

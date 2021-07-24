@@ -1,5 +1,9 @@
 (* TODO: remove what's not actually used *)
 
+(* We use version numbers starting from 0xF1100, which is supposed to look like "FILOU".
+   This acts as a kind of magic number. *)
+let protocol_version = 0xF1100
+
 include Mysc
 
 module Path = Typath.UNIX

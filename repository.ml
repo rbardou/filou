@@ -452,18 +452,22 @@ struct
                   garbage_collect_dir sub_path
                 else
                   unit
-          | OK (File { path = file_path; size }) ->
+          | OK (File { size }) ->
               match Hash.of_hex filename_string with
                 | None ->
                     unit
                 | Some hash ->
-                    if Hash_set.mem hash reachable || !read_only then
-                      unit
-                    else
-                      let* () = Device.remove_file location file_path in
-                      incr removed_object_count;
-                      removed_object_total_size := !removed_object_total_size + size;
-                      unit
+                    match Device.file_path_of_path sub_path with
+                      | None ->
+                          unit
+                      | Some file_path ->
+                          if Hash_set.mem hash reachable || !read_only then
+                            unit
+                          else
+                            let* () = Device.remove_file location file_path in
+                            incr removed_object_count;
+                            removed_object_total_size := !removed_object_total_size + size;
+                            unit
       in
       let* () = garbage_collect_dir [] in
       ok (!removed_object_count, !removed_object_total_size)

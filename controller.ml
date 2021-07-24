@@ -46,6 +46,8 @@ let read_clone_config ~clone_location =
   decode_robin_string T.clone_config contents
 
 let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
+  echo "Cloning %s into: %s" (Device.show_location main_location)
+    (Device.show_location clone_location);
   (* Check that the remote repository is readable. *)
   let* _ = Bare.fetch_root main_location in
   (* Initialize the clone. *)
@@ -809,8 +811,14 @@ let push ~verbose setup (paths: Device.path list) =
     else
       let* stat = Device.stat (Clone.workdir setup) path in
       match stat with
-        | File { path; _ } ->
-            push_file ~verbose setup root path
+        | File _ ->
+            (
+              match Device.file_path_of_path path with
+                | None ->
+                    ok root
+                | Some path ->
+                    push_file ~verbose setup root path
+            )
         | Dir ->
             let new_root = ref root in
             let* () =

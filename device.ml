@@ -3,34 +3,82 @@ open Misc
 include Device_common
 
 type location =
-  | Local of mode * Path.absolute_dir
+  | Local of mode * Device_local.location
+  | SSH_filou of mode * Device_ssh_filou.location
 
 let parse_location mode string =
-  match Path.parse string with
-    | None ->
+  match Device_location_lexer.location (Lexing.from_string string) with
+    | `invalid ->
         failed [ "invalid location: " ^ string ]
-    | Some path ->
-        let path = Path.Any_relativity.to_absolute (Path.Any.to_dir path) in
-        OK (Local (mode, path))
+    | `local path ->
+        ok (Local (mode, path |> Path.Any.to_absolute |> Path.Any_kind.to_dir))
+    | `ssh_filou (username, hostname, port, path) ->
+        let location =
+          Device_ssh_filou.make_location
+            ?username
+            ~hostname
+            ?port
+            ~path: (Path.Any.to_dir path)
+            ()
+        in
+        ok (SSH_filou (mode, location))
 
 let show_location = function
   | Local (_, path) ->
+      (* TODO: if path starts with something that looks like a protocol, prepend "file://" *)
       Path.show path
+  | SSH_filou (
+      _,
+      { username; hostname; port; path; connection = _ }
+    ) ->
+      sf "filou+ssh://%s%s%s/%s"
+        (match username with None -> "" | Some u -> u ^ "@")
+        hostname
+        (match port with None -> "" | Some p -> ":" ^ string_of_int p)
+        (Path.Any_relativity.show path)
 
 let sublocation location filename =
   match location with
     | Local (mode, path) ->
         Local (mode, Path.Dir (filename, path))
+    | SSH_filou (mode, location) ->
+        SSH_filou (mode, Device_ssh_filou.sublocation location filename)
 
-let with_lock location path f =
+type lock = file_path
+
+let lock location path =
+  let* () =
+    match location with
+      | Local (mode, location) ->
+          Device_local.lock mode location path
+      | SSH_filou (mode, location) ->
+          Device_ssh_filou.lock mode location path
+  in
+  ok (path: lock)
+
+let unlock location (lock: lock) =
   match location with
     | Local (mode, location) ->
-        Device_local.with_lock mode location path f
+        Device_local.unlock mode location lock
+    | SSH_filou (mode, location) ->
+        Device_ssh_filou.unlock mode location
+
+let with_lock location path f =
+  let* lock = lock location path in
+  match f () with
+    | exception exn ->
+        let* () = unlock location lock in
+        raise exn
+    | result ->
+        let* () = unlock location lock in
+        result
 
 let iter_read_dir location path f =
   match location with
     | Local (_, location) ->
         Device_local.iter_read_dir location path f
+    | SSH_filou (_, location) ->
+        Device_ssh_filou.iter_read_dir location path f
 
 let read_dir location path =
   let list = ref [] in
@@ -41,11 +89,15 @@ let write_file_incrementally location path write_contents =
   match location with
     | Local (mode, location) ->
         Device_local.write_file_incrementally mode location path write_contents
+    | SSH_filou (mode, location) ->
+        Device_ssh_filou.write_file_incrementally mode location path write_contents
 
 let write_file_incrementally_bytes location path write_contents =
   match location with
     | Local (mode, location) ->
         Device_local.write_file_incrementally_bytes mode location path write_contents
+    | SSH_filou (mode, location) ->
+        Device_ssh_filou.write_file_incrementally_bytes mode location path write_contents
 
 let write_file location path contents =
   write_file_incrementally location path @@ fun write ->
@@ -55,6 +107,8 @@ let read_file_incrementally location path read_contents =
   match location with
     | Local (_, location) ->
         Device_local.read_file_incrementally location path read_contents
+    | SSH_filou (_, location) ->
+        Device_ssh_filou.read_file_incrementally location path read_contents
 
 let read_file location path =
   read_file_incrementally location path @@ fun read ->
@@ -77,6 +131,8 @@ let stat location path =
   match location with
     | Local (_, location) ->
         Device_local.stat location path
+    | SSH_filou (_, location) ->
+        Device_ssh_filou.stat location path
 
 let exists location (path: path) =
   match stat location path with
@@ -149,3 +205,5 @@ let remove_file location file_path =
   match location with
     | Local (mode, location) ->
         Device_local.remove_file mode location file_path
+    | SSH_filou (mode, location) ->
+        Device_ssh_filou.remove_file mode location file_path
