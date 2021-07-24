@@ -494,11 +494,11 @@ let small_repo () =
   Clone.update ();
   cd clone;
   explore ".filou/root";
-  rm ".filou/e8/78/e878aee40659906d5ccb6940f93a28f3730dcf507e467ce2d9bda2c9eeeb9fdc";
+  rm ".filou/00/7c/007c9212426b740dce1ff2dc928dbc82db8511c4c0c1c5dd4d2f3e65b73be132";
   Clone.update ();
   Clone.update ();
-  rm ".filou/e8/78/e878aee40659906d5ccb6940f93a28f3730dcf507e467ce2d9bda2c9eeeb9fdc";
-  rm ".filou/c1/b8/c1b896190d5906ef0ee8a53cff6e44584674d8f90d74122807eaafe0b5c29632";
+  rm ".filou/00/7c/007c9212426b740dce1ff2dc928dbc82db8511c4c0c1c5dd4d2f3e65b73be132";
+  rm ".filou/8d/a8/8da8b0b911f9d204d5d2689a6cee52d75cc675b796f75591cbf00b05fea29122";
   Clone.update ();
   Clone.update ();
   rm_rf (clone // ".filou");
@@ -568,8 +568,8 @@ let small_repo () =
   Clone.tree ();
   comment "Check that if some files are missing from the cache, they are not added.";
   cd clone;
-  rm ".filou/00/84/0084fb625c884272e1379698afdc70763959a9eab98f2d96e59ed020fa8ed456";
-  rm ".filou/e7/a7/e7a7dc6d20a44dd7fb3755a97db8c924815571a38d60cfd9fd5748a9b26597e2";
+  rm ".filou/39/11/39118085023aa55cbc027c086cd4797bb56f2e228b341369b2632d780d8df56a";
+  rm ".filou/5a/10/5a10cd2da9ce92f68357816df9a56d15675c331b98fe56739080e79d7f5b0e3a";
   let clone_files_1 = find_files clone in
   let main_files_1 = find_files main in
   Clone.prune ();
@@ -641,6 +641,7 @@ let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
 
   comment "Push.";
   (time "push" @@ fun () -> Clone.push []);
+  Clone.check ();
   Clone.stats ();
   ()
 

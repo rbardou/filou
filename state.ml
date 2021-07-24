@@ -26,11 +26,17 @@ end
 
 module File_path_set = Set.Make (File_path)
 
-type hash_index_2 = File_path_set.t File_hash_map.t
+type hash_index_entry =
+  {
+    hash: Repository.file hash;
+    paths: File_path_set.t;
+  }
 
-type hash_index_1 = hash_index_2 hash Map.Char.t
+type hash_index = hash_index_node Map.Char.t
 
-type hash_index = hash_index_1 hash Map.Char.t
+and hash_index_node =
+  | Node of hash_index hash
+  | Entry of hash_index_entry
 
 type non_empty_root =
   {
@@ -116,27 +122,27 @@ struct
       ~encode: File_path_set.elements
       ~decode: File_path_set.of_list
 
-  let hash_index_2: hash_index_2 t =
-    let entry =
-      record @@
-      ("hash", file_hash, fst) @
-      ("paths", file_path_set, snd) @:
-      fun hash paths -> hash, paths
-    in
-    convert (list entry) ~encode: File_hash_map.bindings ~decode: File_hash_map.of_list
+  let hash_index_entry: hash_index_entry t =
+    record @@
+    ("hash", file_hash, fun r -> r.hash) @
+    ("paths", file_path_set, fun r -> r.paths) @:
+    fun hash paths -> { hash; paths }
 
-  let char_to_hash_map typ =
-    let entry =
+  let hash_index: hash_index t =
+    recursive @@ fun hash_index ->
+    let hash_index_node: hash_index_node t =
+      let hi_node = case "Node" (hash hash_index) (fun x -> Node x) in
+      let hi_entry = case "Entry" hash_index_entry (fun x -> Entry x) in
+      variant [ Case hi_node; Case hi_entry ] @@
+      function Node x -> value hi_node x | Entry x -> value hi_entry x
+    in
+    let entry: (char * hash_index_node) t =
       record @@
       ("key", char, fst) @
-      ("hash", hash typ, snd) @:
-      fun key hash -> key, hash
+      ("node", hash_index_node, snd) @:
+      fun key node -> key, node
     in
     convert (list entry) ~encode: Map.Char.bindings ~decode: Map.Char.of_list
-
-  let hash_index_1: hash_index_1 t = char_to_hash_map hash_index_2
-
-  let hash_index: hash_index t = char_to_hash_map hash_index_1
 
   let non_empty_root: non_empty_root t =
     record @@

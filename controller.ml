@@ -109,142 +109,206 @@ struct
 
   (* Read the entire hash index and return a single map containing all of it.
      One can expect less than 200 bytes per hash, so 200MB for 1M files.
-     It starts to be too big in memory after 10M files? *)
-  let fetch_all setup
-      (hash_index_root: hash_index hash): (File_path_set.t File_hash_map.t, [> `failed ]) r =
-    let actual_hash_index = ref File_hash_map.empty in
-    let* () =
-      let* hash_index = fetch_or_fail setup hash_index_root in
-      if Map.Char.is_empty hash_index then
-        warn "hash index is empty for, it should just not exist";
-      list_iter_e (Map.Char.bindings hash_index) @@ fun (char0, hash_index_1_hash) ->
-      let* hash_index_1 = fetch_or_fail setup hash_index_1_hash in
-      if Map.Char.is_empty hash_index_1 then
-        warn "hash index is empty for %s, it should just not exist"
-          (Hash.hex_of_string (String.make 1 char0));
-      list_iter_e (Map.Char.bindings hash_index_1) @@ fun (char1, hash_index_2_hash) ->
-      let* hash_index_2 = fetch_or_fail setup hash_index_2_hash in
-      if File_hash_map.is_empty hash_index_2 then
-        warn "hash index is empty for %s%s, it should just not exist"
-          (Hash.hex_of_string (String.make 1 char0))
-          (Hash.hex_of_string (String.make 1 char1));
-      list_iter_e (File_hash_map.bindings hash_index_2) @@ fun (hash, paths) ->
-      if File_path_set.is_empty paths then
-        warn "Hash index is empty for %s, it should just not exist."
-          (Repository.hex_of_hash hash);
-      actual_hash_index := File_hash_map.add hash paths !actual_hash_index;
-      unit
-    in
-    ok !actual_hash_index
+     It starts to be too big in memory after 10M files?
 
-  let get setup (root: root)
-      (hash: Repository.file hash): (File_path_set.t option, [> `failed ]) r =
-    let hash_bin = Repository.bin_of_hash hash in
-    let char0 = hash_bin.[0] in
-    let char1 = hash_bin.[1] in
-    let* hash_index = fetch_hash_index setup root in
-    let* hash_index_1 =
-      match Map.Char.find_opt char0 hash_index with
-        | None ->
-            ok Map.Char.empty
-        | Some hash_index_1_hash ->
-            fetch_or_fail setup hash_index_1_hash
+     This helper is used by [check], so we warn when we see something weird. *)
+  let fetch_all setup
+      (hash_index_hash: hash_index hash): (File_path_set.t File_hash_map.t, [> `failed ]) r =
+    let result = ref File_hash_map.empty in
+    let rec gather prefix_rev (hash_index_hash: hash_index hash) =
+      let* hash_index = fetch_or_fail setup hash_index_hash in
+      if Map.Char.is_empty hash_index then (
+        let prefix =
+          prefix_rev
+          |> List.rev
+          |> List.map (String.make 1)
+          |> String.concat ""
+          |> Hash.hex_of_string
+        in
+        warn "found an empty hash index that should just not exist for %s" prefix
+      );
+      list_iter_e (Map.Char.bindings hash_index) @@ function
+      | char, Node node_hash_index_hash ->
+          gather (char :: prefix_rev) node_hash_index_hash
+      | _, Entry { hash; paths } ->
+          result := File_hash_map.add hash paths !result;
+          unit
     in
-    let* hash_index_2 =
-      match Map.Char.find_opt char1 hash_index_1 with
-        | None ->
-            ok File_hash_map.empty
-        | Some hash_index_2_hash ->
-            fetch_or_fail setup hash_index_2_hash
-    in
-    ok (File_hash_map.find_opt hash hash_index_2)
+    let* () = gather [] hash_index_hash in
+    ok !result
+
+  let get_hash_char ~hash_bin ~char_index =
+    if char_index >= String.length hash_bin then
+      (* This should never happen, hashes are too long to have
+         so many entries that we require one level per character.
+         Moreover, even if they weren't too long, the last character
+         will always have exactly one entry, so we'll never need to read it. *)
+      failed [
+        sf "trying to read character %d of hash %s" char_index
+          (Hash.hex_of_string hash_bin);
+      ]
+    else
+      ok hash_bin.[char_index]
+
+  let get setup (root: root) (hash: Repository.file hash): (File_path_set.t, [> `failed ]) r =
+    match root with
+      | Empty ->
+          ok File_path_set.empty
+      | Non_empty root ->
+          let hash_bin = Repository.bin_of_hash hash in
+          let rec find (hash_index_hash: hash_index hash) (char_index: int) =
+            let* char = get_hash_char ~hash_bin ~char_index in
+            let* hash_index = fetch_or_fail setup hash_index_hash in
+            match Map.Char.find_opt char hash_index with
+              | None ->
+                  ok File_path_set.empty
+              | Some (Node node_hash_index_hash) ->
+                  find node_hash_index_hash (char_index + 1)
+              | Some (Entry { hash = entry_hash; paths }) ->
+                  if Repository.compare_hashes hash entry_hash = 0 then
+                    ok paths
+                  else
+                    ok File_path_set.empty
+          in
+          find root.hash_index 0
 
   (* Also returns the old list of paths that were associated to this hash. *)
   let add setup (root: root) (added_file_hash: Repository.file hash)
       (path: Device.file_path): (hash_index hash * File_path_set.t, [> `failed ]) r =
-    let added_file_hash_bin = Repository.bin_of_hash added_file_hash in
-    let char0 = added_file_hash_bin.[0] in
-    let char1 = added_file_hash_bin.[1] in
-    let* hash_index = fetch_hash_index setup root in
-    let* hash_index_1 =
-      match Map.Char.find_opt char0 hash_index with
-        | None ->
+    let hash_bin = Repository.bin_of_hash added_file_hash in
+    let rec add_to (hash_index: hash_index) char_index =
+      let* char = get_hash_char ~hash_bin ~char_index in
+      let* new_hash_index, old_paths =
+        match Map.Char.find_opt char hash_index with
+          | None ->
+              ok (
+                Map.Char.add char
+                  (Entry { hash = added_file_hash; paths = File_path_set.singleton path })
+                  hash_index,
+                File_path_set.empty
+              )
+          | Some (Node node_hash_index_hash) ->
+              let* node_hash_index = fetch_or_fail setup node_hash_index_hash in
+              let* new_node_hash_index_hash, old_paths =
+                add_to node_hash_index (char_index + 1)
+              in
+              ok (
+                Map.Char.add char (Node new_node_hash_index_hash) hash_index,
+                old_paths
+              )
+          | Some (Entry { hash = entry_hash; paths }) ->
+              let* new_hash_index_node, old_paths =
+                if Repository.compare_hashes entry_hash added_file_hash = 0 then
+                  ok (
+                    Entry {
+                      hash = entry_hash;
+                      paths = File_path_set.add path paths;
+                    },
+                    paths
+                  )
+                else
+                  let rec create_node char_index =
+                    let* existing_entry_char =
+                      get_hash_char ~hash_bin: (Repository.bin_of_hash entry_hash) ~char_index
+                    in
+                    let* new_entry_char =
+                      get_hash_char ~hash_bin ~char_index
+                    in
+                    if Char.equal existing_entry_char new_entry_char then
+                      let* new_sub_node = create_node (char_index + 1) in
+                      let* new_sub_node_hash_index_hash =
+                        store_later setup T.hash_index (
+                          Map.Char.singleton existing_entry_char new_sub_node
+                        )
+                      in
+                      ok (Node new_sub_node_hash_index_hash)
+                    else
+                      let new_node_hash_index =
+                        Map.Char.of_list [
+                          existing_entry_char,
+                          Entry { hash = entry_hash; paths };
+                          new_entry_char,
+                          Entry {
+                            hash = added_file_hash;
+                            paths = File_path_set.singleton path;
+                          };
+                        ]
+                      in
+                      let* new_node_hash_index_hash =
+                        store_later setup T.hash_index new_node_hash_index
+                      in
+                      ok (Node new_node_hash_index_hash)
+                  in
+                  let* new_node = create_node (char_index + 1) in
+                  ok (new_node, File_path_set.empty)
+              in
+              ok (
+                Map.Char.add char new_hash_index_node hash_index,
+                old_paths
+              )
+      in
+      let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
+      ok (new_hash_index_hash, old_paths)
+    in
+    let* hash_index =
+      match root with
+        | Empty ->
             ok Map.Char.empty
-        | Some hash_index_1_hash ->
-            fetch_or_fail setup hash_index_1_hash
+        | Non_empty root ->
+            fetch_or_fail setup root.hash_index
     in
-    let* hash_index_2 =
-      match Map.Char.find_opt char1 hash_index_1 with
-        | None ->
-            ok File_hash_map.empty
-        | Some hash_index_2_hash ->
-            fetch_or_fail setup hash_index_2_hash
-    in
-    let old_paths =
-      File_hash_map.find_opt added_file_hash hash_index_2
-      |> default File_path_set.empty
-    in
-    let new_hash_index_2 =
-      let new_paths = File_path_set.add path old_paths in
-      File_hash_map.add added_file_hash new_paths hash_index_2
-    in
-    let* new_hash_index_2_hash = store_later setup T.hash_index_2 new_hash_index_2 in
-    let new_hash_index_1 = Map.Char.add char1 new_hash_index_2_hash hash_index_1 in
-    let* new_hash_index_1_hash = store_later setup T.hash_index_1 new_hash_index_1 in
-    let new_hash_index = Map.Char.add char0 new_hash_index_1_hash hash_index in
-    let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
-    ok (new_hash_index_hash, old_paths)
+    add_to hash_index 0
 
   (* Does not actually store the result so that one can bulk remove. *)
   let remove setup (hash_index: hash_index) (hash: Repository.file hash)
       (path: Device.file_path): (hash_index, [> `failed ]) r =
     let hash_bin = Repository.bin_of_hash hash in
-    let char0 = hash_bin.[0] in
-    let char1 = hash_bin.[1] in
-    let* hash_index_1 =
-      match Map.Char.find_opt char0 hash_index with
+    let rec remove_from (hash_index: hash_index) char_index: (hash_index, _) r =
+      let* char = get_hash_char ~hash_bin ~char_index in
+      match Map.Char.find_opt char hash_index with
         | None ->
-            ok Map.Char.empty
-        | Some hash_index_1_hash ->
-            fetch_or_fail setup hash_index_1_hash
+            ok hash_index
+        | Some (Entry { hash = entry_hash; paths }) ->
+            if Repository.compare_hashes entry_hash hash <> 0 then
+              ok hash_index
+            else
+              let new_paths = File_path_set.remove path paths in
+              if File_path_set.is_empty new_paths then
+                ok (Map.Char.remove char hash_index)
+              else
+                ok (Map.Char.add char (Entry { hash; paths = new_paths }) hash_index)
+        | Some (Node node_hash_index_hash) ->
+            let* node_hash_index = fetch_or_fail setup node_hash_index_hash in
+            let* new_node_hash_index = remove_from node_hash_index (char_index + 1) in
+            (* [new_node_hash_index], which is the [char] entry in [hash_index], can be:
+               - empty;
+               - a singleton of a [Node] (that contains several entries);
+               - a singleton of an [Entry];
+               - a map with at least 2 items.
+               So there are several cases:
+               - (A) if it is empty, we can remove it from [hash_index] completely;
+               - (B) if it contains several entries (i.e. it is either a singleton with
+                 a [Node], or it contains at least 2 items), we keep it as is;
+               - (C) if it only contains one [Entry], we can put it in [hash_index]
+                 as an [Entry] instead of a [Node]. *)
+            match Map.Char.choose_opt new_node_hash_index with
+              | None ->
+                  (* [new_node_hash_index] is empty, remove the node from [hash_index]. *)
+                  ok (Map.Char.remove char hash_index)
+              | Some (sub_char, (Entry _ as entry))
+                when Map.Char.is_empty (Map.Char.remove sub_char new_node_hash_index) ->
+                  (* [new_node_hash_index] contains only 1 entry,
+                     replace the entry in [hash_index] by an [Entry] instead of a [Node]. *)
+                  ok (Map.Char.add char entry hash_index)
+              | _ ->
+                  (* [new_node_hash_index] contains at least 2 entries,
+                     replace the entry in [hash_index], keeping a [Node]. *)
+                  let* new_node_hash_index_hash =
+                    store_later setup T.hash_index new_node_hash_index
+                  in
+                  ok (Map.Char.add char (Node new_node_hash_index_hash) hash_index)
     in
-    let* hash_index_2 =
-      match Map.Char.find_opt char1 hash_index_1 with
-        | None ->
-            ok File_hash_map.empty
-        | Some hash_index_2_hash ->
-            fetch_or_fail setup hash_index_2_hash
-    in
-    let set =
-      match File_hash_map.find_opt hash hash_index_2 with
-        | None ->
-            File_path_set.empty
-        | Some set ->
-            set
-    in
-    let new_set = File_path_set.remove path set in
-    let new_hash_index_2 =
-      if File_path_set.is_empty new_set then
-        File_hash_map.remove hash hash_index_2
-      else
-        File_hash_map.add hash new_set hash_index_2
-    in
-    let* new_hash_index_1 =
-      if File_hash_map.is_empty new_hash_index_2 then
-        ok (Map.Char.remove char1 hash_index_1)
-      else
-        let* new_hash_index_2_hash =
-          store_later setup T.hash_index_2 new_hash_index_2
-        in
-        ok (Map.Char.add char1 new_hash_index_2_hash hash_index_1)
-    in
-    if Map.Char.is_empty new_hash_index_1 then
-      ok (Map.Char.remove char0 hash_index)
-    else
-      let* new_hash_index_1_hash =
-        store_later setup T.hash_index_1 new_hash_index_1
-      in
-      ok (Map.Char.add char0 new_hash_index_1_hash hash_index)
+    remove_from hash_index 0
 
 end
 
@@ -583,12 +647,8 @@ let tree ~color ~max_depth ~only_main ~only_dirs
               trace (
                 sf "failed to look up duplicates for %s" (Device.show_file_path file_path)
               ) @@
-              let* hash_entry = Hash_index.get setup root hash in
-              match hash_entry with
-                | None ->
-                    failed [ "%s is missing from the hash index"; ]
-                | Some set ->
-                    ok (File_path_set.remove file_path set)
+              let* paths = Hash_index.get setup root hash in
+              ok (File_path_set.remove file_path paths)
     in
     let print_duplicate_paths duplicates =
       File_path_set.iter' duplicates @@ fun duplicate_path ->
