@@ -127,6 +127,9 @@ sig
   val fetch: t -> 'a hash ->
     ('a, [> `failed | `not_available ]) r
 
+  val fetch_raw: t -> Hash.t ->
+    (string, [> `failed | `not_available ]) r
+
   val store_file: source: Device.location -> source_path: Device.file_path -> target: t ->
     on_progress: (bytes: int -> size: int -> unit) ->
     (file hash * int, [> `failed ]) r
@@ -144,6 +147,9 @@ sig
 
   val fetch_root: t ->
     (root, [> `failed ]) r
+
+  val fetch_root_raw: t ->
+    (string, [> `failed ]) r
 
   val reachable: ?files: bool -> t -> (Hash_set.t, [> `failed ]) r
 
@@ -258,6 +264,15 @@ struct
                 x
             | OK encoded_value ->
                 decode_robin_string typ encoded_value
+
+  let fetch_raw location (hash: Hash.t) =
+    trace ("failed to fetch object with hash " ^ Hash.to_hex hash) @@
+    let path = file_path_of_hash hash in
+    match Device.read_file location path with
+      | ERROR { code = `no_such_file; msg } ->
+          ERROR { code = `not_available; msg }
+      | ERROR { code = `failed; _ } | OK _ as x ->
+          x
 
   let store_file ~source ~source_path ~target ~on_progress =
     trace ("failed to store " ^ Device.show_file_path source_path) @@
@@ -375,6 +390,14 @@ struct
             ok root
     else
       actually_fetch_root ()
+
+  let fetch_root_raw location =
+    trace "failed to fetch root" @@
+    match Device.read_file location root_path with
+    | ERROR { code = (`no_such_file | `failed); msg } ->
+        failed msg
+    | OK _ as x ->
+        x
 
   let direct_value_dependencies ~files typ value =
     let equal: 'a. 'a -> 'a Protype.annotation -> packed_hash option =

@@ -450,6 +450,38 @@ let main () =
         in
         `stats cache
       );
+      (
+        Clap.case
+          ~description: "Show an object. Mostly useful for debugging."
+          "show"
+        @@ fun () ->
+        let cache =
+          Clap.flag
+            ~set_long: "cache"
+            ~set_short: 'C'
+            ~description:
+              "Only read from the clone repository cache, not the main \
+               repository."
+            false
+        in
+        let max_depth =
+          Clap.default_int
+            ~long: "depth"
+            ~short: 'r'
+            ~description:
+              "Show the objects referenced by OBJECT, recursively, with maximum depth DEPTH."
+            3
+        in
+        let obj =
+          Clap.default_string
+            ~description:
+              "Object to show. Can be an object hash or an alias: \
+               'journal', 'hash_index' or 'root_dir'."
+            ~placeholder: "OBJECT"
+            "journal"
+        in
+        `show (obj, cache, max_depth)
+      );
     ]
   in
   Clap.close ();
@@ -548,6 +580,9 @@ let main () =
       | `stats cache ->
           let* setup = find_local_clone ~clone_only: cache () in
           Controller.stats setup
+      | `show (obj, cache, max_depth) ->
+          let* setup = find_local_clone ~clone_only: cache () in
+          Controller.show setup obj ~max_depth
   with
     | OK () ->
         ()

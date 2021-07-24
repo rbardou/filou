@@ -75,6 +75,13 @@ sig
   val fetch: t -> 'a hash ->
     ('a, [> `failed | `not_available ]) r
 
+  (** Fetch an object from its hash, but do not decode it.
+
+      Cannot return objects which were not already stored (if they were stored
+      with [store_later]). *)
+  val fetch_raw: t -> Hash.t ->
+    (string, [> `failed | `not_available ]) r
+
   (** Store a file as an object. *)
   val store_file: source: Device.location -> source_path: Device.file_path -> target: t ->
     on_progress: (bytes: int -> size: int -> unit) ->
@@ -99,6 +106,12 @@ sig
   (** Read the root. *)
   val fetch_root: t ->
     (root, [> `failed ]) r
+
+  (** Read the root, but do not decode it.
+
+      This always read from the device, it never uses the root that was cached in memory. *)
+  val fetch_root_raw: t ->
+    (string, [> `failed ]) r
 
   (** Get the set of objects that are reachable from the root.
 

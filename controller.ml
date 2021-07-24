@@ -1422,3 +1422,76 @@ let stats setup =
   echo "Efficiency (total size / disk usage): %d%%"
     (total_bytes * 100 / total_disk_usage);
   unit
+
+let show setup obj ~max_depth =
+  let* obj =
+    match obj with
+      | "journal" -> ok `journal
+      | "hash_index" -> ok `hash_index
+      | "root_dir" -> ok `root_dir
+      | _ ->
+          match Hash.of_hex obj with
+            | None ->
+                failed [ "invalid object hash or alias: " ^ obj ]
+            | Some hash ->
+                ok (`hash hash)
+  in
+  let rec pp_value ~indent ~max_depth fmt (value: Robin.Value.t) =
+    Protype_robin.Explore.pp_value_gen ~custom ~indent ?max_depth () fmt value
+  and custom ~indent ~max_depth fmt (value: Robin.Value.t) =
+    match value with
+      | String s ->
+          (
+            match Hash.of_bin s with
+              | None ->
+                  false
+              | Some hash ->
+                  match Repository.fetch_raw setup hash with
+                    | ERROR _ ->
+                        false
+                    | OK encoded_value ->
+                        match Robin.Decode.from_string encoded_value with
+                          | Error _ ->
+                              false
+                          | Ok value ->
+                              (* TODO: indentation is broken here *)
+                              Format.fprintf fmt "%s =\n%s%a" (Hash.to_hex hash)
+                                (String.make indent ' ')
+                                (pp_value ~indent ~max_depth) value;
+                              true
+          )
+      | _ ->
+          false
+  in
+  let show_encoded_object encoded_value =
+    match Robin.Decode.from_string encoded_value with
+      | Error _ ->
+          print_string encoded_value;
+          flush stdout
+      | Ok value ->
+          Format.printf "%a@." (pp_value ~indent: 0 ~max_depth: (Some max_depth)) value
+  in
+  match obj with
+    | `hash hash ->
+        let* encoded_object = Repository.fetch_raw setup hash in
+        show_encoded_object encoded_object;
+        unit
+    | `journal ->
+        let* encoded_object = Repository.fetch_root_raw setup in
+        show_encoded_object encoded_object;
+        unit
+    | `root_dir | `hash_index as obj ->
+        let* root = Repository.fetch_root setup in
+        match root.head.root with
+          | Empty ->
+              echo "empty";
+              unit
+          | Non_empty non_empty_root ->
+              let hash =
+                match obj with
+                  | `root_dir -> Repository.hash_of_hash non_empty_root.root_dir
+                  | `hash_index -> Repository.hash_of_hash non_empty_root.hash_index
+              in
+              let* encoded_object = Repository.fetch_raw setup hash in
+              show_encoded_object encoded_object;
+              unit

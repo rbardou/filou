@@ -90,6 +90,22 @@ struct
       | OK _ as x ->
           x
 
+  let fetch_raw setup hash =
+    match R.fetch_raw setup.clone_dot_filou hash with
+      | ERROR { code = `not_available; _ } as error ->
+          (
+            match setup.main with
+              | None ->
+                  error
+              | Some main ->
+                  let* () = R.transfer ~source: main ~target: setup.clone_dot_filou hash in
+                  R.fetch_raw setup.clone_dot_filou hash
+          )
+      | ERROR { code = `failed; _ } as x ->
+          x
+      | OK _ as x ->
+          x
+
   let store_file ~source ~source_path ~target ~on_progress =
     match target.main with
       | None ->
@@ -123,7 +139,7 @@ struct
           setup.clone_root_is_up_to_date <- true;
           unit
 
-  let fetch_root setup =
+  let fetch_root_gen fetch setup =
     let* () =
       match setup.main with
         | None ->
@@ -134,7 +150,10 @@ struct
             else
               R.transfer_root ~source: main ~target: setup.clone_dot_filou ()
     in
-    R.fetch_root setup.clone_dot_filou
+    fetch setup.clone_dot_filou
+
+  let fetch_root setup = fetch_root_gen R.fetch_root setup
+  let fetch_root_raw setup = fetch_root_gen R.fetch_root_raw setup
 
   let reachable ?files setup =
     match setup.main with
