@@ -36,9 +36,7 @@ val compare_file_paths: file_path -> file_path -> int
 (** Convert a string to a repository path.
 
     Suitable for command-line inputs. *)
-val parse_path: location -> string -> (path, [> `failed ]) r
-
-val parse_file_path: location -> string -> (file_path, [> `failed ]) r
+val parse_local_path: (Path.absolute, Path.dir) Path.t -> string -> (path, [> `failed ]) r
 
 (** Convert a path to a string. *)
 val show_path: path -> string
@@ -63,8 +61,6 @@ val read_dir: location -> path ->
 val iter_read_dir: location -> path ->
   (Path.Filename.t -> (unit, [> `no_such_file | `failed ] as 'e) r) ->
   (unit, 'e) r
-
-val check_directory_is_empty_or_inexistant: location -> path -> (unit, [> `failed ]) r
 
 (** Write a file.
 

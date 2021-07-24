@@ -414,6 +414,11 @@ let () =
   let device_mode = if dry_run then Device.RO else RW in
   let parse_location = Device.parse_location device_mode in
   let find_local_clone () = Controller.find_local_clone device_mode in
+  let parse_local_path setup string =
+    match Clone.workdir setup with
+      | Local (_, root) ->
+          Device.parse_local_path root string
+  in
   match
     match command with
       | `init location ->
@@ -433,7 +438,7 @@ let () =
               | [] -> [ "." ]
               | _ -> paths
           in
-          let* paths = list_map_e paths (Device.parse_path (Clone.workdir setup)) in
+          let* paths = list_map_e paths (parse_local_path setup) in
           Controller.tree ~color ~max_depth ~only_main ~only_dirs ~print_size
             ~print_file_count ~print_duplicates ~full_dir_paths setup paths
       | `push paths ->
@@ -443,7 +448,7 @@ let () =
               | [] -> [ "." ]
               | _ -> paths
           in
-          let* paths = list_map_e paths (Device.parse_path (Clone.workdir setup)) in
+          let* paths = list_map_e paths (parse_local_path setup) in
           Controller.push ~verbose setup paths
       | `pull paths ->
           let* setup = find_local_clone ~clone_only: false () in
@@ -452,12 +457,12 @@ let () =
               | [] -> [ "." ]
               | _ -> paths
           in
-          let* paths = list_map_e paths (Device.parse_path (Clone.workdir setup)) in
+          let* paths = list_map_e paths (parse_local_path setup) in
           Controller.pull ~verbose setup paths
       | `rm (paths, recursive) ->
           (* TODO: show progress "Deleted X files." *)
           let* setup = find_local_clone ~clone_only: false () in
-          let* paths = list_map_e paths (Device.parse_path (Clone.workdir setup)) in
+          let* paths = list_map_e paths (parse_local_path setup) in
           Controller.remove ~recursive setup paths
       | `check (cache, hash_all, hash_metadata) ->
           let* setup = find_local_clone ~clone_only: cache () in
