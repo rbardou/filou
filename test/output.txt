@@ -14,6 +14,18 @@ $ main.exe --no-color tree
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
 -->  0 init
+# Play with the configuration.
+$ main.exe --no-color config
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
+$ main.exe --no-color config --main /tmp
+$ main.exe --no-color config
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/
+$ main.exe --no-color config --main /tmp/filou-test/main
+$ main.exe --no-color config
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
 # Add a file.
 $ cd /tmp/filou-test/clone
 $ echo blablabla > toto

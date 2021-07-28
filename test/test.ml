@@ -220,6 +220,9 @@ struct
 
   let stats ?v ?dry_run ?color () =
     run ?v ?dry_run ?color [ "stats" ]
+
+  let config ?v ?dry_run ?color ?main () =
+    run ?v ?dry_run ?color ("config" :: list_of_option ~name: "--main" main)
 end
 
 module Main = Make_filou (struct let path = Some main end)
@@ -300,6 +303,13 @@ let small_repo () =
   Clone.check ();
   Clone.tree ();
   Clone.log ();
+
+  comment "Play with the configuration.";
+  Filou.config ();
+  Filou.config ~main: "/tmp" ();
+  Filou.config ();
+  Filou.config ~main ();
+  Filou.config ();
 
   comment "Add a file.";
   cd clone;

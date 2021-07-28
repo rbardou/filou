@@ -61,6 +61,11 @@ let rec list_filter_e ?(acc = []) l f =
         else
           list_filter_e ~acc tail f
 
+let opt_map_e o f =
+  match o with
+    | None -> ok None
+    | Some x -> let* y = f x in ok (Some y)
+
 let trace error_message = function
   | OK _ as x -> x
   | ERROR { code; msg } -> ERROR { code; msg = error_message :: msg }

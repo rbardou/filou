@@ -43,24 +43,28 @@ let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
   (* Initialize the clone. *)
   write_clone_config ~clone_location { main_location }
 
-let find_local_clone ~clone_only mode =
+let find_local_clone_config mode =
   let rec find current =
     let clone_location = Device.Local (mode, current) in
     match read_clone_config ~clone_location with
       | OK config ->
-          let main =
-            if clone_only then
-              None
-            else
-              Some config.main_location
-          in
-          OK (Clone.setup ~main ~workdir: clone_location ())
+          ok (clone_location, config)
       | ERROR { code = (`no_such_file | `failed); _ } ->
           match Path.parent current with
             | None -> failed [ "not in a clone repository" ]
             | Some parent -> find parent
   in
   find (Path.get_cwd ())
+
+let find_local_clone ~clone_only mode =
+  let* clone_location, config = find_local_clone_config mode in
+  let main =
+    if clone_only then
+      None
+    else
+      Some config.main_location
+  in
+  ok (Clone.setup ~main ~workdir: clone_location ())
 
 let store_later = Repository.store_later
 
@@ -1455,3 +1459,13 @@ let show setup obj ~max_depth =
               let* encoded_object = Repository.fetch_raw setup hash in
               show_encoded_object encoded_object;
               unit
+
+let config ~mode ~main_location =
+  let* clone_location, config = find_local_clone_config mode in
+  match main_location with
+    | None ->
+        echo "clone repository: %s" (Device.show_location clone_location);
+        echo "main repository: %s" (Device.show_location config.main_location);
+        unit
+    | Some main_location ->
+        write_clone_config ~clone_location { main_location }

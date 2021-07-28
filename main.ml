@@ -482,6 +482,21 @@ let main () =
         in
         `show (obj, cache, max_depth)
       );
+      (
+        Clap.case
+          ~description:
+            "With no arguments, show the configuration. With \
+             arguments, update the configuration."
+          "config"
+        @@ fun () ->
+        let main =
+          Clap.optional_string
+            ~long: "main"
+            ~description: "Set the location of the main repository. See 'clone --help'."
+            ()
+        in
+        `config main
+      );
     ]
   in
   Clap.close ();
@@ -583,6 +598,9 @@ let main () =
       | `show (obj, cache, max_depth) ->
           let* setup = find_local_clone ~clone_only: cache () in
           Controller.show setup obj ~max_depth
+      | `config main ->
+          let* main_location = opt_map_e main parse_location in
+          Controller.config ~mode: device_mode ~main_location
   with
     | OK () ->
         ()
