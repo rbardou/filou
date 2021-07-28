@@ -245,22 +245,25 @@ let clone_tree () =
 let explore path =
   echo "$ explore %s" path;
   let contents = read_file path in
-  Format.printf "%a@." Protype_robin.Explore.pp_string contents
+  Format.fprintf Format.str_formatter "%a@." Protype_robin.Explore.pp_string contents;
+  let string = Format.flush_str_formatter () in
+  print_string string;
+  string
 
-let explore_main path =
-  cd main;
-  explore path
+(* let explore_main path = *)
+(*   cd main; *)
+(*   explore path *)
 
 let explore_clone path =
   cd clone;
   explore (".filou" // path)
 
-let explore_hash hash =
-  explore (String.sub hash 0 2 // String.sub hash 2 2 // hash)
+(* let explore_hash hash = *)
+(*   explore (String.sub hash 0 2 // String.sub hash 2 2 // hash) *)
 
-let explore_main_hash hash =
-  cd main;
-  explore_hash hash
+(* let explore_main_hash hash = *)
+(*   cd main; *)
+(*   explore_hash hash *)
 
 (* let explore_clone_hash hash = *)
 (*   cd clone; *)
@@ -278,11 +281,22 @@ let diff_string_sets a b =
   Set.String.diff a b |> Set.String.iter (echo "- %s");
   Set.String.diff b a |> Set.String.iter (echo "+ %s")
 
+let (=~*) str rex =
+  match Rex.(str =~ perl _1 rex) with
+    | None ->
+        echo "%S does not match %S" str rex;
+        exit 1
+    | Some x ->
+        x
+
+let dot_filou_hash hash =
+  ".filou" // String.sub hash 0 2 // String.sub hash 2 2 // hash
+
 let small_repo () =
   comment "Initialize a main repository and a clone.";
   Filou.init ~main ();
   Filou.clone ~main ~clone ();
-  explore_clone "config";
+  let _ = explore_clone "config" in
   Clone.check ();
   Clone.tree ();
   Clone.log ();
@@ -500,12 +514,14 @@ let small_repo () =
   comment "Test update.";
   Clone.update ();
   cd clone;
-  explore ".filou/root";
-  rm ".filou/00/7c/007c9212426b740dce1ff2dc928dbc82db8511c4c0c1c5dd4d2f3e65b73be132";
+  let root = explore ".filou/root" in
+  let root_dir = root =~* "root_dir = ([0-9a-f]{64})" in
+  let hash_index = root =~* "hash_index = ([0-9a-f]{64})" in
+  rm (dot_filou_hash root_dir);
   Clone.update ();
   Clone.update ();
-  rm ".filou/00/7c/007c9212426b740dce1ff2dc928dbc82db8511c4c0c1c5dd4d2f3e65b73be132";
-  rm ".filou/8d/a8/8da8b0b911f9d204d5d2689a6cee52d75cc675b796f75591cbf00b05fea29122";
+  rm (dot_filou_hash root_dir);
+  rm (dot_filou_hash hash_index);
   Clone.update ();
   Clone.update ();
   rm_rf (clone // ".filou");
@@ -575,8 +591,11 @@ let small_repo () =
   Clone.tree ();
   comment "Check that if some files are missing from the cache, they are not added.";
   cd clone;
-  rm ".filou/39/11/39118085023aa55cbc027c086cd4797bb56f2e228b341369b2632d780d8df56a";
-  rm ".filou/5a/10/5a10cd2da9ce92f68357816df9a56d15675c331b98fe56739080e79d7f5b0e3a";
+  let root = explore ".filou/root" in
+  let root_dir = root =~* "root_dir = ([0-9a-f]{64})" in
+  let hash_index = root =~* "hash_index = ([0-9a-f]{64})" in
+  rm (dot_filou_hash root_dir);
+  rm (dot_filou_hash hash_index);
   let clone_files_1 = find_files clone in
   let main_files_1 = find_files main in
   Clone.prune ();
@@ -654,5 +673,5 @@ let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
 
 let () =
   small_repo ();
-(*   large_repo ~files: 200 ~dirs: 15 (); *)
+(*   large_repo ~files: 100000 ~dirs: 3000 (); *)
   ()

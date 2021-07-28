@@ -26,17 +26,11 @@ end
 
 module File_path_set = Set.Make (File_path)
 
-type hash_index_entry =
-  {
-    hash: Repository.file hash;
-    paths: File_path_set.t;
-  }
+type hash_index_bucket = File_path_set.t File_hash_map.t
 
-type hash_index = hash_index_node Map.Char.t
-
-and hash_index_node =
-  | Node of hash_index hash
-  | Entry of hash_index_entry
+type hash_index =
+  | Leaf of hash_index_bucket hash
+  | Node of { zero: hash_index; one: hash_index }
 
 type non_empty_root =
   {
@@ -122,27 +116,28 @@ struct
       ~encode: File_path_set.elements
       ~decode: File_path_set.of_list
 
-  let hash_index_entry: hash_index_entry t =
-    record @@
-    ("hash", file_hash, fun r -> r.hash) @
-    ("paths", file_path_set, fun r -> r.paths) @:
-    fun hash paths -> { hash; paths }
+  let hash_index_bucket: hash_index_bucket t =
+    let entry: (Repository.file Repository.hash * File_path_set.t) t =
+      record @@
+      ("hash", file_hash, fst) @
+      ("paths", file_path_set, snd) @:
+      fun hash paths -> hash, paths
+    in
+    convert (list entry) ~encode: File_hash_map.bindings ~decode: File_hash_map.of_list
 
   let hash_index: hash_index t =
     recursive @@ fun hash_index ->
-    let hash_index_node: hash_index_node t =
-      let hi_node = case "Node" (hash hash_index) (fun x -> Node x) in
-      let hi_entry = case "Entry" hash_index_entry (fun x -> Entry x) in
-      variant [ Case hi_node; Case hi_entry ] @@
-      function Node x -> value hi_node x | Entry x -> value hi_entry x
-    in
-    let entry: (char * hash_index_node) t =
+    let leaf = case "Leaf" (hash hash_index_bucket) (fun x -> Leaf x) in
+    let zero_one: (hash_index * hash_index) t =
       record @@
-      ("key", char, fst) @
-      ("node", hash_index_node, snd) @:
-      fun key node -> key, node
+      ("zero", hash_index, fst) @
+      ("one", hash_index, snd) @:
+      fun zero one -> zero, one
     in
-    convert (list entry) ~encode: Map.Char.bindings ~decode: Map.Char.of_list
+    let node = case "Node" zero_one (fun (zero, one) -> Node { zero; one }) in
+    variant [ Case leaf; Case node ] @@ function
+    | Leaf x -> value leaf x
+    | Node { zero; one } -> value node (zero, one)
 
   let non_empty_root: non_empty_root t =
     record @@

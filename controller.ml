@@ -87,218 +87,178 @@ let fetch_root_dir setup (root: root) =
     | Non_empty root ->
         fetch_or_fail setup root.root_dir
 
-let fetch_hash_index setup (root: root) =
-  match root with
-    | Empty ->
-        ok Map.Char.empty
-    | Non_empty root ->
-        fetch_or_fail setup root.hash_index
-
 module Hash_index =
 struct
 
+  let max_bucket_size = 512
+
+  (* With 1M hashes and buckets of size 512, assuming buckets are half full,
+     we need around 4000 buckets. So the file that stores the [hash_index]
+     itself can be about, what, 200KB? Maybe up to 1MB? Which is fine?
+     We could add a [Big_node] constructor to split the [hash_index] itself
+     once it gets too big. *)
+
+  (* Return [false] for [0], [true] for [1].
+     If [bit] is outside [string], returns [0] as if it was padded with zeros. *)
+  let get_bit string bit =
+    let char_index = bit / 8 in
+    if char_index >= String.length string then
+      false
+    else
+      let byte = Char.code string.[char_index] in
+      let bit = bit mod 8 in
+      (byte lsr (7 - bit)) land 1 <> 0
+
+  let rec check_prefix ?(from = 0) hash_bin = function
+    | [] ->
+        unit
+    | head :: tail ->
+        if get_bit hash_bin from <> head then
+          failed [ sf "%s is in the wrong bucket" (Hash.hex_of_string hash_bin) ]
+        else
+          check_prefix ~from: (from + 1) hash_bin tail
+
   (* Read the entire hash index and return a single map containing all of it.
      One can expect less than 200 bytes per hash, so 200MB for 1M files.
-     It starts to be too big in memory after 10M files?
-
-     This helper is used by [check], so we warn when we see something weird. *)
+     It starts to be too big in memory after 10M files? *)
   let fetch_all setup
       (hash_index_hash: hash_index hash): (File_path_set.t File_hash_map.t, [> `failed ]) r =
-    let result = ref File_hash_map.empty in
-    let rec gather prefix_rev (hash_index_hash: hash_index hash) =
-      let* hash_index = fetch_or_fail setup hash_index_hash in
-      if Map.Char.is_empty hash_index then (
-        let prefix =
-          prefix_rev
-          |> List.rev
-          |> List.map (String.make 1)
-          |> String.concat ""
-          |> Hash.hex_of_string
-        in
-        warn "found an empty hash index that should just not exist for %s" prefix
-      );
-      list_iter_e (Map.Char.bindings hash_index) @@ function
-      | char, Node node_hash_index_hash ->
-          gather (char :: prefix_rev) node_hash_index_hash
-      | _, Entry { hash; paths } ->
-          result := File_hash_map.add hash paths !result;
-          unit
+    let* hash_index = fetch_or_fail setup hash_index_hash in
+    let rec gather prefix_rev acc (hash_index: hash_index) =
+      match hash_index with
+        | Leaf bucket_hash ->
+            let* bucket = fetch_or_fail setup bucket_hash in
+            list_fold_e acc (File_hash_map.bindings bucket) @@ fun acc (hash, paths) ->
+            (* This helper is used by [check], so we can fail if we see something weird.
+               Otherwise we could assume that hashes appear only in one bucket. *)
+            let* () = check_prefix (Repository.bin_of_hash hash) (List.rev prefix_rev) in
+            if File_hash_map.mem hash acc then
+              failed [ sf "hash %s appears in two buckets" (Repository.hex_of_hash hash) ]
+            else
+              ok (File_hash_map.add hash paths acc)
+        | Node { zero; one } ->
+            let* acc = gather (false :: prefix_rev) acc zero in
+            gather (true :: prefix_rev) acc one
     in
-    let* () = gather [] hash_index_hash in
-    ok !result
-
-  let get_hash_char ~hash_bin ~char_index =
-    if char_index >= String.length hash_bin then
-      (* This should never happen, hashes are too long to have
-         so many entries that we require one level per character.
-         Moreover, even if they weren't too long, the last character
-         will always have exactly one entry, so we'll never need to read it. *)
-      failed [
-        sf "trying to read character %d of hash %s" char_index
-          (Hash.hex_of_string hash_bin);
-      ]
-    else
-      ok hash_bin.[char_index]
+    gather [] File_hash_map.empty hash_index
 
   let get setup (root: root) (hash: Repository.file hash): (File_path_set.t, [> `failed ]) r =
     match root with
       | Empty ->
           ok File_path_set.empty
       | Non_empty root ->
+          let* hash_index = fetch_or_fail setup root.hash_index in
           let hash_bin = Repository.bin_of_hash hash in
-          let rec find (hash_index_hash: hash_index hash) (char_index: int) =
-            let* char = get_hash_char ~hash_bin ~char_index in
-            let* hash_index = fetch_or_fail setup hash_index_hash in
-            match Map.Char.find_opt char hash_index with
-              | None ->
-                  ok File_path_set.empty
-              | Some (Node node_hash_index_hash) ->
-                  find node_hash_index_hash (char_index + 1)
-              | Some (Entry { hash = entry_hash; paths }) ->
-                  if Repository.compare_hashes hash entry_hash = 0 then
-                    ok paths
-                  else
-                    ok File_path_set.empty
+          let rec find bit (hash_index: hash_index) =
+            match hash_index with
+              | Leaf bucket_hash ->
+                  let* bucket = fetch_or_fail setup bucket_hash in
+                  File_hash_map.find_opt hash bucket |> default File_path_set.empty |> ok
+              | Node { zero; one } ->
+                  find (bit + 1) (if get_bit hash_bin bit then zero else one)
           in
-          find root.hash_index 0
+          find 0 hash_index
 
   (* Also returns the old list of paths that were associated to this hash. *)
   let add setup (root: root) (added_file_hash: Repository.file hash)
       (path: Device.file_path): (hash_index hash * File_path_set.t, [> `failed ]) r =
-    let hash_bin = Repository.bin_of_hash added_file_hash in
-    let rec add_to (hash_index: hash_index) char_index =
-      let* char = get_hash_char ~hash_bin ~char_index in
-      let* new_hash_index, old_paths =
-        match Map.Char.find_opt char hash_index with
-          | None ->
-              ok (
-                Map.Char.add char
-                  (Entry { hash = added_file_hash; paths = File_path_set.singleton path })
-                  hash_index,
-                File_path_set.empty
-              )
-          | Some (Node node_hash_index_hash) ->
-              let* node_hash_index = fetch_or_fail setup node_hash_index_hash in
-              let* new_node_hash_index_hash, old_paths =
-                add_to node_hash_index (char_index + 1)
-              in
-              ok (
-                Map.Char.add char (Node new_node_hash_index_hash) hash_index,
-                old_paths
-              )
-          | Some (Entry { hash = entry_hash; paths }) ->
-              let* new_hash_index_node, old_paths =
-                if Repository.compare_hashes entry_hash added_file_hash = 0 then
-                  ok (
-                    Entry {
-                      hash = entry_hash;
-                      paths = File_path_set.add path paths;
-                    },
-                    paths
-                  )
-                else
-                  let rec create_node char_index =
-                    let* existing_entry_char =
-                      get_hash_char ~hash_bin: (Repository.bin_of_hash entry_hash) ~char_index
+    match root with
+      | Empty ->
+          let bucket =
+            File_hash_map.singleton added_file_hash (File_path_set.singleton path)
+          in
+          let* bucket_hash = store_later setup T.hash_index_bucket bucket in
+          let hash_index = Leaf bucket_hash in
+          let* hash_index_hash = store_later setup T.hash_index hash_index in
+          ok (hash_index_hash, File_path_set.empty)
+      | Non_empty root ->
+          let* hash_index = fetch_or_fail setup root.hash_index in
+          let hash_bin = Repository.bin_of_hash added_file_hash in
+          let add_to_bucket bucket =
+            let old_paths =
+              File_hash_map.find_opt added_file_hash bucket
+              |> default File_path_set.empty
+            in
+            let new_paths = File_path_set.add path old_paths in
+            File_hash_map.add added_file_hash new_paths bucket, old_paths
+          in
+          let rec add_to bit (hash_index: hash_index): (hash_index * File_path_set.t, _) r =
+            match hash_index with
+              | Leaf bucket_hash ->
+                  let* bucket = fetch_or_fail setup bucket_hash in
+                  (* One could think that storing the size of each bucket in
+                     the [hash_index] would allow to make the following test
+                     without having to read the bucket, but we'll have to read it
+                     anyway to add the path to it or to split it if it's too big. *)
+                  if File_hash_map.cardinal bucket < max_bucket_size then
+                    (* Bucket has room for more hashes. *)
+                    let new_bucket, old_paths = add_to_bucket bucket in
+                    let* new_bucket_hash = store_later setup T.hash_index_bucket new_bucket in
+                    ok (Leaf new_bucket_hash, old_paths)
+                  else
+                    (* Bucket is too big, split it.
+                       In theory we should split recursively in case one of the two
+                       resulting buckets has 0 entries. But the probability of this
+                       is 1/2^max_bucket_size, i.e. very, VERY low. MUCH lower than
+                       the probability of having hash collisions. And even if this
+                       happens, nothing will break anyway. *)
+                    let one, zero =
+                      File_hash_map.partition' bucket @@ fun hash _ ->
+                      get_bit (Repository.bin_of_hash hash) bit
                     in
-                    let* new_entry_char =
-                      get_hash_char ~hash_bin ~char_index
+                    let one, zero, old_paths =
+                      if get_bit hash_bin bit then
+                        let one, old_paths = add_to_bucket one in
+                        one, zero, old_paths
+                      else
+                        let zero, old_paths = add_to_bucket zero in
+                        one, zero, old_paths
                     in
-                    if Char.equal existing_entry_char new_entry_char then
-                      let* new_sub_node = create_node (char_index + 1) in
-                      let* new_sub_node_hash_index_hash =
-                        store_later setup T.hash_index (
-                          Map.Char.singleton existing_entry_char new_sub_node
-                        )
-                      in
-                      ok (Node new_sub_node_hash_index_hash)
-                    else
-                      let new_node_hash_index =
-                        Map.Char.of_list [
-                          existing_entry_char,
-                          Entry { hash = entry_hash; paths };
-                          new_entry_char,
-                          Entry {
-                            hash = added_file_hash;
-                            paths = File_path_set.singleton path;
-                          };
-                        ]
-                      in
-                      let* new_node_hash_index_hash =
-                        store_later setup T.hash_index new_node_hash_index
-                      in
-                      ok (Node new_node_hash_index_hash)
-                  in
-                  let* new_node = create_node (char_index + 1) in
-                  ok (new_node, File_path_set.empty)
-              in
-              ok (
-                Map.Char.add char new_hash_index_node hash_index,
-                old_paths
-              )
-      in
-      let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
-      ok (new_hash_index_hash, old_paths)
-    in
-    let* hash_index =
-      match root with
-        | Empty ->
-            ok Map.Char.empty
-        | Non_empty root ->
-            fetch_or_fail setup root.hash_index
-    in
-    add_to hash_index 0
+                    let* one_hash = store_later setup T.hash_index_bucket one in
+                    let* zero_hash = store_later setup T.hash_index_bucket zero in
+                    ok (Node { zero = Leaf zero_hash; one = Leaf one_hash }, old_paths)
+              | Node { zero; one } ->
+                  if get_bit hash_bin bit then
+                    let* new_one, old_paths = add_to (bit + 1) one in
+                    ok (Node { zero; one = new_one }, old_paths)
+                  else
+                    let* new_zero, old_paths = add_to (bit + 1) zero in
+                    ok (Node { zero = new_zero; one }, old_paths)
+          in
+          let* new_hash_index, old_paths = add_to 0 hash_index in
+          let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
+          ok (new_hash_index_hash, old_paths)
 
   (* Does not actually store the result so that one can bulk remove. *)
   let remove setup (hash_index: hash_index) (hash: Repository.file hash)
       (path: Device.file_path): (hash_index, [> `failed ]) r =
     let hash_bin = Repository.bin_of_hash hash in
-    let rec remove_from (hash_index: hash_index) char_index: (hash_index, _) r =
-      let* char = get_hash_char ~hash_bin ~char_index in
-      match Map.Char.find_opt char hash_index with
-        | None ->
-            ok hash_index
-        | Some (Entry { hash = entry_hash; paths }) ->
-            if Repository.compare_hashes entry_hash hash <> 0 then
-              ok hash_index
-            else
-              let new_paths = File_path_set.remove path paths in
+    let rec remove_from bit (hash_index: hash_index): (hash_index, _) r =
+      match hash_index with
+        | Leaf bucket_hash ->
+            let* bucket = fetch_or_fail setup bucket_hash in
+            let old_paths =
+              File_hash_map.find_opt hash bucket |> default File_path_set.empty
+            in
+            let new_paths = File_path_set.remove path old_paths in
+            let new_bucket =
               if File_path_set.is_empty new_paths then
-                ok (Map.Char.remove char hash_index)
+                File_hash_map.remove hash bucket
               else
-                ok (Map.Char.add char (Entry { hash; paths = new_paths }) hash_index)
-        | Some (Node node_hash_index_hash) ->
-            let* node_hash_index = fetch_or_fail setup node_hash_index_hash in
-            let* new_node_hash_index = remove_from node_hash_index (char_index + 1) in
-            (* [new_node_hash_index], which is the [char] entry in [hash_index], can be:
-               - empty;
-               - a singleton of a [Node] (that contains several entries);
-               - a singleton of an [Entry];
-               - a map with at least 2 items.
-               So there are several cases:
-               - (A) if it is empty, we can remove it from [hash_index] completely;
-               - (B) if it contains several entries (i.e. it is either a singleton with
-                 a [Node], or it contains at least 2 items), we keep it as is;
-               - (C) if it only contains one [Entry], we can put it in [hash_index]
-                 as an [Entry] instead of a [Node]. *)
-            match Map.Char.choose_opt new_node_hash_index with
-              | None ->
-                  (* [new_node_hash_index] is empty, remove the node from [hash_index]. *)
-                  ok (Map.Char.remove char hash_index)
-              | Some (sub_char, (Entry _ as entry))
-                when Map.Char.is_empty (Map.Char.remove sub_char new_node_hash_index) ->
-                  (* [new_node_hash_index] contains only 1 entry,
-                     replace the entry in [hash_index] by an [Entry] instead of a [Node]. *)
-                  ok (Map.Char.add char entry hash_index)
-              | _ ->
-                  (* [new_node_hash_index] contains at least 2 entries,
-                     replace the entry in [hash_index], keeping a [Node]. *)
-                  let* new_node_hash_index_hash =
-                    store_later setup T.hash_index new_node_hash_index
-                  in
-                  ok (Map.Char.add char (Node new_node_hash_index_hash) hash_index)
+                File_hash_map.add hash new_paths bucket
+            in
+            (* TODO: if bucket becomes too small, merge it with its neighbor, if any. *)
+            let* new_bucket_hash = store_later setup T.hash_index_bucket new_bucket in
+            ok (Leaf new_bucket_hash)
+        | Node { zero; one } ->
+            if get_bit hash_bin bit then
+              let* new_one = remove_from (bit + 1) one in
+              ok (Node { zero; one = new_one })
+            else
+              let* new_zero = remove_from (bit + 1) zero in
+              ok (Node { zero = new_zero; one })
     in
-    remove_from hash_index 0
+    remove_from 0 hash_index
 
 end
 

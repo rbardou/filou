@@ -1053,7 +1053,7 @@ $ explore .filou/root
     command = "push .";
     root = { Non_empty = {
         root_dir = 007c9212426b740dce1ff2dc928dbc82db8511c4c0c1c5dd4d2f3e65b73be132;
-        hash_index = 8da8b0b911f9d204d5d2689a6cee52d75cc675b796f75591cbf00b05fea29122;
+        hash_index = 46831df2ca355f99357e3999efa937cad647f50b7d99478a610385a59923a700;
       } };
   };
   undo = [
@@ -1065,49 +1065,49 @@ $ explore .filou/root
       command = "push .";
       root = { Non_empty = {
           root_dir = 81adb4bfe41aa789a9a05dc3079c49925b515c60866ee6accd633bb35254f5fd;
-          hash_index = 26a801b7de664701c733f09f40d32bd4631a9ebffc92f7f84e8ea5a0a3249925;
+          hash_index = 46831df2ca355f99357e3999efa937cad647f50b7d99478a610385a59923a700;
         } };
     };
     {
       command = "rm -r bla";
       root = { Non_empty = {
           root_dir = afa9eb8561076bab703034baa3109e6b6e8b71a2454c2732fd1f0e74396aa5eb;
-          hash_index = 74a3d894e4f795eb8c757c195af48983825c0a4ead0c5fd2f9450ca091c0deb8;
+          hash_index = 71c76ec04127dcc65e9fefe5c7dbd32757c075c1c092aaf949e8e91a33bc53d4;
         } };
     };
     {
       command = "push .";
       root = { Non_empty = {
           root_dir = 81adb4bfe41aa789a9a05dc3079c49925b515c60866ee6accd633bb35254f5fd;
-          hash_index = 26a801b7de664701c733f09f40d32bd4631a9ebffc92f7f84e8ea5a0a3249925;
+          hash_index = 46831df2ca355f99357e3999efa937cad647f50b7d99478a610385a59923a700;
         } };
     };
     {
       command = "rm -r plif bla/bli";
       root = { Non_empty = {
           root_dir = 469eff2ee35d5d1b991fbe2d2bf279d1236ddc84405c207b6fcebc5a0c287e61;
-          hash_index = 9eb9d8ab11a0ccc345771198cdd8490d1d03f68d5f2ea0f0ad49663bb2805584;
+          hash_index = 324b176748a4ef6286ac87621afa2f24c257cd7b23de15fb4a12b4d97005a750;
         } };
     };
     {
       command = "push .";
       root = { Non_empty = {
           root_dir = 81adb4bfe41aa789a9a05dc3079c49925b515c60866ee6accd633bb35254f5fd;
-          hash_index = 26a801b7de664701c733f09f40d32bd4631a9ebffc92f7f84e8ea5a0a3249925;
+          hash_index = 46831df2ca355f99357e3999efa937cad647f50b7d99478a610385a59923a700;
         } };
     };
     {
       command = "rm plif bla/bli/plouf bla/blo/plouf";
       root = { Non_empty = {
           root_dir = 42c841776df006f78a7c940a01c56be7e68120afdf1cb4e13fdcc82f69c85ab3;
-          hash_index = 7d2db1d6f97dabe64bc8ba4c2b70801170927d7b1ae13dd3e71b67612fa3426b;
+          hash_index = 566b95752137b8a34b3c8fe53e3b9b39d3f60fddc84236a997edc549f4887ab4;
         } };
     };
     {
       command = "push .";
       root = { Non_empty = {
           root_dir = 007c9212426b740dce1ff2dc928dbc82db8511c4c0c1c5dd4d2f3e65b73be132;
-          hash_index = 8da8b0b911f9d204d5d2689a6cee52d75cc675b796f75591cbf00b05fea29122;
+          hash_index = 46831df2ca355f99357e3999efa937cad647f50b7d99478a610385a59923a700;
         } };
     };
     {
@@ -1118,63 +1118,63 @@ $ explore .filou/root
       command = "rm bla/bli/plouf";
       root = { Non_empty = {
           root_dir = 4b98dde17a215f75717d1960d313fc4b4ccac3c5a47eae7a0931a86ba750d1c1;
-          hash_index = bc76219d52716390aec4a3d61499bc4f90bcd00e7bdda3b50889e5683819db12;
+          hash_index = 74ea856db6e97f22875e26ce77885a4c77b4172fd85fa9414284e2dff572d72b;
         } };
     };
     {
       command = "rm titi toto tutu";
       root = { Non_empty = {
           root_dir = 41292f5a3b1b4b8277cba8848d00e65996af15cd7321b881529fee68b2d1f1f6;
-          hash_index = 62d5dc143bbd2561718da5537a29dca78b2313f77b967a190de6027e5c903ae2;
+          hash_index = 1506e1b1a63e72fc6106feac94ec2cbdd8725210fed592b768cb21ba84fbc250;
         } };
     };
     {
       command = "rm plif";
       root = { Non_empty = {
           root_dir = cefe8a18e9963d8120074c75c3ba057ea0458a049ced1bb6400472dea2a1a3ae;
-          hash_index = cec7345e6d677d37c90ffeb6ca331a76e64d44fa885523e2cbfb0d0418f9c28f;
+          hash_index = 53ac1650860f9e1c68432b3273b4e8a4fa40c59e3ef2eea6d164827f8cc50815;
         } };
     };
     {
       command = "push .";
       root = { Non_empty = {
           root_dir = 81adb4bfe41aa789a9a05dc3079c49925b515c60866ee6accd633bb35254f5fd;
-          hash_index = 26a801b7de664701c733f09f40d32bd4631a9ebffc92f7f84e8ea5a0a3249925;
+          hash_index = 46831df2ca355f99357e3999efa937cad647f50b7d99478a610385a59923a700;
         } };
     };
     {
       command = "push bla/bli/plouf bla/blo/plouf";
       root = { Non_empty = {
           root_dir = cefe8a18e9963d8120074c75c3ba057ea0458a049ced1bb6400472dea2a1a3ae;
-          hash_index = cec7345e6d677d37c90ffeb6ca331a76e64d44fa885523e2cbfb0d0418f9c28f;
+          hash_index = 53ac1650860f9e1c68432b3273b4e8a4fa40c59e3ef2eea6d164827f8cc50815;
         } };
     };
     {
       command = "push bla/bli/plouf bla/blo/plouf";
       root = { Non_empty = {
           root_dir = cefe8a18e9963d8120074c75c3ba057ea0458a049ced1bb6400472dea2a1a3ae;
-          hash_index = cec7345e6d677d37c90ffeb6ca331a76e64d44fa885523e2cbfb0d0418f9c28f;
+          hash_index = 53ac1650860f9e1c68432b3273b4e8a4fa40c59e3ef2eea6d164827f8cc50815;
         } };
     };
     {
       command = "push tutu titi";
       root = { Non_empty = {
           root_dir = 01511eeeeccce49cac2576bdabeb3e55176ed4ef40d07a21906b212ba3df8155;
-          hash_index = 7d2db1d6f97dabe64bc8ba4c2b70801170927d7b1ae13dd3e71b67612fa3426b;
+          hash_index = 566b95752137b8a34b3c8fe53e3b9b39d3f60fddc84236a997edc549f4887ab4;
         } };
     };
     {
       command = "push .";
       root = { Non_empty = {
           root_dir = 6c7bb05f1e31d03e8305898fac7905ca0d1c5df9ade2685765fd9a5c803df2bb;
-          hash_index = e9d428f2d4f8335fb58ec193a4eace34ee9d2c189513b8a71308f4c003d543d3;
+          hash_index = 44c405d44c55baa8a1bf6dc91240d52108a8c91dc4d987ab6f672103c01e9281;
         } };
     };
     {
       command = "push toto";
       root = { Non_empty = {
           root_dir = 6c7bb05f1e31d03e8305898fac7905ca0d1c5df9ade2685765fd9a5c803df2bb;
-          hash_index = e9d428f2d4f8335fb58ec193a4eace34ee9d2c189513b8a71308f4c003d543d3;
+          hash_index = 44c405d44c55baa8a1bf6dc91240d52108a8c91dc4d987ab6f672103c01e9281;
         } };
     };
     {
@@ -1195,7 +1195,7 @@ Computing reachable object set...
 Copied 0 objects.
 Clone is up-to-date.
 $ rm .filou/00/7c/007c9212426b740dce1ff2dc928dbc82db8511c4c0c1c5dd4d2f3e65b73be132
-$ rm .filou/8d/a8/8da8b0b911f9d204d5d2689a6cee52d75cc675b796f75591cbf00b05fea29122
+$ rm .filou/46/83/46831df2ca355f99357e3999efa937cad647f50b7d99478a610385a59923a700
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color update
 Computing reachable object set...
@@ -1228,7 +1228,7 @@ $ tree -a -s -F
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color update
 Computing reachable object set...
-Copied 26 objects.
+Copied 33 objects.
 Clone is up-to-date.
 $ cd /tmp/filou-test/clone
 $ tree -a -s -F
@@ -1245,16 +1245,30 @@ $ tree -a -s -F
 │   ├── [       4096]  01/
 │   │   └── [       4096]  51/
 │   │       └── [        183]  01511eeeeccce49cac2576bdabeb3e55176ed4ef40d07a21906b212ba3df8155
-│   ├── [       4096]  26/
-│   │   └── [       4096]  a8/
-│   │       └── [        361]  26a801b7de664701c733f09f40d32bd4631a9ebffc92f7f84e8ea5a0a3249925
+│   ├── [       4096]  07/
+│   │   └── [       4096]  86/
+│   │       └── [         87]  07866657909a05f003d5fe28188ba666491760f32045446be92098d6170ab33c
+│   ├── [       4096]  13/
+│   │   └── [       4096]  3e/
+│   │       └── [        216]  133ef8a038b5757b940c44d5c79bad41a5577b415ba9b878ab4cb0a6689c583d
+│   ├── [       4096]  15/
+│   │   └── [       4096]  06/
+│   │       └── [         55]  1506e1b1a63e72fc6106feac94ec2cbdd8725210fed592b768cb21ba84fbc250
+│   ├── [       4096]  32/
+│   │   └── [       4096]  4b/
+│   │       └── [         55]  324b176748a4ef6286ac87621afa2f24c257cd7b23de15fb4a12b4d97005a750
 │   ├── [       4096]  41/
 │   │   └── [       4096]  29/
 │   │       └── [         97]  41292f5a3b1b4b8277cba8848d00e65996af15cd7321b881529fee68b2d1f1f6
 │   ├── [       4096]  42/
 │   │   └── [       4096]  c8/
 │   │       └── [        183]  42c841776df006f78a7c940a01c56be7e68120afdf1cb4e13fdcc82f69c85ab3
+│   ├── [       4096]  44/
+│   │   └── [       4096]  c4/
+│   │       └── [         55]  44c405d44c55baa8a1bf6dc91240d52108a8c91dc4d987ab6f672103c01e9281
 │   ├── [       4096]  46/
+│   │   ├── [       4096]  83/
+│   │   │   └── [         55]  46831df2ca355f99357e3999efa937cad647f50b7d99478a610385a59923a700
 │   │   └── [       4096]  9e/
 │   │       └── [        247]  469eff2ee35d5d1b991fbe2d2bf279d1236ddc84405c207b6fcebc5a0c287e61
 │   ├── [       4096]  49/
@@ -1266,64 +1280,71 @@ $ tree -a -s -F
 │   ├── [       4096]  4b/
 │   │   └── [       4096]  98/
 │   │       └── [         96]  4b98dde17a215f75717d1960d313fc4b4ccac3c5a47eae7a0931a86ba750d1c1
-│   ├── [       4096]  62/
-│   │   └── [       4096]  d5/
-│   │       └── [        184]  62d5dc143bbd2561718da5537a29dca78b2313f77b967a190de6027e5c903ae2
+│   ├── [       4096]  4d/
+│   │   └── [       4096]  55/
+│   │       └── [        228]  4d559a9f33a79562534cf0aa7d8e196321e5fbe8d35899df589b8f09f9ab1233
+│   ├── [       4096]  53/
+│   │   └── [       4096]  ac/
+│   │       └── [         55]  53ac1650860f9e1c68432b3273b4e8a4fa40c59e3ef2eea6d164827f8cc50815
+│   ├── [       4096]  56/
+│   │   └── [       4096]  6b/
+│   │       └── [         55]  566b95752137b8a34b3c8fe53e3b9b39d3f60fddc84236a997edc549f4887ab4
 │   ├── [       4096]  6c/
 │   │   └── [       4096]  7b/
 │   │       └── [         87]  6c7bb05f1e31d03e8305898fac7905ca0d1c5df9ade2685765fd9a5c803df2bb
+│   ├── [       4096]  71/
+│   │   └── [       4096]  c7/
+│   │       └── [         55]  71c76ec04127dcc65e9fefe5c7dbd32757c075c1c092aaf949e8e91a33bc53d4
+│   ├── [       4096]  72/
+│   │   └── [       4096]  a4/
+│   │       └── [        169]  72a4850ec444542fe6d765961a9e0efcfe47ba5b94347e1236af1edce9d52e66
 │   ├── [       4096]  74/
-│   │   └── [       4096]  a3/
-│   │       └── [        273]  74a3d894e4f795eb8c757c195af48983825c0a4ead0c5fd2f9450ca091c0deb8
-│   ├── [       4096]  7d/
-│   │   └── [       4096]  2d/
-│   │       └── [        216]  7d2db1d6f97dabe64bc8ba4c2b70801170927d7b1ae13dd3e71b67612fa3426b
+│   │   └── [       4096]  ea/
+│   │       └── [         55]  74ea856db6e97f22875e26ce77885a4c77b4172fd85fa9414284e2dff572d72b
 │   ├── [       4096]  81/
 │   │   └── [       4096]  ad/
 │   │       └── [        297]  81adb4bfe41aa789a9a05dc3079c49925b515c60866ee6accd633bb35254f5fd
 │   ├── [       4096]  89/
 │   │   └── [       4096]  a8/
 │   │       └── [         88]  89a8d8fe98958200025991c7e91cf190915e217f5c2165b8d0215cbcd11dba56
-│   ├── [       4096]  8d/
-│   │   └── [       4096]  a8/
-│   │       └── [        361]  8da8b0b911f9d204d5d2689a6cee52d75cc675b796f75591cbf00b05fea29122
+│   ├── [       4096]  95/
+│   │   └── [       4096]  c7/
+│   │       └── [         75]  95c79518fe43b0eb0b36ca97dbd66f494da7392f49c0f18a92d902b1c345bd21
 │   ├── [       4096]  97/
 │   │   └── [       4096]  3f/
 │   │       └── [         88]  973fadf617f27d59ab3cede722310e1a7b9c191ca188d58e65c9d955e3c6f901
 │   ├── [       4096]  9b/
 │   │   └── [       4096]  72/
 │   │       └── [         96]  9b728004118565346eafe5b5fc882e60c0c0edba09d95b42a5556d6604bc82e6
-│   ├── [       4096]  9e/
-│   │   └── [       4096]  b9/
-│   │       └── [        285]  9eb9d8ab11a0ccc345771198cdd8490d1d03f68d5f2ea0f0ad49663bb2805584
 │   ├── [       4096]  af/
 │   │   └── [       4096]  a9/
 │   │       └── [        231]  afa9eb8561076bab703034baa3109e6b6e8b71a2454c2732fd1f0e74396aa5eb
-│   ├── [       4096]  bc/
-│   │   └── [       4096]  76/
-│   │       └── [        116]  bc76219d52716390aec4a3d61499bc4f90bcd00e7bdda3b50889e5683819db12
 │   ├── [       4096]  ca/
 │   │   └── [       4096]  e8/
 │   │       └── [        146]  cae86e802cd0940a86f153c30ac718678539004f90c928cb58d1714519076156
 │   ├── [       4096]  cb/
 │   │   └── [       4096]  1d/
 │   │       └── [         88]  cb1d78e51ff06c0d65cc17bf9cb86b39a1581aa64436fbd72c2f625607996d59
+│   ├── [       4096]  cd/
+│   │   └── [       4096]  7e/
+│   │       └── [        289]  cd7e56f88600700621e6b81f55e70f59eef827e5a8ae80404fac0db0283e01a2
 │   ├── [       4096]  ce/
-│   │   ├── [       4096]  c7/
-│   │   │   └── [        354]  cec7345e6d677d37c90ffeb6ca331a76e64d44fa885523e2cbfb0d0418f9c28f
 │   │   └── [       4096]  fe/
 │   │       └── [        248]  cefe8a18e9963d8120074c75c3ba057ea0458a049ced1bb6400472dea2a1a3ae
 │   ├── [         44]  config
-│   ├── [       4096]  e9/
-│   │   └── [       4096]  d4/
-│   │       └── [        104]  e9d428f2d4f8335fb58ec193a4eace34ee9d2c189513b8a71308f4c003d543d3
+│   ├── [       4096]  ee/
+│   │   └── [       4096]  2b/
+│   │       └── [        296]  ee2b6c2a30a1adc33b57e20b82787ef9f2e659ef0a59a8333fd21f144982ed21
+│   ├── [       4096]  fd/
+│   │   └── [       4096]  8c/
+│   │       └── [        146]  fd8c05b76fa28501d543c9a2a8db8a056879754993f597298d19f548ece8e53a
 │   └── [       1758]  root
 ├── [          4]  plif
 ├── [          6]  titi
 ├── [          9]  toto
 └── [          3]  tutu
 
-55 directories, 34 files
+69 directories, 41 files
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check --cache
 Directory structure looks ok (total size: 30, file count: 6).
@@ -1586,7 +1607,7 @@ $ main.exe --no-color tree
 # Check what prune removes.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color prune --yes
-Removed 46 objects totalling 8.52 kB.
+Removed 56 objects totalling 7.55 kB.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 30, file count: 6).
@@ -1668,7 +1689,7 @@ $ tree -a -s -F
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color update
 Computing reachable object set...
-Copied 2 objects.
+Copied 3 objects.
 Clone is up-to-date.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
@@ -1680,17 +1701,19 @@ $ main.exe --no-color push bla/bli
 Pushed: bla/bli/truc
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color prune --yes
-Removed 8 objects totalling 1.78 kB.
+Removed 10 objects totalling 1.76 kB.
 # Clone: some objects should have been removed, no files should have been added:
 - /tmp/filou-test/clone/.filou/00/7c/007c9212426b740dce1ff2dc928dbc82db8511c4c0c1c5dd4d2f3e65b73be132
-- /tmp/filou-test/clone/.filou/26/a8/26a801b7de664701c733f09f40d32bd4631a9ebffc92f7f84e8ea5a0a3249925
+- /tmp/filou-test/clone/.filou/46/83/46831df2ca355f99357e3999efa937cad647f50b7d99478a610385a59923a700
 - /tmp/filou-test/clone/.filou/4a/8b/4a8bb7d8f6cfa4003d385366f04f6abacd3baf5858e63bcee288cebc3fbd7f62
 - /tmp/filou-test/clone/.filou/89/a8/89a8d8fe98958200025991c7e91cf190915e217f5c2165b8d0215cbcd11dba56
+- /tmp/filou-test/clone/.filou/ee/2b/ee2b6c2a30a1adc33b57e20b82787ef9f2e659ef0a59a8333fd21f144982ed21
 # Main: should be the same diff:
 - /tmp/filou-test/main/00/7c/007c9212426b740dce1ff2dc928dbc82db8511c4c0c1c5dd4d2f3e65b73be132
-- /tmp/filou-test/main/26/a8/26a801b7de664701c733f09f40d32bd4631a9ebffc92f7f84e8ea5a0a3249925
+- /tmp/filou-test/main/46/83/46831df2ca355f99357e3999efa937cad647f50b7d99478a610385a59923a700
 - /tmp/filou-test/main/4a/8b/4a8bb7d8f6cfa4003d385366f04f6abacd3baf5858e63bcee288cebc3fbd7f62
 - /tmp/filou-test/main/89/a8/89a8d8fe98958200025991c7e91cf190915e217f5c2165b8d0215cbcd11dba56
+- /tmp/filou-test/main/ee/2b/ee2b6c2a30a1adc33b57e20b82787ef9f2e659ef0a59a8333fd21f144982ed21
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 44, file count: 7).
@@ -1711,8 +1734,20 @@ $ main.exe --no-color tree
 └── tutu
 # Check that if some files are missing from the cache, they are not added.
 $ cd /tmp/filou-test/clone
+$ explore .filou/root
+{
+  redo = [];
+  head = {
+    command = "push bla/bli";
+    root = { Non_empty = {
+        root_dir = 39118085023aa55cbc027c086cd4797bb56f2e228b341369b2632d780d8df56a;
+        hash_index = 6b4683747aceabd8059900b8e11dd214047bd9ebaa9bf73a77b5e7740e8f1e07;
+      } };
+  };
+  undo = [];
+}
 $ rm .filou/39/11/39118085023aa55cbc027c086cd4797bb56f2e228b341369b2632d780d8df56a
-$ rm .filou/5a/10/5a10cd2da9ce92f68357816df9a56d15675c331b98fe56739080e79d7f5b0e3a
+$ rm .filou/6b/46/6b4683747aceabd8059900b8e11dd214047bd9ebaa9bf73a77b5e7740e8f1e07
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color prune --yes
 Removed 0 objects totalling 0 B.
