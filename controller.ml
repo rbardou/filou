@@ -537,6 +537,8 @@ let tree ~color ~max_depth ~only_main ~only_dirs
               print_string "-- "
           | `dir_not_pushed | `file_not_pushed ->
               print_string "++ "
+          | `file_differs ->
+              print_string "≠≠ "
       )
     in
     let print_prefix_and_filename kind =
@@ -549,6 +551,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
           | `file -> false
           | `file_not_pulled -> print_string "\027[33m"; true
           | `file_not_pushed -> print_string "\027[31m"; true
+          | `file_differs -> print_string "\027[35m"; true
           | `inconsistent -> print_string "\027[1m\027[35m"; true
       in
       print_string (
@@ -559,7 +562,8 @@ let tree ~color ~max_depth ~only_main ~only_dirs
               match kind, full_dir_paths with
                 | (`dir | `dir_not_pulled | `dir_not_pushed), true ->
                     Device.show_file_path (dir_path, filename)
-                | (`file | `file_not_pulled | `file_not_pushed | `inconsistent), true
+                | (`file | `file_not_pulled | `file_not_pushed |
+                   `file_differs | `inconsistent), true
                 | _, false ->
                     Path.Filename.show filename
       );
@@ -567,7 +571,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
       match kind with
         | `dir | `dir_not_pulled | `dir_not_pushed ->
             print_char '/'
-        | `file | `file_not_pulled | `file_not_pushed ->
+        | `file | `file_not_pulled | `file_not_pushed | `file_differs ->
             ()
         | `inconsistent ->
             print_char '?'
@@ -665,7 +669,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
               )
             else
               (
-                print_prefix_and_filename `inconsistent;
+                print_prefix_and_filename `file_differs;
                 print_newline ();
                 unit
               )

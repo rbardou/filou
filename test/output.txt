@@ -1785,3 +1785,32 @@ Removed 1 objects totalling 12 B.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
 -->  0 push bla/bli
+# Push a file, remove it and re-push it from another clone.
+$ rm -r -f /tmp/filou-test/main
+$ rm -r -f /tmp/filou-test/clone
+$ main.exe --no-color init /tmp/filou-test/main
+$ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
+Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone/
+$ cd /tmp/filou-test/clone
+$ echo 'contents of bla first version' > bla
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push
+Pushed: bla
+$ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone2
+Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone2/
+$ cd /tmp/filou-test/clone2
+$ cd /tmp/filou-test/clone2
+$ main.exe --no-color rm bla
+$ echo 'contents of bla second version' > bla
+$ cd /tmp/filou-test/clone2
+$ main.exe --no-color push
+Pushed: bla
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+└≠≠ bla
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 30, file count: 1).
+All files are available.
+Hash index is consistent with the directory structure.

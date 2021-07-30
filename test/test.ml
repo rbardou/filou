@@ -43,6 +43,13 @@ let clone =
     ~placeholder: "PATH"
     "/tmp/filou-test/clone"
 
+let clone2 =
+  Clap.default_string
+    ~long: "clone2"
+    ~description: "Where to put the second clone repository."
+    ~placeholder: "PATH"
+    "/tmp/filou-test/clone2"
+
 let () =
   Clap.close ()
 
@@ -223,10 +230,18 @@ struct
 
   let config ?v ?dry_run ?color ?main () =
     run ?v ?dry_run ?color ("config" :: list_of_option ~name: "--main" main)
+
+  let show ?v ?dry_run ?color ?what ?r () =
+    run ?v ?dry_run ?color (
+      "show" ::
+      list_of_option what @
+      list_of_option ~name: "-r" (Option.map string_of_int r)
+    )
 end
 
 module Main = Make_filou (struct let path = Some main end)
 module Clone = Make_filou (struct let path = Some clone end)
+module Clone2 = Make_filou (struct let path = Some clone2 end)
 module Filou = Make_filou (struct let path = None end)
 
 let tree () = cmd "tree" [ "-a"; "-s"; "-F" ]
@@ -634,6 +649,22 @@ let small_repo () =
   comment "Main: diff should be empty:";
   diff_string_sets main_files_1 main_files_2;
   Clone.log ();
+
+  comment "Push a file, remove it and re-push it from another clone.";
+  rm_rf main;
+  rm_rf clone;
+  Filou.init ~main ();
+  Filou.clone ~main ~clone ();
+  cd clone;
+  create_file "bla" "contents of bla first version";
+  Clone.push [];
+  Filou.clone ~main ~clone: clone2 ();
+  cd clone2;
+  Clone2.rm [ "bla" ];
+  create_file "bla" "contents of bla second version";
+  Clone2.push [];
+  Clone.tree ();
+  Clone.check ();
   ()
 
 let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
