@@ -1814,3 +1814,57 @@ $ main.exe --no-color check
 Directory structure looks ok (total size: 30, file count: 1).
 All files are available.
 Hash index is consistent with the directory structure.
+# Test the show command with large recursivity.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color show -r 1000
+{
+  redo = [];
+  head = {
+    command = "push .";
+    root = { Non_empty = {
+        root_dir = 9b16d0e119eb143dafb4c90c042945a8879e7588c3de6d437836124f665aee0f =
+        [ { File = {
+              name = "bla";
+              hash = 20580e3e285f773043630dc3218e4d40339c4e353093c680d54136b5fffcddfa =
+              "";
+              size = 30;
+            } } ];
+        hash_index = 712236a0e9b77d07c859b9a19cb4362b0ff843d3d757111de364d370c1eab2fc =
+        { Leaf = b9b9a5da6f39564e5649d3d21cc363b100f7f1862ba5f8d197f814752e03c540 =
+          [ {
+              hash = 20580e3e285f773043630dc3218e4d40339c4e353093c680d54136b5fffcddfa =
+              "";
+              paths = [ [ "bla" ] ];
+            } ] };
+      } };
+  };
+  undo = [
+    {
+      command = "rm bla";
+      root = 31 (Empty);
+    };
+    {
+      command = "push .";
+      root = { Non_empty = {
+          root_dir = c6926b83b3b7dc996fd820a34432a8ef4d02bf11ec58f63ed9fdb3a10e6b2770 =
+          [ { File = {
+                name = "bla";
+                hash = 20d3840f86a24fa8883fa9be2c7f9018850bd1855993a300fd6d5572a25bc568 =
+                "";
+                size = 29;
+              } } ];
+          hash_index = cd4318d2beb1da2b1096e80eb5170e4fb420a5a6d2f2608ccb5e6483c8938270 =
+          { Leaf = 8284451c46d60597646aad29e28515336418c999ddb583bfdd3da8860530ddb2 =
+            [ {
+                hash = 20d3840f86a24fa8883fa9be2c7f9018850bd1855993a300fd6d5572a25bc568 =
+                "";
+                paths = [ [ "bla" ] ];
+              } ] };
+        } };
+    };
+    {
+      command = "init";
+      root = 31 (Empty);
+    };
+  ];
+}

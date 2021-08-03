@@ -665,6 +665,9 @@ let small_repo () =
   Clone2.push [];
   Clone.tree ();
   Clone.check ();
+
+  comment "Test the show command with large recursivity.";
+  Clone.show ~r: 1000 ();
   ()
 
 let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
