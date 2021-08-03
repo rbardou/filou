@@ -21,12 +21,12 @@ let main () =
   in
   let color =
     Clap.flag
-      ~description: "Use ANSI escape codes to colorize logs."
+      ~description: "Use ANSI escape codes to colorize logs and display progress."
       ~set_long: "color"
       ~unset_long: "no-color"
       true
   in
-  if not color then Progress_bar.not_a_tty ();
+  if not color then Prout.not_a_tty ();
   let command =
     let tree_or_ls_args command =
       let max_depth =

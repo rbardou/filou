@@ -6,6 +6,10 @@ let protocol_version = 0xF1100
 
 include Mysc
 
+(* We don't want to use [echo] but [Prout.echo]. *)
+type do_not_use = Do_not_use
+let echo = Do_not_use
+
 module Path = Typath.UNIX
 
 let (//) = Path.concat
@@ -82,7 +86,7 @@ let decode_robin_string typ string =
     | Error error ->
         failed [ Protype_robin.Decode.show_error error ]
 
-let warn x = Printf.ksprintf (echo "Warning: %s") x
+let warn x = Printf.ksprintf (Prout.echo "Warning: %s") x
 
 let rec list_take ?(acc = []) n l =
   if n <= 0 then

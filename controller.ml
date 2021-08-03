@@ -16,8 +16,8 @@ let fetch_or_fail setup hash =
     | OK _ as x ->
         x
 
-let on_copy_progress progress prefix ~bytes ~size =
-  progress (fun () -> sf "%s (%d / %d) (%d%%)" prefix bytes size (bytes * 100 / size))
+let on_copy_progress prefix ~bytes ~size =
+  Prout.minor (fun () -> sf "%s (%d / %d) (%d%%)" prefix bytes size (bytes * 100 / size))
 
 let init (location: Device.location) =
   Bare.store_root location {
@@ -36,7 +36,7 @@ let read_clone_config ~clone_location =
   decode_robin_string T.clone_config contents
 
 let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
-  echo "Cloning %s into: %s" (Device.show_location main_location)
+  Prout.echo "Cloning %s into: %s" (Device.show_location main_location)
     (Device.show_location clone_location);
   (* Check that the remote repository is readable. *)
   let* _ = Bare.fetch_root main_location in
@@ -348,15 +348,13 @@ let check ~clone_only ~hash setup =
           let files = match x with `metadata -> false | `all -> true in
           let count = ref 0 in
           let* () =
-            Progress_bar.run ~quiet: false @@ fun progress ->
-            progress ~major: true
-              (fun () -> "Checking hashes: computing the set of reachable objects...");
+            Prout.major_s "Checking hashes: computing the set of reachable objects...";
             let* hashes = Repository.reachable ~files setup in
             let hashes = Repository.Hash_set.elements hashes in
             count := List.length hashes;
             let index = ref 0 in
             let progress () =
-              progress @@ fun () ->
+              Prout.minor @@ fun () ->
               sf "Checking hashes (%d / %d) (%d%%)" !index !count (!index * 100 / !count)
             in
             progress ();
@@ -366,20 +364,21 @@ let check ~clone_only ~hash setup =
             progress ();
             unit
           in
-          echo "No reachable object is corrupted (object count: %d)." !count;
+          Prout.echo "No reachable object is corrupted (object count: %d)." !count;
           unit
   in
   let* root = fetch_root setup in
   match root with
     | Empty ->
-        echo "Repository is empty.";
+        Prout.echo_s "Repository is empty.";
         unit
     | Non_empty root ->
         let expected_hash_index = ref File_hash_map.empty in
         let* size, count = check_dir ~clone_only expected_hash_index setup [] root.root_dir in
         let expected_hash_index = !expected_hash_index in
-        echo "Directory structure looks ok (total size: %d, file count: %d)." size count;
-        echo "All files are available.";
+        Prout.echo "Directory structure looks ok (total size: %d, file count: %d)."
+          size count;
+        Prout.echo_s "All files are available.";
         let* actual_hash_index = Hash_index.fetch_all setup root.hash_index in
         let* () =
           let exception Inconsistent of string in
@@ -414,7 +413,7 @@ let check ~clone_only ~hash setup =
               msg;
             ]
         in
-        echo "Hash index is consistent with the directory structure.";
+        Prout.echo_s "Hash index is consistent with the directory structure.";
         unit
 
 let show_size size =
@@ -855,13 +854,12 @@ let push_file ~verbose (setup: Clone.setup) (root: root)
               ok None
           | None ->
               let* file_hash, file_size =
-                Progress_bar.run ~quiet: false @@ fun progress ->
                 Repository.store_file
                   ~source: (Clone.workdir setup)
                   ~source_path: path
                   ~target: setup
                   ~on_progress: (
-                    on_copy_progress progress ("Pushing: " ^ Device.show_file_path path)
+                    on_copy_progress ("Pushing: " ^ Device.show_file_path path)
                   )
               in
               let dir_entry =
@@ -877,16 +875,16 @@ let push_file ~verbose (setup: Clone.setup) (root: root)
   let* update_result = update_dir [] root_dir dir_path in
   match update_result with
     | None ->
-        if verbose then echo "Already exists: %s" (Device.show_file_path path);
+        if verbose then Prout.echo "Already exists: %s" (Device.show_file_path path);
         ok root
     | Some (new_root_dir_hash, added_file_hash, _, _) ->
         let* new_hash_index_hash, old_paths =
           Hash_index.add setup root added_file_hash path
         in
         if File_path_set.is_empty old_paths then
-          echo "Pushed: %s" (Device.show_file_path path)
+          Prout.echo "Pushed: %s" (Device.show_file_path path)
         else
-          echo "Pushed: %s (duplicate of: %s)" (Device.show_file_path path) (
+          Prout.echo "Pushed: %s (duplicate of: %s)" (Device.show_file_path path) (
             File_path_set.elements old_paths
             |> List.map Device.show_file_path
             |> String.concat ", "
@@ -955,23 +953,23 @@ let pull ~verbose setup (paths: Device.path list) =
                       ]
                   | [] ->
                       match
-                        Progress_bar.run ~quiet: false @@ fun progress ->
                         Repository.fetch_file ~source: setup hash
                           ~target: (Clone.workdir setup)
                           ~target_path
                           ~on_progress: (
-                            on_copy_progress progress
+                            on_copy_progress
                               ("Pulling: " ^ Device.show_file_path target_path)
                           )
                       with
                         | ERROR { code = `already_exists; _ } ->
                             if verbose then
-                              echo "Already exists: %s" (Device.show_file_path target_path);
+                              Prout.echo "Already exists: %s"
+                                (Device.show_file_path target_path);
                             unit
                         | ERROR { code = `failed | `not_available; msg } ->
                             failed msg
                         | OK () ->
-                            echo "Pulled: %s" (Device.show_file_path target_path);
+                            Prout.echo "Pulled: %s" (Device.show_file_path target_path);
                             unit
   in
   let* root = fetch_root setup in
@@ -1138,31 +1136,30 @@ let remove ~recursive setup (paths: Device.path list) =
 
 let update setup =
   let* count =
-    Progress_bar.run ~quiet: false @@ fun progress ->
-    progress ~major: true (fun () -> "Computing reachable object set...");
+    Prout.major_s "Computing reachable object set...";
     let on_availability_check_progress ~checked ~count =
-      progress @@ fun () ->
+      Prout.minor @@ fun () ->
       sf "Checking availability (%d / %d) (%d%%)" checked count (checked * 100 / count)
     in
     let on_copy_progress ~transferred ~count =
-      progress @@ fun () ->
+      Prout.minor @@ fun () ->
       sf "Copying (%d / %d) (%d%%)" transferred count (transferred * 100 / count)
     in
     Repository.update ~on_availability_check_progress ~on_copy_progress setup
   in
-  echo "Copied %d objects." count;
-  echo "Clone is up-to-date.";
+  Prout.echo "Copied %d objects." count;
+  Prout.echo_s "Clone is up-to-date.";
   unit
 
 let print_journal { redo; head; undo } =
   let redo = List.mapi (fun i x -> - i - 1, x) redo in
   (
     List.iter' (List.rev redo) @@ fun (i, { command; _ }) ->
-    echo "    %2d %s" i command;
+    Prout.echo "    %2d %s" i command;
   );
-  echo "-->  0 %s" head.command;
+  Prout.echo "-->  0 %s" head.command;
   List.iteri' undo @@ fun i { command; _ } ->
-  echo "    %2d %s" (i + 1) command
+  Prout.echo "    %2d %s" (i + 1) command
 
 let prune ~yes ~keep_undo ~keep_redo setup =
   let* journal = Repository.fetch_root setup in
@@ -1177,27 +1174,27 @@ let prune ~yes ~keep_undo ~keep_redo setup =
     if yes then
       ok true
     else (
-      echo "/!\\ THIS OPERATION CANNOT BE UNDONE /!\\";
-      echo "After this, the history will look like this:";
-      echo "";
+      Prout.echo_s "/!\\ THIS OPERATION CANNOT BE UNDONE /!\\";
+      Prout.echo_s "After this, the history will look like this:";
+      Prout.echo_s "";
       print_journal new_journal;
-      echo "";
-      echo "Repositories:";
-      echo "";
+      Prout.echo_s "";
+      Prout.echo_s "Repositories:";
+      Prout.echo_s "";
       (
         Option.iter' (Clone.main setup) @@ fun location ->
-        echo "  Main repository: %s" (Device.show_location location);
+        Prout.echo "  Main repository: %s" (Device.show_location location);
       );
-      echo "            Clone: %s" (Device.show_location (Clone.workdir setup));
-      echo "";
-      print_string "Prune main repository and its clone? [y/N] ";
+      Prout.echo "            Clone: %s" (Device.show_location (Clone.workdir setup));
+      Prout.echo "";
+      Prout.print_s "Prune main repository and its clone? [y/N] ";
       flush stdout;
       let response = read_line () in
       match String.lowercase_ascii response with
         | "y" | "yes" ->
             ok true
         | "n" | "no" | "" ->
-            echo "Operation was canceled.";
+            Prout.echo_s "Operation was canceled.";
             ok false
         | _ ->
             failed [ "please answer yes or no" ]
@@ -1208,7 +1205,7 @@ let prune ~yes ~keep_undo ~keep_redo setup =
   else
     let* () = Repository.store_root setup new_journal in
     let* (count, size) = Repository.garbage_collect setup in
-    echo "Removed %d objects totalling %s." count (show_size size);
+    Prout.echo "Removed %d objects totalling %s." count (show_size size);
     unit
 
 let log setup =
@@ -1314,7 +1311,7 @@ let diff ~color setup ~before ~after =
           | `file | `inconsistent -> text_color
           | `dir -> "\027[1m" ^ text_color
       in
-      echo "%s%s %s%s%s"
+      Prout.echo "%s%s %s%s%s"
         (if color then text_color else "")
         (match status with `differs -> "? " | `added -> "+ " | `removed -> "- ")
         (Device.show_path path)
@@ -1360,8 +1357,7 @@ let disk_usage size =
 
 let stats setup =
   let* reachable_count, total_bytes, total_disk_usage =
-    Progress_bar.run ~quiet: false @@ fun progress ->
-    progress ~major: true (fun () -> "Computing the set of reachable objects...");
+    Prout.major_s "Computing the set of reachable objects...";
     let* hashes = Repository.reachable ~files: false setup in
     let hashes = Repository.Hash_set.elements hashes in
     let reachable_count = List.length hashes in
@@ -1370,7 +1366,7 @@ let stats setup =
       list_map_e hashes @@ fun hash ->
       incr index;
       (
-        progress @@ fun () ->
+        Prout.minor @@ fun () ->
         sf "Computing stats... (%d / %d) (%d%%)"
           !index reachable_count (!index * 100 / reachable_count)
       );
@@ -1384,10 +1380,10 @@ let stats setup =
     in
     ok (reachable_count, total_bytes, total_disk_usage)
   in
-  echo "Reachable object count: %d" reachable_count;
-  echo "Total size of reachable objects: %s" (show_size total_bytes);
-  echo "Disk usage of reachable objects: %s" (show_size total_disk_usage);
-  echo "Efficiency (total size / disk usage): %d%%"
+  Prout.echo "Reachable object count: %d" reachable_count;
+  Prout.echo "Total size of reachable objects: %s" (show_size total_bytes);
+  Prout.echo "Disk usage of reachable objects: %s" (show_size total_disk_usage);
+  Prout.echo "Efficiency (total size / disk usage): %d%%"
     (total_bytes * 100 / total_disk_usage);
   unit
 
@@ -1452,7 +1448,7 @@ let show setup obj ~max_depth =
         let* root = Repository.fetch_root setup in
         match root.head.root with
           | Empty ->
-              echo "empty";
+              Prout.echo_s "empty";
               unit
           | Non_empty non_empty_root ->
               let hash =
@@ -1468,8 +1464,8 @@ let config ~mode ~main_location =
   let* clone_location, config = find_local_clone_config mode in
   match main_location with
     | None ->
-        echo "clone repository: %s" (Device.show_location clone_location);
-        echo "main repository: %s" (Device.show_location config.main_location);
+        Prout.echo "clone repository: %s" (Device.show_location clone_location);
+        Prout.echo "main repository: %s" (Device.show_location config.main_location);
         unit
     | Some main_location ->
         write_clone_config ~clone_location { main_location }
