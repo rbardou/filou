@@ -174,11 +174,11 @@ struct
   let clone ?v ?dry_run ?color ?main ?clone () =
     run ?v ?dry_run ?color ("clone" :: list_of_option main @ list_of_option clone)
 
-  let push ?v ?dry_run ?color paths =
-    run ?v ?dry_run ?color ("push" :: paths)
+  let push ?(v = true) ?dry_run ?color paths =
+    run ~v ?dry_run ?color ("push" :: paths)
 
-  let pull ?v ?dry_run ?color paths =
-    run ?v ?dry_run ?color ("pull" :: paths)
+  let pull ?(v = true) ?dry_run ?color paths =
+    run ~v ?dry_run ?color ("pull" :: paths)
 
   let ls ?v ?dry_run ?color ?path () =
     run ?v ?dry_run ?color ("ls" :: list_of_option path)
@@ -717,5 +717,5 @@ let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
 
 let () =
   small_repo ();
-(*   large_repo ~files: 100000 ~dirs: 3000 (); *)
+(*   large_repo ~files: 10000 ~dirs: 3000 (); *)
   ()

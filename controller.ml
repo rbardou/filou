@@ -881,14 +881,16 @@ let push_file ~verbose (setup: Clone.setup) (root: root)
         let* new_hash_index_hash, old_paths =
           Hash_index.add setup root added_file_hash path
         in
-        if File_path_set.is_empty old_paths then
-          Prout.echo "Pushed: %s" (Device.show_file_path path)
-        else
-          Prout.echo "Pushed: %s (duplicate of: %s)" (Device.show_file_path path) (
-            File_path_set.elements old_paths
-            |> List.map Device.show_file_path
-            |> String.concat ", "
-          );
+        if verbose then (
+          if File_path_set.is_empty old_paths then
+            Prout.echo "Pushed: %s" (Device.show_file_path path)
+          else
+            Prout.echo "Pushed: %s (duplicate of: %s)" (Device.show_file_path path) (
+              File_path_set.elements old_paths
+              |> List.map Device.show_file_path
+              |> String.concat ", "
+            );
+        );
         ok (
           Non_empty {
             root_dir = new_root_dir_hash;
@@ -969,7 +971,8 @@ let pull ~verbose setup (paths: Device.path list) =
                         | ERROR { code = `failed | `not_available; msg } ->
                             failed msg
                         | OK () ->
-                            Prout.echo "Pulled: %s" (Device.show_file_path target_path);
+                            if verbose then
+                              Prout.echo "Pulled: %s" (Device.show_file_path target_path);
                             unit
   in
   let* root = fetch_root setup in
