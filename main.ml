@@ -603,12 +603,14 @@ let main () =
           Controller.config ~mode: device_mode ~main_location
   with
     | OK () ->
-        ()
+        Prout.clear_progress ()
     | ERROR { msg; _ } ->
+        Prout.clear_progress ();
         error msg
 
 let () =
   Printexc.record_backtrace true;
   try main () with exn ->
+    Prout.clear_progress ();
     Printexc.print_backtrace stderr;
     error [ "uncaught exception"; Printexc.to_string exn ]

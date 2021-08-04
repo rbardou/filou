@@ -565,6 +565,10 @@ $ main.exe --no-color tree --size --count
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm plif
+Listing files...
+Removing files...
+Storing root...
+Removed 1 files.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 26, file count: 5).
@@ -584,6 +588,10 @@ $ main.exe --no-color tree --size --count
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm titi toto tutu
+Listing files...
+Removing files...
+Storing root...
+Removed 3 files.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 8, file count: 2).
@@ -603,6 +611,10 @@ $ main.exe --no-color tree --size --count
 └++ tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm bla/bli/plouf
+Listing files...
+Removing files...
+Storing root...
+Removed 1 files.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 4, file count: 1).
@@ -621,6 +633,10 @@ $ main.exe --no-color tree --size --count
 └++ tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm bla/blo/plouf
+Listing files...
+Removing files...
+Storing root...
+Removed 1 files.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Repository is empty.
@@ -654,6 +670,10 @@ $ main.exe --no-color tree --size --count
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm plif bla/bli/plouf bla/blo/plouf
+Listing files...
+Removing files...
+Storing root...
+Removed 3 files.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 18, file count: 3).
@@ -694,6 +714,7 @@ $ main.exe --no-color tree --size --count
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm plif bla/bli
+Listing files...
 Error:
   bla/bli is a directory
 Exit code: 1
@@ -716,6 +737,10 @@ $ main.exe --no-color tree --size --count
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm -r plif bla/bli
+Listing files...
+Removing files...
+Storing root...
+Removed 2 files.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 22, file count: 4).
@@ -754,6 +779,10 @@ $ main.exe --no-color tree
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm -r bla
+Listing files...
+Removing files...
+Storing root...
+Removed 2 files.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 22, file count: 4).
@@ -789,6 +818,10 @@ $ main.exe --no-color tree
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm -r .
+Listing files...
+Removing files...
+Storing root...
+Removed 6 files.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Repository is empty.
@@ -1849,6 +1882,10 @@ Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone2/
 $ cd /tmp/filou-test/clone2
 $ cd /tmp/filou-test/clone2
 $ main.exe --no-color rm bla
+Listing files...
+Removing files...
+Storing root...
+Removed 1 files.
 $ echo 'contents of bla second version' > bla
 $ cd /tmp/filou-test/clone2
 $ main.exe -v --no-color push

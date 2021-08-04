@@ -49,6 +49,9 @@ let parse_local_path repository_root string =
                 ^ string
               ]
           | R_some (D path) ->
+              (* TODO: some operations in Controller will use the resulting path
+                 as a file if the file exists; if the user explicitely added a /
+                 at the end, maybe we should fail instead? *)
               device_path_of_path path
           | R_some (F path) ->
               device_path_of_path path

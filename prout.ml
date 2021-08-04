@@ -84,4 +84,5 @@ let clear_progress () =
     print_string "\027[u";
     (* Erase after cursor. *)
     print_string "\027[J";
+    flush stdout;
   )

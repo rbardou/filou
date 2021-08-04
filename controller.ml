@@ -269,17 +269,23 @@ end
 module Dir =
 struct
 
-  type file =
+  type found_file =
     {
       path: Device.file_path;
       hash: Repository.file hash;
       size: int;
     }
 
-  (* List files that [paths] denote: their path, hash and size.
-     If [recursive], if a path is a directory, list its contents recursively.
-     Else, if a path is a directory, fail. *)
-  let list_paths ~recursive setup (root: root) (paths: Device.path list) =
+  type found =
+    | Found_file of found_file
+    | Found_dir of {
+        dir_path_rev: Device.path;
+        dir: dir;
+      }
+
+  (* Convert [paths] to a list of [found].
+     Fail if one of the [paths] do not denote something that exists. *)
+  let find_paths setup (root: root) (paths: Device.path list): (found list, _) r =
     match root, paths with
       | Empty, [] ->
           ok []
@@ -287,34 +293,13 @@ struct
           failed [ "repository is empty" ]
       | Non_empty { root_dir; _ }, _ ->
           let found = ref [] in
-          (* [dir_path_rev] = path of [dir], in reverse order *)
-          let rec list_whole_dir (dir: dir) dir_path_rev =
-            list_iter_e (Filename_map.bindings dir) @@ fun (filename, dir_entry) ->
-            match dir_entry with
-              | File { hash; size } ->
-                  let file =
-                    {
-                      path = (List.rev dir_path_rev, filename);
-                      hash;
-                      size;
-                    }
-                  in
-                  found := file :: !found;
-                  unit
-              | Dir { hash = subdir_hash; _ } ->
-                  let* subdir = fetch_or_fail setup subdir_hash in
-                  list_whole_dir subdir (filename :: dir_path_rev)
-          in
           let rec list_dir (dir_hash: dir hash) dir_path_rev (path: Device.path) =
             let* dir = fetch_or_fail setup dir_hash in
             match path with
               | [] ->
-                  if recursive then
-                    list_whole_dir dir dir_path_rev
-                  else
-                    failed [
-                      sf "%s is a directory" (Device.show_path (List.rev dir_path_rev))
-                    ]
+                  let dir = Found_dir { dir_path_rev; dir } in
+                  found := dir :: !found;
+                  unit
               | head :: tail ->
                   match Filename_map.find_opt head dir, tail with
                     | None, _ ->
@@ -331,7 +316,7 @@ struct
                         ]
                     | Some (File { hash; size }), [] ->
                         let file =
-                          {
+                          Found_file {
                             path = (List.rev dir_path_rev, head);
                             hash;
                             size;
@@ -344,6 +329,55 @@ struct
           in
           let* () = list_iter_e paths (list_dir root_dir []) in
           ok (List.rev !found)
+
+  (* Find [paths] with [find_paths], then iterate on all files that they denote.
+     If not [recursive], fail if a path denotes a directory;
+     else, list the whole directory recursively. *)
+  let find_and_iter_paths ~recursive setup (root: root) (paths: Device.path list)
+      (f: found_file -> (unit, _) r) =
+    (* First, find [paths]. If one doesn't exist we don't want to
+       iterate nor recurse at all, we want to fail early. *)
+    let* found = find_paths setup root paths in
+    (* Then, actually iterate. *)
+    list_iter_e found @@ fun found ->
+    match found with
+      | Found_file file ->
+          f file
+      | Found_dir { dir_path_rev; dir } ->
+          if recursive then
+            (* [dir_path_rev] = path of [dir], in reverse order *)
+            let rec list_whole_dir dir_path_rev (dir: dir) =
+              list_iter_e (Filename_map.bindings dir) @@ fun (filename, dir_entry) ->
+              match dir_entry with
+                | File { hash; size } ->
+                    f {
+                      path = (List.rev dir_path_rev, filename);
+                      hash;
+                      size;
+                    }
+                | Dir { hash = subdir_hash; _ } ->
+                    let* subdir = fetch_or_fail setup subdir_hash in
+                    list_whole_dir (filename :: dir_path_rev) subdir
+            in
+            list_whole_dir dir_path_rev dir
+          else
+            failed [
+              sf "%s is a directory" (Device.show_path (List.rev dir_path_rev))
+            ]
+
+  (* Same as [find_and_iter_paths] but return a list instead of iterating,
+     and display progress. *)
+  let find_and_list_paths ~recursive setup root paths =
+    let count = ref 0 in
+    let list = ref [] in
+    let* () =
+      find_and_iter_paths ~recursive setup root paths @@ fun found_file ->
+      list := found_file :: !list;
+      incr count;
+      Prout.minor (fun () -> sf "Listing files... (%d)" !count);
+      unit
+    in
+    ok (List.rev !list)
 
   type add_result =
     | Already_exists
@@ -1198,15 +1232,29 @@ let remove_file setup (root: root) (path: Device.file_path): (root, _) r =
 
 let remove ~recursive setup (paths: Device.path list) =
   let* root = fetch_root setup in
-  let* file_paths = Dir.list_paths ~recursive setup root paths in
+  Prout.major "Listing files...";
+  let* files_to_remove = Dir.find_and_list_paths ~recursive setup root paths in
+  Prout.major "Removing files...";
+  let count = List.length files_to_remove in
   let* root =
-    list_fold_e root file_paths @@ fun root { path; _ } ->
+    let index = ref 0 in
+    list_fold_e root files_to_remove @@ fun root { path; _ } ->
+    incr index;
+    (
+      Prout.minor @@ fun () ->
+      sf "Removing files... (%d / %d) (%d%%)" !index count (!index * 100 / count)
+    );
     remove_file setup root path
   in
-  store_root setup root @@
-  String.concat " " (
-    "rm" :: (if recursive then [ "-r" ] else []) @ List.map Device.show_path paths
-  )
+  Prout.major "Storing root...";
+  let* () =
+    store_root setup root @@
+    String.concat " " (
+      "rm" :: (if recursive then [ "-r" ] else []) @ List.map Device.show_path paths
+    )
+  in
+  Prout.echo "Removed %d files." count;
+  unit
 
 let update setup =
   let* count =

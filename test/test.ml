@@ -710,7 +710,7 @@ let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
   Clone.tree ();
 
   comment "Push.";
-  (time "push" @@ fun () -> Clone.push []);
+  (time "push" @@ fun () -> Clone.push ~v: false []);
   Clone.check ();
   Clone.stats ~v ();
   ()
