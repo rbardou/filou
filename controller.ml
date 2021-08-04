@@ -266,6 +266,82 @@ struct
 
 end
 
+module Dir =
+struct
+
+  type add_result =
+    | Already_exists
+    | Added of {
+        new_dir_hash: dir hash;
+        added_file_hash: Repository.file hash;
+        added_file_size: int;
+      }
+
+  let add setup (root_dir: dir) ((dir_path, filename): Device.file_path)
+      (get_hash_and_size: unit -> (Repository.file Repository.hash * int, _) r):
+    (add_result, [> `failed ]) r =
+    let rec update_dir dir_path_rev (dir: dir) = function
+      | head :: tail ->
+          let* head_dir, head_dir_total_size, head_dir_total_file_count =
+            match Filename_map.find_opt head dir with
+              | None ->
+                  ok (empty_dir, 0, 0)
+              | Some (File _) ->
+                  failed [
+                    "parent directory already exists as a file: " ^
+                    (Device.show_file_path (List.rev dir_path_rev, head));
+                  ]
+              | Some (Dir { hash = head_dir_hash; total_size; total_file_count }) ->
+                  let* dir = fetch_or_fail setup head_dir_hash in
+                  ok (dir, total_size, total_file_count)
+          in
+          let* update_result =
+            update_dir (head :: dir_path_rev) head_dir tail
+          in
+          (
+            match update_result with
+              | Already_exists ->
+                  ok Already_exists
+              | Added {
+                  new_dir_hash = new_head_dir_hash;
+                  added_file_hash;
+                  added_file_size;
+                } ->
+                  let head_dir_entry =
+                    Dir {
+                      hash = new_head_dir_hash;
+                      total_size = head_dir_total_size + added_file_size;
+                      total_file_count = head_dir_total_file_count + 1;
+                    }
+                  in
+                  let new_dir = Filename_map.add head head_dir_entry dir in
+                  let* new_dir_hash = store_later setup T.dir new_dir in
+                  ok (Added { new_dir_hash; added_file_hash; added_file_size })
+          )
+      | [] ->
+          match Filename_map.find_opt filename dir with
+            | Some (Dir _) ->
+                failed [ "file already exists as a directory" ]
+            | Some (File _) ->
+                (* TODO: check if hashes are the same,
+                   without calling Repository.store_file *)
+                ok Already_exists
+            | None ->
+                let* added_file_hash, added_file_size = get_hash_and_size () in
+                let dir_entry =
+                  File {
+                    hash = added_file_hash;
+                    size = added_file_size;
+                  }
+                in
+                let new_dir = Filename_map.add filename dir_entry dir in
+                let* new_dir_hash = store_later setup T.dir new_dir in
+                ok (Added { new_dir_hash; added_file_hash; added_file_size })
+    in
+    update_dir [] root_dir dir_path
+
+end
+
 (* Recursively check sizes, file counts, and whether reachable files are available. *)
 let rec check_dir ~clone_only expected_hash_index setup
     (path: Device.path) (dir: dir hash) =
@@ -807,77 +883,24 @@ let tree ~color ~max_depth ~only_main ~only_dirs
         in
         print_merged_entry ~last: true head
 
-let push_file ~verbose (setup: Clone.setup) (root: root)
-    (((dir_path, filename) as path): Device.file_path) =
+let push_file ~verbose (setup: Clone.setup) (root: root) (path: Device.file_path) =
   trace ("failed to push file: " ^ Device.show_file_path path) @@
   let* root_dir = fetch_root_dir setup root in
-  let rec update_dir dir_path_rev (dir: dir) = function
-    | head :: tail ->
-        let* head_dir, head_dir_total_size, head_dir_total_file_count =
-          match Filename_map.find_opt head dir with
-            | None ->
-                ok (empty_dir, 0, 0)
-            | Some (File _) ->
-                failed [
-                  "parent directory already exists as a file: " ^
-                  (Device.show_file_path (List.rev dir_path_rev, head));
-                ]
-            | Some (Dir { hash = head_dir_hash; total_size; total_file_count }) ->
-                let* dir = fetch_or_fail setup head_dir_hash in
-                ok (dir, total_size, total_file_count)
-        in
-        let* update_result =
-          update_dir (head :: dir_path_rev) head_dir tail
-        in
-        (
-          match update_result with
-            | None ->
-                ok None
-            | Some (new_head_dir_hash, added_file_hash, size_diff, file_count_diff) ->
-                let head_dir_entry =
-                  Dir {
-                    hash = new_head_dir_hash;
-                    total_size = head_dir_total_size + size_diff;
-                    total_file_count = head_dir_total_file_count + file_count_diff;
-                  }
-                in
-                let new_dir = Filename_map.add head head_dir_entry dir in
-                let* new_dir_hash = store_later setup T.dir new_dir in
-                ok (Some (new_dir_hash, added_file_hash, size_diff, file_count_diff))
-        )
-    | [] ->
-        match Filename_map.find_opt filename dir with
-          | Some (Dir _) ->
-              failed [ "file already exists as a directory" ]
-          | Some (File _) ->
-              (* TODO: check if hashes are the same *)
-              ok None
-          | None ->
-              let* file_hash, file_size =
-                Repository.store_file
-                  ~source: (Clone.workdir setup)
-                  ~source_path: path
-                  ~target: setup
-                  ~on_progress: (
-                    on_copy_progress ("Pushing: " ^ Device.show_file_path path)
-                  )
-              in
-              let dir_entry =
-                File {
-                  hash = file_hash;
-                  size = file_size;
-                }
-              in
-              let new_dir = Filename_map.add filename dir_entry dir in
-              let* new_dir_hash = store_later setup T.dir new_dir in
-              ok (Some (new_dir_hash, file_hash, file_size, 1))
+  let* add_result =
+    Dir.add setup root_dir path @@ fun () ->
+    Repository.store_file
+      ~source: (Clone.workdir setup)
+      ~source_path: path
+      ~target: setup
+      ~on_progress: (
+        on_copy_progress ("Pushing: " ^ Device.show_file_path path)
+      )
   in
-  let* update_result = update_dir [] root_dir dir_path in
-  match update_result with
-    | None ->
+  match add_result with
+    | Already_exists ->
         if verbose then Prout.echo "Already exists: %s" (Device.show_file_path path);
         ok root
-    | Some (new_root_dir_hash, added_file_hash, _, _) ->
+    | Added { new_dir_hash = new_root_dir_hash; added_file_hash; _ } ->
         let* new_hash_index_hash, old_paths =
           Hash_index.add setup root added_file_hash path
         in
