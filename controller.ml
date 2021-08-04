@@ -269,6 +269,82 @@ end
 module Dir =
 struct
 
+  type file =
+    {
+      path: Device.file_path;
+      hash: Repository.file hash;
+      size: int;
+    }
+
+  (* List files that [paths] denote: their path, hash and size.
+     If [recursive], if a path is a directory, list its contents recursively.
+     Else, if a path is a directory, fail. *)
+  let list_paths ~recursive setup (root: root) (paths: Device.path list) =
+    match root, paths with
+      | Empty, [] ->
+          ok []
+      | Empty, _ :: _ ->
+          failed [ "repository is empty" ]
+      | Non_empty { root_dir; _ }, _ ->
+          let found = ref [] in
+          (* [dir_path_rev] = path of [dir], in reverse order *)
+          let rec list_whole_dir (dir: dir) dir_path_rev =
+            list_iter_e (Filename_map.bindings dir) @@ fun (filename, dir_entry) ->
+            match dir_entry with
+              | File { hash; size } ->
+                  let file =
+                    {
+                      path = (List.rev dir_path_rev, filename);
+                      hash;
+                      size;
+                    }
+                  in
+                  found := file :: !found;
+                  unit
+              | Dir { hash = subdir_hash; _ } ->
+                  let* subdir = fetch_or_fail setup subdir_hash in
+                  list_whole_dir subdir (filename :: dir_path_rev)
+          in
+          let rec list_dir (dir_hash: dir hash) dir_path_rev (path: Device.path) =
+            let* dir = fetch_or_fail setup dir_hash in
+            match path with
+              | [] ->
+                  if recursive then
+                    list_whole_dir dir dir_path_rev
+                  else
+                    failed [
+                      sf "%s is a directory" (Device.show_path (List.rev dir_path_rev))
+                    ]
+              | head :: tail ->
+                  match Filename_map.find_opt head dir, tail with
+                    | None, _ ->
+                        failed [
+                          sf "no such file or directory: %s"
+                            (Device.show_path (List.rev dir_path_rev @ path));
+                        ]
+                    | Some (File _), _ :: _ ->
+                        failed [
+                          sf "no such file or directory: %s"
+                            (Device.show_path (List.rev dir_path_rev @ path));
+                          sf "%s is a file"
+                            (Device.show_file_path (List.rev dir_path_rev, head));
+                        ]
+                    | Some (File { hash; size }), [] ->
+                        let file =
+                          {
+                            path = (List.rev dir_path_rev, head);
+                            hash;
+                            size;
+                          }
+                        in
+                        found := file :: !found;
+                        unit
+                    | Some (Dir { hash = head_dir_hash; _ }), _ ->
+                        list_dir head_dir_hash (head :: dir_path_rev) tail
+          in
+          let* () = list_iter_e paths (list_dir root_dir []) in
+          ok (List.rev !found)
+
   type add_result =
     | Already_exists
     | Added of {
@@ -339,6 +415,101 @@ struct
                 ok (Added { new_dir_hash; added_file_hash; added_file_size })
     in
     update_dir [] root_dir dir_path
+
+  type remove_result =
+    | File_does_not_exist
+    | Is_a_directory
+    | Removed of {
+        new_dir_hash: dir Repository.hash option; (* [None] if dir is now empty *)
+        removed_file_hash: Repository.file hash;
+        removed_file_size: int;
+      }
+
+  let remove setup (root_dir: dir) (path: Device.file_path):
+    (remove_result, [> `failed ]) r =
+    let rec remove_from_dir (dir: dir) dir_path_rev (path: Device.path) =
+      match path with
+        | [] ->
+            ok Is_a_directory
+        | head :: tail ->
+            match Filename_map.find_opt head dir with
+              | None ->
+                  ok File_does_not_exist
+              | Some (Dir { hash; total_size; total_file_count }) ->
+                  (* Requested to remove [head/tail] from [dir]. *)
+                  (* Find [subdir] named [head] in [dir]. *)
+                  let* subdir = fetch_or_fail setup hash in
+                  (* Remove [tail] from [subdir]. *)
+                  let* remove_result =
+                    remove_from_dir subdir (head :: dir_path_rev) tail
+                  in
+                  (* Update [dir]. *)
+                  (
+                    match remove_result with
+                      | File_does_not_exist | Is_a_directory as x ->
+                          ok x
+                      | Removed { new_dir_hash; removed_file_hash; removed_file_size } ->
+                          let new_dir =
+                            match new_dir_hash with
+                              | None ->
+                                  (* Removed [subdir], i.e. [head], completely. *)
+                                  Filename_map.remove head dir
+                              | Some new_dir_hash ->
+                                  (* Removed part of [head], which still contains files. *)
+                                  Filename_map.add head
+                                    (
+                                      Dir {
+                                        hash = new_dir_hash;
+                                        total_size = total_size - removed_file_size;
+                                        total_file_count = total_file_count - 1;
+                                      }
+                                    )
+                                    dir
+                          in
+                          let* new_dir_hash =
+                            if Filename_map.is_empty new_dir then
+                              ok None
+                            else
+                              (* TODO: share with below? *)
+                              let* new_dir_hash = store_later setup T.dir new_dir in
+                              ok (Some new_dir_hash)
+                          in
+                          ok (
+                            Removed {
+                              new_dir_hash;
+                              removed_file_hash;
+                              removed_file_size;
+                            }
+                          )
+                  )
+              | Some (File { hash = removed_file_hash; size = removed_file_size }) ->
+                  match tail with
+                    | _ :: _ ->
+                        failed [
+                          "no such file or directory: " ^
+                          Device.show_path (List.rev_append dir_path_rev path);
+                          Device.show_path (List.rev dir_path_rev) ^
+                          " is a file";
+                        ]
+                    | [] ->
+                        (* Remove file [head] from current [dir]. *)
+                        let new_dir = Filename_map.remove head dir in
+                        let* new_dir_hash =
+                          if Filename_map.is_empty new_dir then
+                            ok None
+                          else
+                            let* new_dir_hash = store_later setup T.dir new_dir in
+                            ok (Some new_dir_hash)
+                        in
+                        ok (
+                          Removed {
+                            new_dir_hash;
+                            removed_file_hash;
+                            removed_file_size;
+                          }
+                        )
+    in
+    remove_from_dir root_dir [] (Device.path_of_file_path path)
 
 end
 
@@ -1002,163 +1173,40 @@ let pull ~verbose setup (paths: Device.path list) =
   let* root_dir = fetch_root_dir setup root in
   list_iter_e paths (pull root_dir [])
 
-type remove_result =
-  | Unchanged
-  | Removed_whole_dir
-  | Dir_not_empty of {
-      new_dir_hash: dir Repository.hash;
-      size_diff: int; (* positive, to be subtracted *)
-      file_count_diff: int; (* positive, to be subtracted *)
-    }
+let remove_file setup (root: root) (path: Device.file_path): (root, _) r =
+  match root with
+    | Empty ->
+        failed [ sf "no such file: %s" (Device.show_file_path path) ]
+    | Non_empty root ->
+        let* root_dir = fetch_or_fail setup root.root_dir in
+        let* remove_result = Dir.remove setup root_dir path in
+        match remove_result with
+          | File_does_not_exist ->
+              failed [ sf "no such file: %s" (Device.show_file_path path) ]
+          | Is_a_directory ->
+              failed [ sf "%s is a directory" (Device.show_file_path path) ]
+          | Removed { new_dir_hash = None; _ } ->
+              ok Empty
+          | Removed { new_dir_hash = Some new_dir_hash; removed_file_hash; _ } ->
+              let* hash_index = fetch_or_fail setup root.hash_index in
+              let* new_hash_index =
+                Hash_index.remove setup hash_index removed_file_hash path
+              in
+              let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
+              let new_root = { root_dir = new_dir_hash; hash_index = new_hash_index_hash } in
+              ok (Non_empty new_root)
 
 let remove ~recursive setup (paths: Device.path list) =
-  let removed_paths = ref [] in
-  let rec remove_from_dir (dir: dir) dir_path_rev (path: Device.path) =
-    match path with
-      | [] ->
-          (* Fully followed the requested path: remove where we are, i.e. [dir]. *)
-          if recursive then
-            (* We could return [Removed_whole_dir], but we need to update [removed_paths]. *)
-            let* () =
-              list_iter_e (Filename_map.bindings dir) @@ fun (filename, _) ->
-              let* (_: remove_result) = remove_from_dir dir dir_path_rev [ filename ] in
-              unit
-            in
-            ok Removed_whole_dir
-          else
-            failed [
-              sf "%s is a directory, use --recursive (or -r) to remove it and its contents"
-                (Device.show_path (List.rev dir_path_rev))
-            ]
-      | head :: tail ->
-          match Filename_map.find_opt head dir with
-            | None ->
-                (* Requested to remove something that doesn't exist. *)
-                ok Unchanged
-            | Some (Dir { hash; total_size; total_file_count }) ->
-                (* Requested to remove [head/tail] from [dir]. *)
-                (* Find [subdir] named [head] in [dir]. *)
-                let* subdir = fetch_or_fail setup hash in
-                (* Remove [tail] from [subdir]. *)
-                let* remove_result =
-                  remove_from_dir subdir (head :: dir_path_rev) tail
-                in
-                (* Update [dir]. *)
-                (
-                  match remove_result with
-                    | Unchanged ->
-                        ok Unchanged
-                    | Removed_whole_dir ->
-                        (* Removed [subdir], i.e. [head], completely. *)
-                        let new_dir = Filename_map.remove head dir in
-                        if Filename_map.is_empty new_dir then
-                          ok Removed_whole_dir
-                        else
-                          let* new_dir_hash = store_later setup T.dir new_dir in
-                          (* TODO: share with below? *)
-                          ok (
-                            Dir_not_empty {
-                              new_dir_hash;
-                              size_diff = total_size;
-                              file_count_diff = total_file_count;
-                            }
-                          )
-                    | Dir_not_empty { new_dir_hash; size_diff; file_count_diff } ->
-                        (* Removed part of [head], which still contains files. *)
-                        let new_dir =
-                          Filename_map.add head
-                            (
-                              Dir {
-                                hash = new_dir_hash;
-                                total_size = total_size - size_diff;
-                                total_file_count = total_file_count - file_count_diff;
-                              }
-                            )
-                            dir
-                        in
-                        let* new_dir_hash = store_later setup T.dir new_dir in
-                        ok (
-                          Dir_not_empty {
-                            new_dir_hash;
-                            size_diff;
-                            file_count_diff;
-                          }
-                        )
-                )
-            | Some (File { hash; size }) ->
-                match tail with
-                  | _ :: _ ->
-                      failed [
-                        "no such file or directory: " ^
-                        Device.show_path (List.rev_append dir_path_rev path);
-                        Device.show_path (List.rev dir_path_rev) ^
-                        " is a file";
-                      ]
-                  | [] ->
-                      (* Remove file [head] from current [dir]. *)
-                      let new_dir = Filename_map.remove head dir in
-                      removed_paths :=
-                        (hash, (List.rev dir_path_rev, head)) :: !removed_paths;
-                      if Filename_map.is_empty new_dir then
-                        ok Removed_whole_dir
-                      else
-                        let* new_dir_hash = store_later setup T.dir new_dir in
-                        ok (
-                          Dir_not_empty {
-                            new_dir_hash;
-                            size_diff = size;
-                            file_count_diff = 1;
-                          }
-                        )
-  in
   let* root = fetch_root setup in
-  match root, paths with
-    | Empty, [] ->
-        unit
-    | Empty, _ :: _ ->
-        failed [ "repository is empty" ]
-    | Non_empty { hash_index; _ }, _ ->
-        (* Update [root_dir]. *)
-        let* root =
-          list_fold_e root paths @@ fun root path ->
-          let* root_dir = fetch_root_dir setup root in
-          let* remove_result = remove_from_dir root_dir [] path in
-          match remove_result with
-            | Removed_whole_dir ->
-                ok Empty
-            | Unchanged ->
-                ok root
-            | Dir_not_empty { new_dir_hash; _ } ->
-                ok (Non_empty { root_dir = new_dir_hash; hash_index })
-        in
-        let* root =
-          match root with
-            | Empty ->
-                ok Empty
-            | Non_empty root ->
-                (* Update [hash_index].
-                   Note: removing files with no pathes that lead to them
-                   is a task for the garbage collector. *)
-                (* TODO: this is probably inefficient as we re-fetch stuff
-                   that we just stored. *)
-                let* hash_index = fetch_or_fail setup root.hash_index in
-                let* new_hash_index =
-                  list_fold_e hash_index !removed_paths @@
-                  fun hash_index (hash, path) ->
-                  Hash_index.remove setup hash_index hash path
-                in
-                let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
-                ok (
-                  Non_empty {
-                    root_dir = root.root_dir;
-                    hash_index = new_hash_index_hash;
-                  }
-                )
-        in
-        store_root setup root @@
-        String.concat " " (
-          "rm" :: (if recursive then [ "-r" ] else []) @ List.map Device.show_path paths
-        )
+  let* file_paths = Dir.list_paths ~recursive setup root paths in
+  let* root =
+    list_fold_e root file_paths @@ fun root { path; _ } ->
+    remove_file setup root path
+  in
+  store_root setup root @@
+  String.concat " " (
+    "rm" :: (if recursive then [ "-r" ] else []) @ List.map Device.show_path paths
+  )
 
 let update setup =
   let* count =

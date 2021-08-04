@@ -695,7 +695,7 @@ $ main.exe --no-color tree --size --count
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color rm plif bla/bli
 Error:
-  bla/bli is a directory, use --recursive (or -r) to remove it and its contents
+  bla/bli is a directory
 Exit code: 1
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
