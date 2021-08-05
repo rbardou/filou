@@ -31,7 +31,11 @@ $ cd /tmp/filou-test/clone
 $ echo blablabla > toto
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push toto
+Listing files...
+Listing files to push...
+Pushing files...
 Pushed: toto
+Pushed 1 files (9 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 9, file count: 1).
@@ -51,7 +55,11 @@ $ main.exe --no-color diff
 # Add the file again.
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
 Already exists: toto
+Pushing files...
+Pushed 1 files (0 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 9, file count: 1).
@@ -74,8 +82,12 @@ $ echo blu > tutu
 $ echo blibli > titi
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push tutu titi
+Listing files...
+Listing files to push...
+Pushing files...
 Pushed: tutu
 Pushed: titi
+Pushed 2 files (9 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 18, file count: 3).
@@ -106,16 +118,28 @@ $ mkdir bla/blo
 $ echo plif > bla/blo/plouf
 $ cd /tmp/filou-test/clone
 $ main.exe -v --dry-run --no-color push bla/bli/plouf bla/blo/plouf
+Listing files...
+Listing files to push...
+Pushing files...
 Pushed: bla/bli/plouf
 Pushed: bla/blo/plouf
+Pushed 2 files (8 B).
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push bla/bli/plouf bla/blo/plouf
+Listing files...
+Listing files to push...
+Pushing files...
 Pushed: bla/bli/plouf
 Pushed: bla/blo/plouf
+Pushed 2 files (8 B).
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push bla/bli/plouf bla/blo/plouf
+Listing files...
+Listing files to push...
 Already exists: bla/bli/plouf
 Already exists: bla/blo/plouf
+Pushing files...
+Pushed 2 files (0 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check --cache
 Directory structure looks ok (total size: 26, file count: 5).
@@ -273,12 +297,16 @@ $ main.exe --no-color log
 $ echo plif > plif
 $ cd /tmp/filou-test/clone
 $ main.exe -v --dry-run --no-color push
+Listing files...
+Listing files to push...
 Already exists: titi
 Already exists: bla/blo/plouf
 Already exists: bla/bli/plouf
 Already exists: toto
 Already exists: tutu
+Pushing files...
 Pushed: plif (duplicate of: bla/blo/plouf)
+Pushed 6 files (4 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --duplicates
 ./
@@ -293,12 +321,16 @@ $ main.exe --no-color tree --duplicates
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
 Already exists: titi
 Already exists: bla/blo/plouf
 Already exists: bla/bli/plouf
 Already exists: toto
 Already exists: tutu
+Pushing files...
 Pushed: plif (duplicate of: bla/blo/plouf)
+Pushed 6 files (4 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --duplicates
 ./
@@ -650,12 +682,16 @@ $ main.exe --no-color tree --size --count
 └++ tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
+Pushing files...
 Pushed: titi
 Pushed: bla/blo/plouf
 Pushed: bla/bli/plouf
 Pushed: toto
 Pushed: tutu
 Pushed: plif (duplicate of: bla/blo/plouf)
+Pushed 6 files (30 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree --size --count
 ./ (30 B) (6 files)
@@ -689,12 +725,16 @@ $ main.exe --no-color tree --size --count
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
 Already exists: titi
-Pushed: bla/blo/plouf
-Pushed: bla/bli/plouf
 Already exists: toto
 Already exists: tutu
+Pushing files...
+Pushed: bla/blo/plouf
+Pushed: bla/bli/plouf
 Pushed: plif (duplicate of: bla/blo/plouf)
+Pushed 6 files (12 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 30, file count: 6).
@@ -759,12 +799,16 @@ $ main.exe --no-color tree --size --count
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
 Already exists: titi
 Already exists: bla/blo/plouf
-Pushed: bla/bli/plouf
 Already exists: toto
 Already exists: tutu
+Pushing files...
+Pushed: bla/bli/plouf
 Pushed: plif (duplicate of: bla/blo/plouf)
+Pushed 6 files (8 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 ./
@@ -798,12 +842,16 @@ $ main.exe --no-color tree --size --count
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
 Already exists: titi
-Pushed: bla/blo/plouf (duplicate of: plif)
-Pushed: bla/bli/plouf
 Already exists: toto
 Already exists: tutu
 Already exists: plif
+Pushing files...
+Pushed: bla/blo/plouf (duplicate of: plif)
+Pushed: bla/bli/plouf
+Pushed 6 files (8 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 ./
@@ -835,12 +883,16 @@ $ main.exe --no-color tree --size --count
 └++ tutu (3 B)
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
+Pushing files...
 Pushed: titi
 Pushed: bla/blo/plouf
 Pushed: bla/bli/plouf
 Pushed: toto
 Pushed: tutu
 Pushed: plif (duplicate of: bla/blo/plouf)
+Pushed 6 files (30 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 ./
@@ -895,9 +947,14 @@ $ mkdir toto
 $ echo 'this shouldn'\''t be here' > toto/wrong
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
 Already exists: titi
 Already exists: bla/blo/plouf
 Already exists: bla/bli/plouf
+Already exists: tutu
+Already exists: plif
+Pushing files...
 Error:
   failed to push file: toto/wrong:
   parent directory already exists as a file: toto
@@ -971,9 +1028,14 @@ $ mkdir toto/tutu
 $ echo 'this shouldn'\''t be here' > toto/tutu/wrong
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
 Already exists: titi
 Already exists: bla/blo/plouf
 Already exists: bla/bli/plouf
+Already exists: tutu
+Already exists: plif
+Pushing files...
 Error:
   failed to push file: toto/tutu/wrong:
   parent directory already exists as a file: toto
@@ -1020,8 +1082,14 @@ $ mkdir bla/bli/plouf/tutu
 $ echo 'this shouldn'\''t be here' > bla/bli/plouf/tutu/wrong
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
 Already exists: titi
 Already exists: bla/blo/plouf
+Already exists: toto
+Already exists: tutu
+Already exists: plif
+Pushing files...
 Error:
   failed to push file: bla/bli/plouf/tutu/wrong:
   parent directory already exists as a file: bla/bli/plouf
@@ -1079,11 +1147,12 @@ $ rmdir bla/bli
 $ echo 'I should be a directory' > bla/bli
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
 Already exists: titi
 Already exists: bla/blo/plouf
 Error:
-  failed to push file: bla/bli:
-  file already exists as a directory
+  bla/bli already exists as a directory
 Exit code: 1
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
@@ -1612,8 +1681,12 @@ $ main.exe --no-color tree
 └++ tutu
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push bla
+Listing files...
+Listing files to push...
+Pushing files...
 Pushed: bla/blo/plouf
 Pushed: bla/bli/plouf
+Pushed 2 files (8 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
 -->  0 push bla
@@ -1655,12 +1728,16 @@ Error:
 Exit code: 1
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
-Pushed: titi
+Listing files...
+Listing files to push...
 Already exists: bla/blo/plouf
 Already exists: bla/bli/plouf
+Pushing files...
+Pushed: titi
 Pushed: toto
 Pushed: tutu
 Pushed: plif (duplicate of: bla/blo/plouf)
+Pushed 6 files (22 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
 -->  0 push .
@@ -1790,8 +1867,12 @@ $ main.exe --no-color log
 $ echo 'this is a truc' > bla/bli/truc
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push bla/bli
+Listing files...
+Listing files to push...
 Already exists: bla/bli/plouf
+Pushing files...
 Pushed: bla/bli/truc
+Pushed 2 files (14 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color prune --yes
 Removed 10 objects totalling 1.76 kB.
@@ -1876,7 +1957,11 @@ $ cd /tmp/filou-test/clone
 $ echo 'contents of bla first version' > bla
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
+Pushing files...
 Pushed: bla
+Pushed 1 files (29 B).
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone2
 Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone2/
 $ cd /tmp/filou-test/clone2
@@ -1889,7 +1974,11 @@ Removed 1 files.
 $ echo 'contents of bla second version' > bla
 $ cd /tmp/filou-test/clone2
 $ main.exe -v --no-color push
+Listing files...
+Listing files to push...
+Pushing files...
 Pushed: bla
+Pushed 1 files (30 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 ./

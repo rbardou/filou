@@ -280,70 +280,67 @@ struct
     | Found_file of found_file
     | Found_dir of {
         dir_path_rev: Device.path;
-        dir: dir;
+        dir_hash: dir hash;
       }
+
+  let find setup (root: root) (path: Device.path): (found option, _) r =
+    match root with
+      | Empty ->
+          ok None
+      | Non_empty { root_dir; _ } ->
+          let rec find_in_dir (dir_hash: dir hash) dir_path_rev (path: Device.path) =
+            match path with
+              | [] ->
+                  ok (Some (Found_dir { dir_path_rev; dir_hash }))
+              | head :: tail ->
+                  let* dir = fetch_or_fail setup dir_hash in
+                  match Filename_map.find_opt head dir, tail with
+                    | None, _
+                    | Some (File _), _ :: _ ->
+                        ok None
+                    | Some (File { hash; size }), [] ->
+                        ok (
+                          Some (
+                            Found_file {
+                              path = (List.rev dir_path_rev, head);
+                              hash;
+                              size;
+                            }
+                          )
+                        )
+                    | Some (Dir { hash = head_dir_hash; _ }), _ ->
+                        find_in_dir head_dir_hash (head :: dir_path_rev) tail
+          in
+          find_in_dir root_dir [] path
 
   (* Convert [paths] to a list of [found].
      Fail if one of the [paths] do not denote something that exists. *)
-  let find_paths setup (root: root) (paths: Device.path list): (found list, _) r =
-    match root, paths with
-      | Empty, [] ->
-          ok []
-      | Empty, _ :: _ ->
-          failed [ "repository is empty" ]
-      | Non_empty { root_dir; _ }, _ ->
-          let found = ref [] in
-          let rec list_dir (dir_hash: dir hash) dir_path_rev (path: Device.path) =
-            let* dir = fetch_or_fail setup dir_hash in
-            match path with
-              | [] ->
-                  let dir = Found_dir { dir_path_rev; dir } in
-                  found := dir :: !found;
-                  unit
-              | head :: tail ->
-                  match Filename_map.find_opt head dir, tail with
-                    | None, _ ->
-                        failed [
-                          sf "no such file or directory: %s"
-                            (Device.show_path (List.rev dir_path_rev @ path));
-                        ]
-                    | Some (File _), _ :: _ ->
-                        failed [
-                          sf "no such file or directory: %s"
-                            (Device.show_path (List.rev dir_path_rev @ path));
-                          sf "%s is a file"
-                            (Device.show_file_path (List.rev dir_path_rev, head));
-                        ]
-                    | Some (File { hash; size }), [] ->
-                        let file =
-                          Found_file {
-                            path = (List.rev dir_path_rev, head);
-                            hash;
-                            size;
-                          }
-                        in
-                        found := file :: !found;
-                        unit
-                    | Some (Dir { hash = head_dir_hash; _ }), _ ->
-                        list_dir head_dir_hash (head :: dir_path_rev) tail
-          in
-          let* () = list_iter_e paths (list_dir root_dir []) in
-          ok (List.rev !found)
+  let find_exact_list setup (root: root) (paths: Device.path list): (found list, _) r =
+    let* list =
+      list_fold_e [] paths @@ fun acc path ->
+      let* found = find setup root path in
+      match found with
+        | None ->
+            failed [ sf "no such file or directory: %s" (Device.show_path path) ]
+        | Some found ->
+            ok (found :: acc)
+    in
+    ok (List.rev list)
 
-  (* Find [paths] with [find_paths], then iterate on all files that they denote.
-     If not [recursive], fail if a path denotes a directory;
-     else, list the whole directory recursively. *)
-  let find_and_iter_paths ~recursive setup (root: root) (paths: Device.path list)
+  (* Same as [find_exact_list] but iterate instead of returning a list
+     and support recursively listing directories (so it only returns files).
+     Fails if a path denotes a directory. *)
+  let iter_exact_list_files ~recursive setup (root: root) (paths: Device.path list)
       (f: found_file -> (unit, _) r) =
     (* First, find [paths]. If one doesn't exist we don't want to
        iterate nor recurse at all, we want to fail early. *)
-    let* found = find_paths setup root paths in
+    let* found = find_exact_list setup root paths in
     (* Then, actually iterate. *)
     list_iter_e found @@ fun found ->
     match found with
       | Found_file file ->
           f file
-      | Found_dir { dir_path_rev; dir } ->
+      | Found_dir { dir_path_rev; dir_hash } ->
           if recursive then
             (* [dir_path_rev] = path of [dir], in reverse order *)
             let rec list_whole_dir dir_path_rev (dir: dir) =
@@ -359,19 +356,20 @@ struct
                     let* subdir = fetch_or_fail setup subdir_hash in
                     list_whole_dir (filename :: dir_path_rev) subdir
             in
+            let* dir = fetch_or_fail setup dir_hash in
             list_whole_dir dir_path_rev dir
           else
             failed [
               sf "%s is a directory" (Device.show_path (List.rev dir_path_rev))
             ]
 
-  (* Same as [find_and_iter_paths] but return a list instead of iterating,
+  (* Same as [iter_exact_list_files] but return a list instead of iterating,
      and display progress. *)
-  let find_and_list_paths ~recursive setup root paths =
+  let find_exact_list_files ~recursive setup root paths =
     let count = ref 0 in
     let list = ref [] in
     let* () =
-      find_and_iter_paths ~recursive setup root paths @@ fun found_file ->
+      iter_exact_list_files ~recursive setup root paths @@ fun found_file ->
       list := found_file :: !list;
       incr count;
       Prout.minor (fun () -> sf "Listing files... (%d)" !count);
@@ -1088,7 +1086,9 @@ let tree ~color ~max_depth ~only_main ~only_dirs
         in
         print_merged_entry ~last: true head
 
-let push_file ~verbose (setup: Clone.setup) (root: root) (path: Device.file_path) =
+let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
+    (setup: Clone.setup) (root: root) (path: Device.file_path):
+  (root, [> `failed ]) r =
   trace ("failed to push file: " ^ Device.show_file_path path) @@
   let* root_dir = fetch_root_dir setup root in
   let* add_result =
@@ -1098,7 +1098,13 @@ let push_file ~verbose (setup: Clone.setup) (root: root) (path: Device.file_path
       ~source_path: path
       ~target: setup
       ~on_progress: (
-        on_copy_progress ("Pushing: " ^ Device.show_file_path path)
+        fun ~bytes ~size: _ ->
+          let bytes = bytes + pushed_size in
+          let size = total_size_to_push in
+          Prout.minor @@ fun () ->
+          sf "Pushing... (%d / %d) (%d%%) (file %d / %d) %s"
+            bytes size (bytes * 100 / size)
+            file_index file_count (Device.show_file_path path)
       )
   in
   match add_result with
@@ -1127,33 +1133,73 @@ let push_file ~verbose (setup: Clone.setup) (root: root) (path: Device.file_path
         )
 
 let push ~verbose setup (paths: Device.path list) =
-  let rec push root path =
+  Prout.major_s "Listing files...";
+  let files = ref [] in
+  let file_count = ref 0 in
+  let rec add_path (path: Device.path) =
     if Device.same_paths path [ dot_filou ] then
-      ok root
+      unit
     else
       let* stat = Device.stat (Clone.workdir setup) path in
       match stat with
-        | File _ ->
-            (
-              match Device.file_path_of_path path with
-                | None ->
-                    ok root
-                | Some path ->
-                    push_file ~verbose setup root path
-            )
         | Dir ->
-            let new_root = ref root in
-            let* () =
-              Device.iter_read_dir (Clone.workdir setup) path @@ fun filename ->
-              let* root = push !new_root (path @ [ filename ]) in
-              new_root := root;
-              unit
-            in
-            ok !new_root
+            Device.iter_read_dir (Clone.workdir setup) path @@ fun filename ->
+            add_path (path @ [ filename ])
+        | File { size } ->
+            match Device.file_path_of_path path with
+              | None ->
+                  (* Should not happen, "." is a directory. *)
+                  unit
+              | Some path ->
+                  files := (path, size) :: !files;
+                  incr file_count;
+                  Prout.minor (fun () -> sf "Listing files... (%d)" !file_count);
+                  unit
   in
+  let* () = list_iter_e paths add_path in
+  let files = List.rev !files in
+  let file_count = !file_count in
+  Prout.major_s "Listing files to push...";
   let* root = fetch_root setup in
-  let* root = list_fold_e root paths push in
-  store_root setup root (String.concat " " ("push" :: List.map Device.show_path paths))
+  let* files_to_push =
+    let file_index = ref 0 in
+    list_filter_e files @@ fun ((file_path: Device.file_path), _) ->
+    let* found = Dir.find setup root (Device.path_of_file_path file_path) in
+    incr file_index;
+    (
+      Prout.minor @@ fun () ->
+      sf "Listing files to push... (%d / %d) (%d%%)"
+        !file_index file_count (!file_index * 100 / file_count)
+    );
+    match found with
+      | None ->
+          ok true
+      | Some (Found_file _) ->
+          (* TODO: check hash *)
+          if verbose then Prout.echo "Already exists: %s" (Device.show_file_path file_path);
+          ok false
+      | Some (Found_dir _) ->
+          failed [ sf "%s already exists as a directory" (Device.show_file_path file_path) ]
+  in
+  Prout.major_s "Pushing files...";
+  let total_size_to_push =
+    List.fold_left' 0 files_to_push @@ fun acc (_, size) -> acc + size
+  in
+  let* root, _ =
+    let file_index = ref 0 in
+    list_fold_e (root, 0) files_to_push @@ fun (root, pushed_size) (path, size) ->
+    incr file_index;
+    let* root =
+      push_file ~verbose ~pushed_size ~total_size_to_push ~file_index: !file_index ~file_count
+        setup root path
+    in
+    ok (root, pushed_size + size)
+  in
+  let* () =
+    store_root setup root (String.concat " " ("push" :: List.map Device.show_path paths))
+  in
+  Prout.echo "Pushed %d files (%s)." file_count (show_size total_size_to_push);
+  unit
 
 let pull ~verbose setup (paths: Device.path list) =
   let rec pull (dir: dir) dir_path_rev (path: Device.path) =
@@ -1233,7 +1279,7 @@ let remove_file setup (root: root) (path: Device.file_path): (root, _) r =
 let remove ~recursive setup (paths: Device.path list) =
   let* root = fetch_root setup in
   Prout.major "Listing files...";
-  let* files_to_remove = Dir.find_and_list_paths ~recursive setup root paths in
+  let* files_to_remove = Dir.find_exact_list_files ~recursive setup root paths in
   Prout.major "Removing files...";
   let count = List.length files_to_remove in
   let* root =
