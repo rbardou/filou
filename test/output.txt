@@ -374,7 +374,11 @@ $ main.exe --no-color tree
 └-- tutu
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color pull titi
+Listing files...
+Listing files to pull...
+Pulling files...
 Pulled: titi
+Pulled 1 files (6 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 ./
@@ -389,7 +393,11 @@ $ main.exe --no-color tree
 └-- tutu
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color pull tutu
+Listing files...
+Listing files to pull...
+Pulling files...
 Pulled: tutu
+Pulled 1 files (3 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 ./
@@ -418,8 +426,12 @@ $ main.exe --no-color tree
 └-- tutu
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color pull titi tutu
+Listing files...
+Listing files to pull...
+Pulling files...
 Pulled: titi
 Pulled: tutu
+Pulled 2 files (9 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 ./
@@ -447,8 +459,12 @@ $ main.exe --no-color tree
 └-- tutu
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color pull titi tutu
+Listing files...
+Listing files to pull...
 Already exists: titi
+Pulling files...
 Pulled: tutu
+Pulled 1 files (3 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 ./
@@ -479,7 +495,11 @@ $ main.exe --no-color tree
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color pull bla/bli
+Listing files...
+Listing files to pull...
+Pulling files...
 Pulled: bla/bli/plouf
+Pulled 1 files (4 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 ./
@@ -508,8 +528,12 @@ $ main.exe --no-color tree
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color pull bla
-Pulled: bla/bli/plouf
+Listing files...
+Listing files to pull...
 Already exists: bla/blo/plouf
+Pulling files...
+Pulled: bla/bli/plouf
+Pulled 1 files (4 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 ./
@@ -538,12 +562,16 @@ $ main.exe --no-color tree
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color pull
-Pulled: bla/bli/plouf
+Listing files...
+Listing files to pull...
 Already exists: bla/blo/plouf
-Pulled: plif
 Already exists: titi
-Pulled: toto
 Already exists: tutu
+Pulling files...
+Pulled: bla/bli/plouf
+Pulled: plif
+Pulled: toto
+Pulled 3 files (17 B).
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
 ./
@@ -991,12 +1019,16 @@ $ main.exe --no-color tree --duplicates
 └── tutu
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color pull
+Listing files...
+Listing files to pull...
 Already exists: bla/bli/plouf
 Already exists: bla/blo/plouf
 Already exists: plif
 Already exists: titi
-Pulled: toto
 Already exists: tutu
+Pulling files...
+Pulled: toto
+Pulled 1 files (9 B).
 $ cat toto
 blablabla%
 $ cd /tmp/filou-test/clone
@@ -1045,12 +1077,16 @@ $ rmdir toto/tutu
 $ rmdir toto
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color pull
+Listing files...
+Listing files to pull...
 Already exists: bla/bli/plouf
 Already exists: bla/blo/plouf
 Already exists: plif
 Already exists: titi
-Pulled: toto
 Already exists: tutu
+Pulling files...
+Pulled: toto
+Pulled 1 files (9 B).
 $ cat toto
 blablabla%
 $ cd /tmp/filou-test/clone
@@ -1099,12 +1135,16 @@ $ rmdir bla/bli/plouf/tutu
 $ rmdir bla/bli/plouf
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color pull
-Pulled: bla/bli/plouf
+Listing files...
+Listing files to pull...
 Already exists: bla/blo/plouf
 Already exists: plif
 Already exists: titi
 Already exists: toto
 Already exists: tutu
+Pulling files...
+Pulled: bla/bli/plouf
+Pulled 1 files (4 B).
 $ cat bla/bli/plouf
 plaf%
 $ cd /tmp/filou-test/clone
@@ -1168,12 +1208,16 @@ $ main.exe --no-color tree
 $ rm bla/bli
 $ cd /tmp/filou-test/clone
 $ main.exe -v --no-color pull
-Pulled: bla/bli/plouf
+Listing files...
+Listing files to pull...
 Already exists: bla/blo/plouf
 Already exists: plif
 Already exists: titi
 Already exists: toto
 Already exists: tutu
+Pulling files...
+Pulled: bla/bli/plouf
+Pulled 1 files (4 B).
 $ cat bla/bli/plouf
 plaf%
 $ cd /tmp/filou-test/clone

@@ -1202,56 +1202,62 @@ let push ~verbose setup (paths: Device.path list) =
   unit
 
 let pull ~verbose setup (paths: Device.path list) =
-  let rec pull (dir: dir) dir_path_rev (path: Device.path) =
-    match path with
-      | [] ->
-          list_iter_e (Filename_map.bindings dir) @@ fun (filename, _) ->
-          pull dir dir_path_rev [ filename ]
-      | head :: tail ->
-          match Filename_map.find_opt head dir with
-            | None ->
-                failed [
-                  "no such file or directory: " ^ Device.show_path (List.rev dir_path_rev);
-                ]
-            | Some (Dir { hash; _ }) ->
-                let* dir = fetch_or_fail setup hash in
-                pull dir (head :: dir_path_rev) tail
-            | Some (File { hash; _ }) ->
-                let target_path = List.rev dir_path_rev, head in
-                trace (sf "failed to pull %s" (Device.show_file_path target_path)) @@
-                match tail with
-                  | _ :: _ ->
-                      failed [
-                        "no such file or directory: " ^
-                        Device.show_path (List.rev_append dir_path_rev path);
-                        Device.show_path (List.rev dir_path_rev) ^
-                        " is a file";
-                      ]
-                  | [] ->
-                      match
-                        Repository.fetch_file ~source: setup hash
-                          ~target: (Clone.workdir setup)
-                          ~target_path
-                          ~on_progress: (
-                            on_copy_progress
-                              ("Pulling: " ^ Device.show_file_path target_path)
-                          )
-                      with
-                        | ERROR { code = `already_exists; _ } ->
-                            if verbose then
-                              Prout.echo "Already exists: %s"
-                                (Device.show_file_path target_path);
-                            unit
-                        | ERROR { code = `failed | `not_available; msg } ->
-                            failed msg
-                        | OK () ->
-                            if verbose then
-                              Prout.echo "Pulled: %s" (Device.show_file_path target_path);
-                            unit
-  in
+  let workdir = Clone.workdir setup in
   let* root = fetch_root setup in
-  let* root_dir = fetch_root_dir setup root in
-  list_iter_e paths (pull root_dir [])
+  Prout.major_s "Listing files...";
+  let* files = Dir.find_exact_list_files ~recursive: true setup root paths in
+  Prout.major_s "Listing files to pull...";
+  let* files_to_pull =
+    let file_count = List.length files in
+    let file_index = ref 0 in
+    list_filter_e files @@ fun file ->
+    incr file_index;
+    (
+      Prout.minor @@ fun () ->
+      sf "Listing files to pull... (%d / %d) (%d%%)"
+        !file_index file_count (!file_index * 100 / file_count)
+    );
+    match Device.stat workdir (Device.path_of_file_path file.path) with
+      | ERROR { code = `failed; _ } as x ->
+          x
+      | ERROR { code = `no_such_file; _ } ->
+          ok true
+      | OK _ ->
+          (* TODO: check hash *)
+          if verbose then
+            Prout.echo "Already exists: %s"
+              (Device.show_file_path file.path);
+          ok false
+  in
+  Prout.major_s "Pulling files...";
+  let file_count = List.length files_to_pull in
+  let* total_size_pulled =
+    let file_index = ref 0 in
+    let total_size_to_pull =
+      List.fold_left' 0 files_to_pull (fun acc file -> acc + file.size)
+    in
+    list_fold_e 0 files_to_pull @@ fun pulled_size file ->
+    incr file_index;
+    let* () =
+      Repository.fetch_file ~source: setup file.hash
+        ~target: (Clone.workdir setup)
+        ~target_path: file.path
+        ~on_progress: (
+          fun ~bytes ~size: _ ->
+            let bytes = bytes + pulled_size in
+            let size = total_size_to_pull in
+            Prout.minor @@ fun () ->
+            sf "Pulling... (%d / %d) (%d%%) (file %d / %d) %s"
+              bytes size (bytes * 100 / size)
+              !file_index file_count (Device.show_file_path file.path)
+        )
+    in
+    if verbose then
+      Prout.echo "Pulled: %s" (Device.show_file_path file.path);
+    ok (pulled_size + file.size)
+  in
+  Prout.echo "Pulled %d files (%s)." file_count (show_size total_size_pulled);
+  unit
 
 let remove_file setup (root: root) (path: Device.file_path): (root, _) r =
   match root with
