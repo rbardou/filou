@@ -175,7 +175,7 @@ struct
     run ?v ?dry_run ?color ("clone" :: list_of_option main @ list_of_option clone)
 
   let push ?(v = true) ?dry_run ?color paths =
-    run ~v ?dry_run ?color ("push" :: paths)
+    run ~v ?dry_run ?color ("push" :: "--yes" :: paths)
 
   let pull ?(v = true) ?dry_run ?color paths =
     run ~v ?dry_run ?color ("pull" :: paths)
@@ -184,7 +184,7 @@ struct
     run ?v ?dry_run ?color ("ls" :: list_of_option path)
 
   let rm ?v ?dry_run ?color ?(r = false) paths =
-    run ?v ?dry_run ?color ("rm" :: flag r "-r" @ paths)
+    run ?v ?dry_run ?color ("rm" :: "--yes" :: flag r "-r" @ paths)
 
   let check ?v ?dry_run ?color ?path ?(cache = false) () =
     run ?v ?dry_run ?color ("check" :: flag cache "--cache" @ list_of_option path)

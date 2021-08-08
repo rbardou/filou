@@ -26,6 +26,12 @@ let main () =
       ~unset_long: "no-color"
       true
   in
+  let yes =
+    Clap.flag
+      ~set_long: "yes"
+      ~description: "Do not prompt for confirmation."
+      false
+  in
   if not color then Prout.not_a_tty ();
   let command =
     let tree_or_ls_args command =
@@ -302,12 +308,6 @@ let main () =
              repository and in the .filou directory of the clone."
           "prune"
         @@ fun () ->
-        let yes =
-          Clap.flag
-            ~set_long: "yes"
-            ~description: "Do not prompt for confirmation."
-            false
-        in
         let keep_undo =
           Clap.default_int
             ~long: "keep-undo"
@@ -547,7 +547,7 @@ let main () =
               | _ -> paths
           in
           let* paths = list_map_e paths (parse_local_path setup) in
-          Controller.push ~verbose setup paths
+          Controller.push ~verbose ~yes setup paths
       | `pull paths ->
           let* setup = find_local_clone ~clone_only: false () in
           let paths =
@@ -561,7 +561,7 @@ let main () =
           (* TODO: show progress "Deleted X files." *)
           let* setup = find_local_clone ~clone_only: false () in
           let* paths = list_map_e paths (parse_local_path setup) in
-          Controller.remove ~recursive setup paths
+          Controller.remove ~recursive ~yes setup paths
       | `check (cache, hash_all, hash_metadata) ->
           let* setup = find_local_clone ~clone_only: cache () in
           let hash =

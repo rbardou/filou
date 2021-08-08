@@ -7,6 +7,19 @@ open State
    one wins, but the repository is not corrupted: it only contains some
    unreachable objects. *)
 
+let prompt_for_confirmation prompt =
+  Prout.print "%s [y/N] " prompt;
+  flush stdout;
+  let response = read_line () in
+  match String.lowercase_ascii response with
+    | "y" | "yes" ->
+        ok true
+    | "n" | "no" | "" ->
+        Prout.echo_s "Operation was canceled.";
+        ok false
+    | _ ->
+        failed [ "please answer yes or no" ]
+
 let empty_dir: dir = Filename_map.empty
 
 let fetch_or_fail setup hash =
@@ -72,7 +85,46 @@ let fetch_root setup =
   let* journal = Repository.fetch_root setup in
   ok journal.head.root
 
-let store_root setup root command =
+let print_journal ?(only_redo = false) { redo; head; undo } =
+  let redo = List.mapi (fun i x -> - i - 1, x) redo in
+  (
+    List.iter' (List.rev redo) @@ fun (i, { command; _ }) ->
+    Prout.echo "    %2d %s" i command;
+  );
+  if not only_redo then (
+    Prout.echo "-->  0 %s" head.command;
+    List.iteri' undo @@ fun i { command; _ } ->
+    Prout.echo "    %2d %s" (i + 1) command
+  )
+
+module Check_redo:
+sig
+  type t
+
+  (* [yes] is the [--yes] CLI argument. *)
+  val check: yes: bool -> journal -> (t, [> `failed ]) r
+end =
+struct
+  type t = unit
+
+  let check ~yes journal =
+    if yes then
+      unit
+    else match journal.redo with
+      | [] ->
+          unit
+      | _ :: _ ->
+          Prout.echo_s "/!\\ YOU WILL LOSE YOUR REDO HISTORY /!\\";
+          Prout.echo_s "After this, the following redo history will no longer be available:";
+          Prout.echo_s "";
+          print_journal ~only_redo: true journal;
+          Prout.echo_s "";
+          let* yes = prompt_for_confirmation "Continue anyway?" in
+          if not yes then exit 0;
+          unit
+end
+
+let store_root ~checked_redo: (_: Check_redo.t) setup root command =
   (* TODO: store journal in memory to avoid re-reading it *)
   let* journal = Repository.fetch_root setup in
   let new_journal =
@@ -1132,7 +1184,9 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
           }
         )
 
-let push ~verbose setup (paths: Device.path list) =
+let push ~verbose ~yes setup (paths: Device.path list) =
+  let* journal = Repository.fetch_root setup in
+  let* checked_redo = Check_redo.check ~yes journal in
   Prout.major_s "Listing files...";
   let files = ref [] in
   let file_count = ref 0 in
@@ -1160,7 +1214,7 @@ let push ~verbose setup (paths: Device.path list) =
   let files = List.rev !files in
   let file_count = !file_count in
   Prout.major_s "Listing files to push...";
-  let* root = fetch_root setup in
+  let root = journal.head.root in
   let* files_to_push =
     let file_index = ref 0 in
     list_filter_e files @@ fun ((file_path: Device.file_path), _) ->
@@ -1196,7 +1250,8 @@ let push ~verbose setup (paths: Device.path list) =
     ok (root, pushed_size + size)
   in
   let* () =
-    store_root setup root (String.concat " " ("push" :: List.map Device.show_path paths))
+    store_root ~checked_redo setup root @@
+    String.concat " " ("push" :: List.map Device.show_path paths)
   in
   Prout.echo "Pushed %d files (%s)." file_count (show_size total_size_to_push);
   unit
@@ -1282,8 +1337,10 @@ let remove_file setup (root: root) (path: Device.file_path): (root, _) r =
               let new_root = { root_dir = new_dir_hash; hash_index = new_hash_index_hash } in
               ok (Non_empty new_root)
 
-let remove ~recursive setup (paths: Device.path list) =
-  let* root = fetch_root setup in
+let remove ~recursive ~yes setup (paths: Device.path list) =
+  let* journal = Repository.fetch_root setup in
+  let* checked_redo = Check_redo.check ~yes journal in
+  let root = journal.head.root in
   Prout.major "Listing files...";
   let* files_to_remove = Dir.find_exact_list_files ~recursive setup root paths in
   Prout.major "Removing files...";
@@ -1300,7 +1357,7 @@ let remove ~recursive setup (paths: Device.path list) =
   in
   Prout.major "Storing root...";
   let* () =
-    store_root setup root @@
+    store_root ~checked_redo setup root @@
     String.concat " " (
       "rm" :: (if recursive then [ "-r" ] else []) @ List.map Device.show_path paths
     )
@@ -1324,16 +1381,6 @@ let update setup =
   Prout.echo "Copied %d objects." count;
   Prout.echo_s "Clone is up-to-date.";
   unit
-
-let print_journal { redo; head; undo } =
-  let redo = List.mapi (fun i x -> - i - 1, x) redo in
-  (
-    List.iter' (List.rev redo) @@ fun (i, { command; _ }) ->
-    Prout.echo "    %2d %s" i command;
-  );
-  Prout.echo "-->  0 %s" head.command;
-  List.iteri' undo @@ fun i { command; _ } ->
-  Prout.echo "    %2d %s" (i + 1) command
 
 let prune ~yes ~keep_undo ~keep_redo setup =
   let* journal = Repository.fetch_root setup in
@@ -1361,17 +1408,7 @@ let prune ~yes ~keep_undo ~keep_redo setup =
       );
       Prout.echo "            Clone: %s" (Device.show_location (Clone.workdir setup));
       Prout.echo "";
-      Prout.print_s "Prune main repository and its clone? [y/N] ";
-      flush stdout;
-      let response = read_line () in
-      match String.lowercase_ascii response with
-        | "y" | "yes" ->
-            ok true
-        | "n" | "no" | "" ->
-            Prout.echo_s "Operation was canceled.";
-            ok false
-        | _ ->
-            failed [ "please answer yes or no" ]
+      prompt_for_confirmation "Prune main repository and its clone?"
     )
   in
   if not yes then

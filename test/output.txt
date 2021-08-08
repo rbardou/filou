@@ -30,7 +30,7 @@ main repository: /tmp/filou-test/main/
 $ cd /tmp/filou-test/clone
 $ echo blablabla > toto
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push toto
+$ main.exe -v --no-color push --yes toto
 Listing files...
 Listing files to push...
 Pushing files...
@@ -54,7 +54,7 @@ $ main.exe --no-color diff
 +  toto
 # Add the file again.
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Already exists: toto
@@ -81,7 +81,7 @@ $ cd /tmp/filou-test/clone
 $ echo blu > tutu
 $ echo blibli > titi
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push tutu titi
+$ main.exe -v --no-color push --yes tutu titi
 Listing files...
 Listing files to push...
 Pushing files...
@@ -117,7 +117,7 @@ $ echo plaf > bla/bli/plouf
 $ mkdir bla/blo
 $ echo plif > bla/blo/plouf
 $ cd /tmp/filou-test/clone
-$ main.exe -v --dry-run --no-color push bla/bli/plouf bla/blo/plouf
+$ main.exe -v --dry-run --no-color push --yes bla/bli/plouf bla/blo/plouf
 Listing files...
 Listing files to push...
 Pushing files...
@@ -125,7 +125,7 @@ Pushed: bla/bli/plouf
 Pushed: bla/blo/plouf
 Pushed 2 files (8 B).
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push bla/bli/plouf bla/blo/plouf
+$ main.exe -v --no-color push --yes bla/bli/plouf bla/blo/plouf
 Listing files...
 Listing files to push...
 Pushing files...
@@ -133,7 +133,7 @@ Pushed: bla/bli/plouf
 Pushed: bla/blo/plouf
 Pushed 2 files (8 B).
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push bla/bli/plouf bla/blo/plouf
+$ main.exe -v --no-color push --yes bla/bli/plouf bla/blo/plouf
 Listing files...
 Listing files to push...
 Already exists: bla/bli/plouf
@@ -296,7 +296,7 @@ $ main.exe --no-color log
 # Test duplicates.
 $ echo plif > plif
 $ cd /tmp/filou-test/clone
-$ main.exe -v --dry-run --no-color push
+$ main.exe -v --dry-run --no-color push --yes
 Listing files...
 Listing files to push...
 Already exists: titi
@@ -320,7 +320,7 @@ $ main.exe --no-color tree --duplicates
 ├── toto
 └── tutu
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Already exists: titi
@@ -624,7 +624,7 @@ $ main.exe --no-color tree --size --count
 ├── toto (9 B)
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color rm plif
+$ main.exe --no-color rm --yes plif
 Listing files...
 Removing files...
 Storing root...
@@ -647,7 +647,7 @@ $ main.exe --no-color tree --size --count
 ├── toto (9 B)
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color rm titi toto tutu
+$ main.exe --no-color rm --yes titi toto tutu
 Listing files...
 Removing files...
 Storing root...
@@ -670,7 +670,7 @@ $ main.exe --no-color tree --size --count
 ├++ toto (9 B)
 └++ tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color rm bla/bli/plouf
+$ main.exe --no-color rm --yes bla/bli/plouf
 Listing files...
 Removing files...
 Storing root...
@@ -692,7 +692,7 @@ $ main.exe --no-color tree --size --count
 ├++ toto (9 B)
 └++ tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color rm bla/blo/plouf
+$ main.exe --no-color rm --yes bla/blo/plouf
 Listing files...
 Removing files...
 Storing root...
@@ -709,7 +709,7 @@ $ main.exe --no-color tree --size --count
 ├++ toto (9 B)
 └++ tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Pushing files...
@@ -733,7 +733,7 @@ $ main.exe --no-color tree --size --count
 ├── toto (9 B)
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color rm plif bla/bli/plouf bla/blo/plouf
+$ main.exe --no-color rm --yes plif bla/bli/plouf bla/blo/plouf
 Listing files...
 Removing files...
 Storing root...
@@ -752,7 +752,7 @@ $ main.exe --no-color tree --size --count
 ├── toto (9 B)
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Already exists: titi
@@ -781,7 +781,7 @@ $ main.exe --no-color tree --size --count
 ├── toto (9 B)
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color rm plif bla/bli
+$ main.exe --no-color rm --yes plif bla/bli
 Listing files...
 Error:
   bla/bli is a directory
@@ -804,7 +804,7 @@ $ main.exe --no-color tree --size --count
 ├── toto (9 B)
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color rm -r plif bla/bli
+$ main.exe --no-color rm --yes -r plif bla/bli
 Listing files...
 Removing files...
 Storing root...
@@ -826,7 +826,7 @@ $ main.exe --no-color tree --size --count
 ├── toto (9 B)
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Already exists: titi
@@ -850,7 +850,7 @@ $ main.exe --no-color tree
 ├── toto
 └── tutu
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color rm -r bla
+$ main.exe --no-color rm --yes -r bla
 Listing files...
 Removing files...
 Storing root...
@@ -869,7 +869,7 @@ $ main.exe --no-color tree --size --count
 ├── toto (9 B)
 └── tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Already exists: titi
@@ -893,7 +893,7 @@ $ main.exe --no-color tree
 ├── toto
 └── tutu
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color rm -r .
+$ main.exe --no-color rm --yes -r .
 Listing files...
 Removing files...
 Storing root...
@@ -910,7 +910,7 @@ $ main.exe --no-color tree --size --count
 ├++ toto (9 B)
 └++ tutu (3 B)
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Pushing files...
@@ -974,7 +974,7 @@ $ rm toto
 $ mkdir toto
 $ echo 'this shouldn'\''t be here' > toto/wrong
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Already exists: titi
@@ -1059,7 +1059,7 @@ $ mkdir toto
 $ mkdir toto/tutu
 $ echo 'this shouldn'\''t be here' > toto/tutu/wrong
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Already exists: titi
@@ -1117,7 +1117,7 @@ $ mkdir bla/bli/plouf
 $ mkdir bla/bli/plouf/tutu
 $ echo 'this shouldn'\''t be here' > bla/bli/plouf/tutu/wrong
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Already exists: titi
@@ -1186,7 +1186,7 @@ $ rm bla/bli/plouf
 $ rmdir bla/bli
 $ echo 'I should be a directory' > bla/bli
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Already exists: titi
@@ -1724,7 +1724,7 @@ $ main.exe --no-color tree
 ├++ toto
 └++ tutu
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push bla
+$ main.exe -v --no-color push --yes bla
 Listing files...
 Listing files to push...
 Pushing files...
@@ -1771,7 +1771,7 @@ Error:
   journal has less than 1 redo entries
 Exit code: 1
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Already exists: bla/blo/plouf
@@ -1910,7 +1910,7 @@ $ main.exe --no-color log
 # Test prune on the clone.
 $ echo 'this is a truc' > bla/bli/truc
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push bla/bli
+$ main.exe -v --no-color push --yes bla/bli
 Listing files...
 Listing files to push...
 Already exists: bla/bli/plouf
@@ -2000,7 +2000,7 @@ Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone/
 $ cd /tmp/filou-test/clone
 $ echo 'contents of bla first version' > bla
 $ cd /tmp/filou-test/clone
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Pushing files...
@@ -2010,14 +2010,14 @@ $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone2
 Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone2/
 $ cd /tmp/filou-test/clone2
 $ cd /tmp/filou-test/clone2
-$ main.exe --no-color rm bla
+$ main.exe --no-color rm --yes bla
 Listing files...
 Removing files...
 Storing root...
 Removed 1 files.
 $ echo 'contents of bla second version' > bla
 $ cd /tmp/filou-test/clone2
-$ main.exe -v --no-color push
+$ main.exe -v --no-color push --yes
 Listing files...
 Listing files to push...
 Pushing files...
