@@ -1991,6 +1991,1736 @@ Removed 1 objects totalling 12 B.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
 -->  0 push bla/bli
+# mv: rename a file at the root
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes plif newplif
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 1) (0%)
+plif -> newplif
+Storing root...
+Moved 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├-- newplif
+├++ plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color pull newplif
+Listing files...
+Listing files to pull...
+Pulling files...
+Pulled: newplif
+Pulled 1 files (4 B).
+$ cat newplif
+plif%
+$ cat plif
+plif%
+# mv: rename a file from root to another empty dir
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes newplif plop/newnewplif
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 1) (0%)
+newplif -> plop/newnewplif
+Storing root...
+Moved 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├++ newplif
+├++ plif
+├-- plop/
+│   └-- newnewplif
+├── titi
+├── toto
+└── tutu
+# mv: rename a file from root to another non-empty dir
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes titi bla/newtiti
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 1) (0%)
+titi -> bla/newtiti
+Storing root...
+Moved 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   ├── blo/
+│   │   └── plouf
+│   └-- newtiti
+├++ newplif
+├++ plif
+├-- plop/
+│   └-- newnewplif
+├++ titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 mv titi bla/newtiti
+     1 mv newplif plop/newnewplif
+     2 mv plif newplif
+     3 push bla/bli
+# mv: rename a file to an existing file
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes toto tutu
+Checking paths...
+Error:
+  target tutu already exists and is a not a directory
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   ├── blo/
+│   │   └── plouf
+│   └-- newtiti
+├++ newplif
+├++ plif
+├-- plop/
+│   └-- newnewplif
+├++ titi
+├── toto
+└── tutu
+# mv: check after the previous mv and undo
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 44, file count: 7).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 mv titi bla/newtiti
+     1 mv newplif plop/newnewplif
+     2 mv plif newplif
+     3 push bla/bli
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo 3
+$ rm newplif
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+# mv: move several files to a new dir
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes bla/bli/plouf tutu bidule
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 2) (0%)
+bla/bli/plouf -> bidule/plouf
+Moving files... (1 / 2) (50%)
+tutu -> bidule/tutu
+Storing root...
+Moved 2 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├-- bidule/
+│   ├-- plouf
+│   └-- tutu
+├── bla/
+│   ├── bli/
+│   │   ├++ plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└++ tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes bla/bli/plouf tutu bidule/
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 2) (0%)
+bla/bli/plouf -> bidule/plouf
+Moving files... (1 / 2) (50%)
+tutu -> bidule/tutu
+Storing root...
+Moved 2 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├-- bidule/
+│   ├-- plouf
+│   └-- tutu
+├── bla/
+│   ├── bli/
+│   │   ├++ plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└++ tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# mv: move several files to the root
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes bla/bli/truc bla/blo/plouf .
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 2) (0%)
+bla/bli/truc -> truc
+Moving files... (1 / 2) (50%)
+bla/blo/plouf -> plouf
+Storing root...
+Moved 2 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └++ truc
+│   └++ blo/
+├── plif
+├-- plouf
+├── titi
+├── toto
+├-- truc
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# mv: move a file to a directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes toto bla
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 1) (0%)
+toto -> bla/toto
+Storing root...
+Moved 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   ├── blo/
+│   │   └── plouf
+│   └-- toto
+├── plif
+├── titi
+├++ toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes titi bla/
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 1) (0%)
+titi -> bla/titi
+Storing root...
+Moved 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   ├── blo/
+│   │   └── plouf
+│   ├-- titi
+│   └-- toto
+├── plif
+├++ titi
+├++ toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo 2
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+# mv: rename a directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes bla newbla
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 3) (0%)
+bla/bli/plouf -> newbla/bli/plouf
+Moving files... (1 / 3) (33%)
+bla/bli/truc -> newbla/bli/truc
+Moving files... (2 / 3) (66%)
+bla/blo/plouf -> newbla/blo/plouf
+Storing root...
+Moved 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├++ bla/
+├-- newbla/
+│   ├-- bli/
+│   │   ├-- plouf
+│   │   └-- truc
+│   └-- blo/
+│       └-- plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 44, file count: 7).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# mv: move a directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes bla plop/plif/plouf/
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 3) (0%)
+bla/bli/plouf -> plop/plif/plouf/bla/bli/plouf
+Moving files... (1 / 3) (33%)
+bla/bli/truc -> plop/plif/plouf/bla/bli/truc
+Moving files... (2 / 3) (66%)
+bla/blo/plouf -> plop/plif/plouf/bla/blo/plouf
+Storing root...
+Moved 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├++ bla/
+├── plif
+├-- plop/
+│   └-- plif/
+│       └-- plouf/
+│           └-- bla/
+│               ├-- bli/
+│               │   ├-- plouf
+│               │   └-- truc
+│               └-- blo/
+│                   └-- plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 44, file count: 7).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# mv: rename a directory into a deep directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes bla plop/plif/plouf
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 3) (0%)
+bla/bli/plouf -> plop/plif/plouf/bli/plouf
+Moving files... (1 / 3) (33%)
+bla/bli/truc -> plop/plif/plouf/bli/truc
+Moving files... (2 / 3) (66%)
+bla/blo/plouf -> plop/plif/plouf/blo/plouf
+Storing root...
+Moved 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├++ bla/
+├── plif
+├-- plop/
+│   └-- plif/
+│       └-- plouf/
+│           ├-- bli/
+│           │   ├-- plouf
+│           │   └-- truc
+│           └-- blo/
+│               └-- plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes plop/plif/plouf/bli bidule/machin
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 2) (0%)
+plop/plif/plouf/bli/plouf -> bidule/machin/plouf
+Moving files... (1 / 2) (50%)
+plop/plif/plouf/bli/truc -> bidule/machin/truc
+Storing root...
+Moved 2 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├-- bidule/
+│   └-- machin/
+│       ├-- plouf
+│       └-- truc
+├++ bla/
+├── plif
+├-- plop/
+│   └-- plif/
+│       └-- plouf/
+│           └-- blo/
+│               └-- plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 44, file count: 7).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo 2
+# mv: move a directory into a directory that already exists
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes bla/blo bla/bli
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 1) (0%)
+bla/blo/plouf -> bla/bli/blo/plouf
+Storing root...
+Moved 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├-- blo/
+│   │   │   └-- plouf
+│   │   ├── plouf
+│   │   └── truc
+│   └++ blo/
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes bla/blo bla/bli/
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 1) (0%)
+bla/blo/plouf -> bla/bli/blo/plouf
+Storing root...
+Moved 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├-- blo/
+│   │   │   └-- plouf
+│   │   ├── plouf
+│   │   └── truc
+│   └++ blo/
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# mv: move a file and a directory at the same time
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes plif bla/bli some/new/directory
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 3) (0%)
+plif -> some/new/directory/plif
+Moving files... (1 / 3) (33%)
+bla/bli/plouf -> some/new/directory/bli/plouf
+Moving files... (2 / 3) (66%)
+bla/bli/truc -> some/new/directory/bli/truc
+Storing root...
+Moved 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├++ bli/
+│   └── blo/
+│       └── plouf
+├++ plif
+├-- some/
+│   └-- new/
+│       └-- directory/
+│           ├-- bli/
+│           │   ├-- plouf
+│           │   └-- truc
+│           └-- plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes plif bla/bli some/new/directory/
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 3) (0%)
+plif -> some/new/directory/plif
+Moving files... (1 / 3) (33%)
+bla/bli/plouf -> some/new/directory/bli/plouf
+Moving files... (2 / 3) (66%)
+bla/bli/truc -> some/new/directory/bli/truc
+Storing root...
+Moved 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├++ bli/
+│   └── blo/
+│       └── plouf
+├++ plif
+├-- some/
+│   └-- new/
+│       └-- directory/
+│           ├-- bli/
+│           │   ├-- plouf
+│           │   └-- truc
+│           └-- plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# mv: move a file onto itself
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes toto toto
+Checking paths...
+Error:
+  target toto already exists and is a not a directory
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+# mv: move a file into a directory named after itself
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes plif plif/newplif
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 1) (0%)
+plif -> plif/newplif
+Storing root...
+Moved 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif?
+├── titi
+├── toto
+└── tutu
+$ cat plif
+plif%
+$ rm plif
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├-- plif/
+│   └-- newplif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color pull
+Listing files...
+Listing files to pull...
+Already exists: bla/bli/plouf
+Already exists: bla/bli/truc
+Already exists: bla/blo/plouf
+Already exists: titi
+Already exists: toto
+Already exists: tutu
+Pulling files...
+Pulled: plif/newplif
+Pulled 1 files (4 B).
+$ cat plif/newplif
+plif%
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+$ rm -r -f /tmp/filou-test/clone/plif
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color pull
+Listing files...
+Listing files to pull...
+Already exists: bla/bli/plouf
+Already exists: bla/bli/truc
+Already exists: bla/blo/plouf
+Already exists: titi
+Already exists: toto
+Already exists: tutu
+Pulling files...
+Pulled: plif
+Pulled 1 files (4 B).
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes plif plif/
+Checking paths...
+Error:
+  target plif already exists and is a not a directory
+Exit code: 1
+# mv: rename a directory into the root directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes bla/bli .
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 2) (0%)
+bla/bli/plouf -> bli/plouf
+Moving files... (1 / 2) (50%)
+bla/bli/truc -> bli/truc
+Storing root...
+Moved 2 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├++ bli/
+│   └── blo/
+│       └── plouf
+├-- bli/
+│   ├-- plouf
+│   └-- truc
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# mv: rename a less deep directory into the root directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes bla .
+Checking paths...
+Listing files...
+Moving files...
+Moving files... (0 / 3) (0%)
+bla/bli/plouf -> bla/bli/plouf
+Moving files... (1 / 3) (33%)
+bla/bli/truc -> bla/bli/truc
+Moving files... (2 / 3) (66%)
+bla/blo/plouf -> bla/blo/plouf
+Storing root...
+Moved 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# mv: move the root directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes . bla/bli
+Checking paths...
+Error:
+  cannot move the root directory
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color mv --yes . bla/bli/
+Checking paths...
+Error:
+  cannot move the root directory
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 44, file count: 7).
+All files are available.
+Hash index is consistent with the directory structure.
+# cp: rename a file at the root
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes plif newplif
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 1) (0%)
+plif -> newplif
+Storing root...
+Copied 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /newplif
+│           = /plif
+├-- newplif
+│   = /bla/blo/plouf
+│   = /plif
+├── plif
+│   = /bla/blo/plouf
+│   = /newplif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color pull newplif
+Listing files...
+Listing files to pull...
+Pulling files...
+Pulled: newplif
+Pulled 1 files (4 B).
+$ cat newplif
+plif%
+$ cat plif
+plif%
+# cp: copy a file from root to another empty dir
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes newplif plop/newnewplif
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 1) (0%)
+newplif -> plop/newnewplif
+Storing root...
+Copied 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /newplif
+│           = /plif
+│           = /plop/newnewplif
+├── newplif
+│   = /bla/blo/plouf
+│   = /plif
+│   = /plop/newnewplif
+├── plif
+│   = /bla/blo/plouf
+│   = /newplif
+│   = /plop/newnewplif
+├-- plop/
+│   └-- newnewplif
+│       = /bla/blo/plouf
+│       = /newplif
+│       = /plif
+├── titi
+├── toto
+└── tutu
+# cp: copy a file from root to another non-empty dir
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes titi bla/newtiti
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 1) (0%)
+titi -> bla/newtiti
+Storing root...
+Copied 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   ├── blo/
+│   │   └── plouf
+│   │       = /newplif
+│   │       = /plif
+│   │       = /plop/newnewplif
+│   └-- newtiti
+│       = /titi
+├── newplif
+│   = /bla/blo/plouf
+│   = /plif
+│   = /plop/newnewplif
+├── plif
+│   = /bla/blo/plouf
+│   = /newplif
+│   = /plop/newnewplif
+├-- plop/
+│   └-- newnewplif
+│       = /bla/blo/plouf
+│       = /newplif
+│       = /plif
+├── titi
+│   = /bla/newtiti
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 cp titi bla/newtiti
+     1 cp newplif plop/newnewplif
+     2 cp plif newplif
+     3 push bla/bli
+# cp: copy a file to an existing file
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes toto tutu
+Checking paths...
+Error:
+  target tutu already exists and is a not a directory
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   ├── blo/
+│   │   └── plouf
+│   │       = /newplif
+│   │       = /plif
+│   │       = /plop/newnewplif
+│   └-- newtiti
+│       = /titi
+├── newplif
+│   = /bla/blo/plouf
+│   = /plif
+│   = /plop/newnewplif
+├── plif
+│   = /bla/blo/plouf
+│   = /newplif
+│   = /plop/newnewplif
+├-- plop/
+│   └-- newnewplif
+│       = /bla/blo/plouf
+│       = /newplif
+│       = /plif
+├── titi
+│   = /bla/newtiti
+├── toto
+└── tutu
+# cp: check after the previous cp and undo
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 58, file count: 10).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 cp titi bla/newtiti
+     1 cp newplif plop/newnewplif
+     2 cp plif newplif
+     3 push bla/bli
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo 3
+$ rm newplif
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+# cp: copy several files to a new dir
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes bla/bli/plouf tutu bidule
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 2) (0%)
+bla/bli/plouf -> bidule/plouf
+Copying files... (1 / 2) (50%)
+tutu -> bidule/tutu
+Storing root...
+Copied 2 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├-- bidule/
+│   ├-- plouf
+│   │   = /bla/bli/plouf
+│   └-- tutu
+│       = /tutu
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   │   = /bidule/plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+    = /bidule/tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes bla/bli/plouf tutu bidule/
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 2) (0%)
+bla/bli/plouf -> bidule/plouf
+Copying files... (1 / 2) (50%)
+tutu -> bidule/tutu
+Storing root...
+Copied 2 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├-- bidule/
+│   ├-- plouf
+│   │   = /bla/bli/plouf
+│   └-- tutu
+│       = /tutu
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   │   = /bidule/plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+    = /bidule/tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# cp: copy several files to the root
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes bla/bli/truc bla/blo/plouf .
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 2) (0%)
+bla/bli/truc -> truc
+Copying files... (1 / 2) (50%)
+bla/blo/plouf -> plouf
+Storing root...
+Copied 2 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   │       = /truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+│           = /plouf
+├── plif
+│   = /bla/blo/plouf
+│   = /plouf
+├-- plouf
+│   = /bla/blo/plouf
+│   = /plif
+├── titi
+├── toto
+├-- truc
+│   = /bla/bli/truc
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# cp: copy a file to a directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes toto bla
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 1) (0%)
+toto -> bla/toto
+Storing root...
+Copied 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   ├── blo/
+│   │   └── plouf
+│   │       = /plif
+│   └-- toto
+│       = /toto
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+│   = /bla/toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes titi bla/
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 1) (0%)
+titi -> bla/titi
+Storing root...
+Copied 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   ├── blo/
+│   │   └── plouf
+│   │       = /plif
+│   ├-- titi
+│   │   = /titi
+│   └-- toto
+│       = /toto
+├── plif
+│   = /bla/blo/plouf
+├── titi
+│   = /bla/titi
+├── toto
+│   = /bla/toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo 2
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+# cp: copy a directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes bla newbla
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 3) (0%)
+bla/bli/plouf -> newbla/bli/plouf
+Copying files... (1 / 3) (33%)
+bla/bli/truc -> newbla/bli/truc
+Copying files... (2 / 3) (66%)
+bla/blo/plouf -> newbla/blo/plouf
+Storing root...
+Copied 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   │   = /newbla/bli/plouf
+│   │   └── truc
+│   │       = /newbla/bli/truc
+│   └── blo/
+│       └── plouf
+│           = /newbla/blo/plouf
+│           = /plif
+├-- newbla/
+│   ├-- bli/
+│   │   ├-- plouf
+│   │   │   = /bla/bli/plouf
+│   │   └-- truc
+│   │       = /bla/bli/truc
+│   └-- blo/
+│       └-- plouf
+│           = /bla/blo/plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+│   = /newbla/blo/plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 66, file count: 10).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# cp: copy a directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes bla plop/plif/plouf/
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 3) (0%)
+bla/bli/plouf -> plop/plif/plouf/bla/bli/plouf
+Copying files... (1 / 3) (33%)
+bla/bli/truc -> plop/plif/plouf/bla/bli/truc
+Copying files... (2 / 3) (66%)
+bla/blo/plouf -> plop/plif/plouf/bla/blo/plouf
+Storing root...
+Copied 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   │   = /plop/plif/plouf/bla/bli/plouf
+│   │   └── truc
+│   │       = /plop/plif/plouf/bla/bli/truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+│           = /plop/plif/plouf/bla/blo/plouf
+├── plif
+│   = /bla/blo/plouf
+│   = /plop/plif/plouf/bla/blo/plouf
+├-- plop/
+│   └-- plif/
+│       └-- plouf/
+│           └-- bla/
+│               ├-- bli/
+│               │   ├-- plouf
+│               │   │   = /bla/bli/plouf
+│               │   └-- truc
+│               │       = /bla/bli/truc
+│               └-- blo/
+│                   └-- plouf
+│                       = /bla/blo/plouf
+│                       = /plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 66, file count: 10).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# cp: copy a directory into a deep directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes bla plop/plif/plouf
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 3) (0%)
+bla/bli/plouf -> plop/plif/plouf/bli/plouf
+Copying files... (1 / 3) (33%)
+bla/bli/truc -> plop/plif/plouf/bli/truc
+Copying files... (2 / 3) (66%)
+bla/blo/plouf -> plop/plif/plouf/blo/plouf
+Storing root...
+Copied 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   │   = /plop/plif/plouf/bli/plouf
+│   │   └── truc
+│   │       = /plop/plif/plouf/bli/truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+│           = /plop/plif/plouf/blo/plouf
+├── plif
+│   = /bla/blo/plouf
+│   = /plop/plif/plouf/blo/plouf
+├-- plop/
+│   └-- plif/
+│       └-- plouf/
+│           ├-- bli/
+│           │   ├-- plouf
+│           │   │   = /bla/bli/plouf
+│           │   └-- truc
+│           │       = /bla/bli/truc
+│           └-- blo/
+│               └-- plouf
+│                   = /bla/blo/plouf
+│                   = /plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes plop/plif/plouf/bli bidule/machin
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 2) (0%)
+plop/plif/plouf/bli/plouf -> bidule/machin/plouf
+Copying files... (1 / 2) (50%)
+plop/plif/plouf/bli/truc -> bidule/machin/truc
+Storing root...
+Copied 2 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├-- bidule/
+│   └-- machin/
+│       ├-- plouf
+│       │   = /bla/bli/plouf
+│       │   = /plop/plif/plouf/bli/plouf
+│       └-- truc
+│           = /bla/bli/truc
+│           = /plop/plif/plouf/bli/truc
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   │   = /bidule/machin/plouf
+│   │   │   = /plop/plif/plouf/bli/plouf
+│   │   └── truc
+│   │       = /bidule/machin/truc
+│   │       = /plop/plif/plouf/bli/truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+│           = /plop/plif/plouf/blo/plouf
+├── plif
+│   = /bla/blo/plouf
+│   = /plop/plif/plouf/blo/plouf
+├-- plop/
+│   └-- plif/
+│       └-- plouf/
+│           ├-- bli/
+│           │   ├-- plouf
+│           │   │   = /bidule/machin/plouf
+│           │   │   = /bla/bli/plouf
+│           │   └-- truc
+│           │       = /bidule/machin/truc
+│           │       = /bla/bli/truc
+│           └-- blo/
+│               └-- plouf
+│                   = /bla/blo/plouf
+│                   = /plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 84, file count: 12).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo 2
+# cp: copy a directory into a directory that already exists
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes bla/blo bla/bli
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 1) (0%)
+bla/blo/plouf -> bla/bli/blo/plouf
+Storing root...
+Copied 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├-- blo/
+│   │   │   └-- plouf
+│   │   │       = /bla/blo/plouf
+│   │   │       = /plif
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /bla/bli/blo/plouf
+│           = /plif
+├── plif
+│   = /bla/bli/blo/plouf
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes bla/blo bla/bli/
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 1) (0%)
+bla/blo/plouf -> bla/bli/blo/plouf
+Storing root...
+Copied 1 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├-- blo/
+│   │   │   └-- plouf
+│   │   │       = /bla/blo/plouf
+│   │   │       = /plif
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /bla/bli/blo/plouf
+│           = /plif
+├── plif
+│   = /bla/bli/blo/plouf
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# cp: copy a file and a directory at the same time
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes plif bla/bli some/new/directory
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 3) (0%)
+plif -> some/new/directory/plif
+Copying files... (1 / 3) (33%)
+bla/bli/plouf -> some/new/directory/bli/plouf
+Copying files... (2 / 3) (66%)
+bla/bli/truc -> some/new/directory/bli/truc
+Storing root...
+Copied 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   │   = /some/new/directory/bli/plouf
+│   │   └── truc
+│   │       = /some/new/directory/bli/truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+│           = /some/new/directory/plif
+├── plif
+│   = /bla/blo/plouf
+│   = /some/new/directory/plif
+├-- some/
+│   └-- new/
+│       └-- directory/
+│           ├-- bli/
+│           │   ├-- plouf
+│           │   │   = /bla/bli/plouf
+│           │   └-- truc
+│           │       = /bla/bli/truc
+│           └-- plif
+│               = /bla/blo/plouf
+│               = /plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes plif bla/bli some/new/directory/
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 3) (0%)
+plif -> some/new/directory/plif
+Copying files... (1 / 3) (33%)
+bla/bli/plouf -> some/new/directory/bli/plouf
+Copying files... (2 / 3) (66%)
+bla/bli/truc -> some/new/directory/bli/truc
+Storing root...
+Copied 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   │   = /some/new/directory/bli/plouf
+│   │   └── truc
+│   │       = /some/new/directory/bli/truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+│           = /some/new/directory/plif
+├── plif
+│   = /bla/blo/plouf
+│   = /some/new/directory/plif
+├-- some/
+│   └-- new/
+│       └-- directory/
+│           ├-- bli/
+│           │   ├-- plouf
+│           │   │   = /bla/bli/plouf
+│           │   └-- truc
+│           │       = /bla/bli/truc
+│           └-- plif
+│               = /bla/blo/plouf
+│               = /plif
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# cp: copy a file onto itself
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes toto toto
+Checking paths...
+Error:
+  target toto already exists and is a not a directory
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+# cp: copy a file into a directory named after itself
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes plif plif/newplif
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 1) (0%)
+Error:
+  failed to add file: plif/newplif:
+  parent directory already exists as a file: plif
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+$ cat plif
+plif%
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes plif plif/
+Checking paths...
+Error:
+  target plif already exists and is a not a directory
+Exit code: 1
+# cp: copy a directory into the root directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes bla/bli .
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 2) (0%)
+bla/bli/plouf -> bli/plouf
+Copying files... (1 / 2) (50%)
+bla/bli/truc -> bli/truc
+Storing root...
+Copied 2 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   │   = /bli/plouf
+│   │   └── truc
+│   │       = /bli/truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+├-- bli/
+│   ├-- plouf
+│   │   = /bla/bli/plouf
+│   └-- truc
+│       = /bla/bli/truc
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# cp: copy a less deep directory into the root directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes bla .
+Checking paths...
+Listing files...
+Copying files...
+Copying files... (0 / 3) (0%)
+Already exists: bla/bli/plouf
+Copying files... (1 / 3) (33%)
+Already exists: bla/bli/truc
+Copying files... (2 / 3) (66%)
+Already exists: bla/blo/plouf
+Storing root...
+Copied 3 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree --duplicates
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+│           = /plif
+├── plif
+│   = /bla/blo/plouf
+├── titi
+├── toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo
+# cp: copy the root directory
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes . bla/bli
+Checking paths...
+Error:
+  cannot copy the root directory
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color cp --yes . bla/bli/
+Checking paths...
+Error:
+  cannot copy the root directory
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 44, file count: 7).
+All files are available.
+Hash index is consistent with the directory structure.
 # Push a file, remove it and re-push it from another clone.
 $ rm -r -f /tmp/filou-test/main
 $ rm -r -f /tmp/filou-test/clone

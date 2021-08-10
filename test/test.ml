@@ -186,6 +186,12 @@ struct
   let rm ?v ?dry_run ?color ?(r = false) paths =
     run ?v ?dry_run ?color ("rm" :: "--yes" :: flag r "-r" @ paths)
 
+  let mv ?(v = true) ?dry_run ?color paths =
+    run ~v ?dry_run ?color ("mv" :: "--yes" :: paths)
+
+  let cp ?(v = true) ?dry_run ?color paths =
+    run ~v ?dry_run ?color ("cp" :: "--yes" :: paths)
+
   let check ?v ?dry_run ?color ?path ?(cache = false) () =
     run ?v ?dry_run ?color ("check" :: flag cache "--cache" @ list_of_option path)
 
@@ -650,6 +656,211 @@ let small_repo () =
   diff_string_sets main_files_1 main_files_2;
   Clone.log ();
 
+  comment "mv: rename a file at the root";
+  Clone.tree ();
+  Clone.mv [ "plif"; "newplif" ];
+  Clone.tree ();
+  Clone.pull [ "newplif" ];
+  cat "newplif";
+  cat "plif";
+  comment "mv: rename a file from root to another empty dir";
+  Clone.mv [ "newplif"; "plop/newnewplif" ];
+  Clone.tree ();
+  comment "mv: rename a file from root to another non-empty dir";
+  Clone.mv [ "titi"; "bla/newtiti" ];
+  Clone.tree ();
+  Clone.log ();
+  comment "mv: rename a file to an existing file";
+  Clone.mv [ "toto"; "tutu" ];
+  Clone.tree ();
+  comment "mv: check after the previous mv and undo";
+  Clone.check ();
+  Clone.log ();
+  Clone.undo ~count: 3 ();
+  rm "newplif";
+  Clone.tree ();
+  comment "mv: move several files to a new dir";
+  Clone.mv [ "bla/bli/plouf"; "tutu"; "bidule" ];
+  Clone.tree ();
+  Clone.undo ();
+  Clone.mv [ "bla/bli/plouf"; "tutu"; "bidule/" ];
+  Clone.tree ();
+  Clone.undo ();
+  comment "mv: move several files to the root";
+  Clone.mv [ "bla/bli/truc"; "bla/blo/plouf"; "." ];
+  Clone.tree ();
+  Clone.undo ();
+  comment "mv: move a file to a directory";
+  Clone.mv [ "toto"; "bla" ];
+  Clone.tree ();
+  Clone.mv [ "titi"; "bla/" ];
+  Clone.tree ();
+  Clone.undo ~count: 2 ();
+  Clone.tree ();
+  comment "mv: rename a directory";
+  Clone.mv [ "bla"; "newbla" ];
+  Clone.tree ();
+  Clone.check ();
+  Clone.undo ();
+  comment "mv: move a directory";
+  Clone.mv [ "bla"; "plop/plif/plouf/" ];
+  Clone.tree ();
+  Clone.check ();
+  Clone.undo ();
+  comment "mv: rename a directory into a deep directory";
+  Clone.mv [ "bla"; "plop/plif/plouf" ];
+  Clone.tree ();
+  Clone.mv [ "plop/plif/plouf/bli"; "bidule/machin" ];
+  Clone.tree ();
+  Clone.check ();
+  Clone.undo ~count: 2 ();
+  comment "mv: move a directory into a directory that already exists";
+  Clone.tree ();
+  Clone.mv [ "bla/blo"; "bla/bli" ];
+  Clone.tree ();
+  Clone.undo ();
+  Clone.mv [ "bla/blo"; "bla/bli/" ];
+  Clone.tree ();
+  Clone.undo ();
+  comment "mv: move a file and a directory at the same time";
+  Clone.tree ();
+  Clone.mv [ "plif"; "bla/bli"; "some/new/directory" ];
+  Clone.tree ();
+  Clone.undo ();
+  Clone.mv [ "plif"; "bla/bli"; "some/new/directory/" ];
+  Clone.tree ();
+  Clone.undo ();
+  comment "mv: move a file onto itself";
+  Clone.mv [ "toto"; "toto" ];
+  Clone.tree ();
+  comment "mv: move a file into a directory named after itself";
+  Clone.tree ();
+  Clone.mv [ "plif"; "plif/newplif" ];
+  Clone.tree ();
+  cat "plif";
+  rm "plif";
+  Clone.tree ();
+  Clone.pull [];
+  cat "plif/newplif";
+  Clone.undo ();
+  rm_rf (clone // "plif");
+  Clone.pull [];
+  Clone.tree ();
+  (* TODO: It's a bit weird that this fails while the previous didn't. *)
+  Clone.mv [ "plif"; "plif/" ];
+  comment "mv: rename a directory into the root directory";
+  Clone.mv [ "bla/bli"; "." ];
+  Clone.tree ();
+  Clone.undo ();
+  comment "mv: rename a less deep directory into the root directory";
+  Clone.mv [ "bla"; "." ];
+  Clone.tree ();
+  Clone.undo ();
+  comment "mv: move the root directory";
+  Clone.mv [ "."; "bla/bli" ];
+  Clone.mv [ "."; "bla/bli/" ];
+  Clone.check ();
+
+  comment "cp: rename a file at the root";
+  Clone.tree ();
+  Clone.cp [ "plif"; "newplif" ];
+  Clone.tree ~duplicates: true ();
+  Clone.pull [ "newplif" ];
+  cat "newplif";
+  cat "plif";
+  comment "cp: copy a file from root to another empty dir";
+  Clone.cp [ "newplif"; "plop/newnewplif" ];
+  Clone.tree ~duplicates: true ();
+  comment "cp: copy a file from root to another non-empty dir";
+  Clone.cp [ "titi"; "bla/newtiti" ];
+  Clone.tree ~duplicates: true ();
+  Clone.log ();
+  comment "cp: copy a file to an existing file";
+  Clone.cp [ "toto"; "tutu" ];
+  Clone.tree ~duplicates: true ();
+  comment "cp: check after the previous cp and undo";
+  Clone.check ();
+  Clone.log ();
+  Clone.undo ~count: 3 ();
+  rm "newplif";
+  Clone.tree ~duplicates: true ();
+  comment "cp: copy several files to a new dir";
+  Clone.cp [ "bla/bli/plouf"; "tutu"; "bidule" ];
+  Clone.tree ~duplicates: true ();
+  Clone.undo ();
+  Clone.cp [ "bla/bli/plouf"; "tutu"; "bidule/" ];
+  Clone.tree ~duplicates: true ();
+  Clone.undo ();
+  comment "cp: copy several files to the root";
+  Clone.cp [ "bla/bli/truc"; "bla/blo/plouf"; "." ];
+  Clone.tree ~duplicates: true ();
+  Clone.undo ();
+  comment "cp: copy a file to a directory";
+  Clone.cp [ "toto"; "bla" ];
+  Clone.tree ~duplicates: true ();
+  Clone.cp [ "titi"; "bla/" ];
+  Clone.tree ~duplicates: true ();
+  Clone.undo ~count: 2 ();
+  Clone.tree ~duplicates: true ();
+  (* TODO: should cp require a -r flag for the following? *)
+  comment "cp: copy a directory";
+  Clone.cp [ "bla"; "newbla" ];
+  Clone.tree ~duplicates: true ();
+  Clone.check ();
+  Clone.undo ();
+  comment "cp: copy a directory";
+  Clone.cp [ "bla"; "plop/plif/plouf/" ];
+  Clone.tree ~duplicates: true ();
+  Clone.check ();
+  Clone.undo ();
+  comment "cp: copy a directory into a deep directory";
+  Clone.cp [ "bla"; "plop/plif/plouf" ];
+  Clone.tree ~duplicates: true ();
+  Clone.cp [ "plop/plif/plouf/bli"; "bidule/machin" ];
+  Clone.tree ~duplicates: true ();
+  Clone.check ();
+  Clone.undo ~count: 2 ();
+  comment "cp: copy a directory into a directory that already exists";
+  Clone.tree ~duplicates: true ();
+  Clone.cp [ "bla/blo"; "bla/bli" ];
+  Clone.tree ~duplicates: true ();
+  Clone.undo ();
+  Clone.cp [ "bla/blo"; "bla/bli/" ];
+  Clone.tree ~duplicates: true ();
+  Clone.undo ();
+  comment "cp: copy a file and a directory at the same time";
+  Clone.tree ~duplicates: true ();
+  Clone.cp [ "plif"; "bla/bli"; "some/new/directory" ];
+  Clone.tree ~duplicates: true ();
+  Clone.undo ();
+  Clone.cp [ "plif"; "bla/bli"; "some/new/directory/" ];
+  Clone.tree ~duplicates: true ();
+  Clone.undo ();
+  comment "cp: copy a file onto itself";
+  Clone.cp [ "toto"; "toto" ];
+  Clone.tree ~duplicates: true ();
+  comment "cp: copy a file into a directory named after itself";
+  Clone.tree ~duplicates: true ();
+  Clone.cp [ "plif"; "plif/newplif" ];
+  Clone.tree ~duplicates: true ();
+  cat "plif";
+  Clone.cp [ "plif"; "plif/" ];
+  comment "cp: copy a directory into the root directory";
+  Clone.cp [ "bla/bli"; "." ];
+  Clone.tree ~duplicates: true ();
+  Clone.undo ();
+  comment "cp: copy a less deep directory into the root directory";
+  Clone.cp [ "bla"; "." ];
+  Clone.tree ~duplicates: true ();
+  Clone.undo ();
+  comment "cp: copy the root directory";
+  Clone.cp [ "."; "bla/bli" ];
+  Clone.cp [ "."; "bla/bli/" ];
+  Clone.check ();
+
+  (* TODO: tree -D, for a large dir, didn't show duplicates...
+     and the --help of -D is wrong *)
+
   comment "Push a file, remove it and re-push it from another clone.";
   rm_rf main;
   rm_rf clone;
@@ -717,5 +928,5 @@ let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
 
 let () =
   small_repo ();
-(*   large_repo ~files: 1000 ~dirs: 200 (); *)
+(*   large_repo ~files: 10000 ~dirs: 200 (); *)
   ()

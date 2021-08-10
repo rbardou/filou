@@ -34,10 +34,21 @@ val compare_paths: path -> path -> int
 
 val compare_file_paths: file_path -> file_path -> int
 
+type path_with_kind =
+  | Dir of path
+  | File of file_path
+
+val show_path_with_kind: path_with_kind -> string
+
 (** Convert a string to a repository path.
 
-    Suitable for command-line inputs. *)
-val parse_local_path: (Path.absolute, Path.dir) Path.t -> string -> (path, [> `failed ]) r
+    Suitable for command-line inputs.
+
+    Also returns:
+    - [`dir]: path ends with a directory separator;
+    - [`file]: path doesn't end with a directory separator. *)
+val parse_local_path: (Path.absolute, Path.dir) Path.t -> string ->
+  (path_with_kind, [> `failed ]) r
 
 (** Convert a path to a string. *)
 val show_path: path -> string

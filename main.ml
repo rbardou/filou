@@ -247,6 +247,75 @@ let main () =
       );
       (
         Clap.case
+          ~description:
+            "Move files.\n\
+             \n\
+             Only metadata is modified. In the clone, files outside of \
+             the .filou directory are not moved."
+          "mv"
+        @@ fun () ->
+        let paths =
+          Clap.list_string
+            ~description:
+              "Paths of the files to move, and target path.\n\
+               \n\
+               The last path of the list is the target path. Other \
+               paths are source paths.\n\
+               \n\
+               If the target path ends with a directory separator (/) \
+               or is the current directory (.), it is considered to be \
+               a directory path. Else, it is considered to be a file \
+               path. Contrary to the UNIX 'mv' command, Filou will not \
+               try to guess what you mean by testing whether the \
+               target path already exists as a directory.\n\
+               \n\
+               If the target path is a directory path, files and \
+               directories denoted by source paths are moved to this \
+               directory, keeping their original name. If the target \
+               path is a file path, there must be only one source \
+               path, and the file or directory denoted by this source \
+               path is moved with the target path as its new path.\n\
+               \n\
+               For instance, if f is a file and d is a directory \
+               containing two files x and y:\n\
+               \n\
+               mv f t     # f -> t\n\
+               mv f t/    # f -> t/f\n\
+               mv d t     # d/x -> t/x, d/y -> t/y\n\
+               mv d t/    # d/x -> t/d/x, d/y -> t/d/y\n\
+               mv f d t   # error\n\
+               mv f d t/  # f -> t/f, d/x -> t/d/x, d/y -> t/d/y\n"
+            ~placeholder: "PATH"
+            ()
+        in
+        `mv paths
+      );
+      (
+        Clap.case
+          ~description:
+            "Copy files.\n\
+             \n\
+             Same as 'mv' but keep sources. Just like 'mv', this only \
+             modifies metadata. Like all duplicate files, data itself \
+             is not duplicated: all copies will simply point to the \
+             same object hash."
+          "cp"
+        @@ fun () ->
+        let paths =
+          Clap.list_string
+            ~description:
+              "Paths of the files to copy, and target path.\n\
+               \n\
+               See 'mv' for a more detailed description (in particular \
+               regarding the importance of the trailing directory \
+               separator in the target path)."
+            ~placeholder: "PATH"
+            ()
+        in
+        `cp paths
+      );
+      (
+        Clap.case
           ~description: "Check for potential corruptions."
           "check"
         @@ fun () ->
@@ -510,12 +579,21 @@ let main () =
   let device_mode = if dry_run then Device.RO else RW in
   let parse_location = Device.parse_location device_mode in
   let find_local_clone () = Controller.find_local_clone device_mode in
-  let parse_local_path setup string =
+  let parse_local_path_with_kind setup string =
     match Clone.workdir setup with
       | Local (_, root) ->
           Device.parse_local_path root string
       | SSH_filou _ ->
           failed [ "cannot operate on the work directory of remote clone repositories" ]
+  in
+  let parse_local_path setup string =
+    (* TODO: some operations in Controller will use the resulting path
+       as a file if the file exists; if the user explicitely added a /
+       at the end, maybe we should fail instead? *)
+    let* path = parse_local_path_with_kind setup string in
+    match path with
+      | Dir path -> ok path
+      | File path -> ok (Device.path_of_file_path path)
   in
   match
     match command with
@@ -562,6 +640,25 @@ let main () =
           let* setup = find_local_clone ~clone_only: false () in
           let* paths = list_map_e paths (parse_local_path setup) in
           Controller.remove ~recursive ~yes setup paths
+      | `mv paths | `cp paths as command ->
+          let* source_paths, target_path =
+            match List.rev paths with
+              | [] ->
+                  failed [ "missing source and target paths" ]
+              | [ _ ] ->
+                  failed [ "missing target path" ]
+              | head :: tail ->
+                  ok (List.rev tail, head)
+          in
+          let* setup = find_local_clone ~clone_only: false () in
+          let* source_paths = list_map_e source_paths (parse_local_path setup) in
+          let* target_path = parse_local_path_with_kind setup target_path in
+          let action =
+            match command with
+              | `mv _ -> Controller.Move
+              | `cp _ -> Controller.Copy
+          in
+          Controller.copy_or_move_files action ~verbose ~yes setup source_paths target_path
       | `check (cache, hash_all, hash_metadata) ->
           let* setup = find_local_clone ~clone_only: cache () in
           let hash =

@@ -328,12 +328,15 @@ struct
       size: int;
     }
 
+  type found_dir =
+    {
+      dir_path_rev: Device.path;
+      dir_hash: dir hash;
+    }
+
   type found =
     | Found_file of found_file
-    | Found_dir of {
-        dir_path_rev: Device.path;
-        dir_hash: dir hash;
-      }
+    | Found_dir of found_dir
 
   let find setup (root: root) (path: Device.path): (found option, _) r =
     match root with
@@ -379,6 +382,27 @@ struct
     in
     ok (List.rev list)
 
+  let iter_dir_files_recursively setup (found_dir: found_dir)
+      (f: Device.file_path -> found_file -> (unit, _) r) =
+    let rec iter_dir_files_recursively ~subdir_path_rev (dir: dir) =
+      list_iter_e (Filename_map.bindings dir) @@ fun (filename, dir_entry) ->
+      match dir_entry with
+        | File { hash; size } ->
+            f (List.rev subdir_path_rev, filename) {
+              path = (
+                List.rev_append found_dir.dir_path_rev (List.rev subdir_path_rev),
+                filename
+              );
+              hash;
+              size;
+            }
+        | Dir { hash = subdir_hash; _ } ->
+            let* subdir = fetch_or_fail setup subdir_hash in
+            iter_dir_files_recursively ~subdir_path_rev: (filename :: subdir_path_rev) subdir
+    in
+    let* dir = fetch_or_fail setup found_dir.dir_hash in
+    iter_dir_files_recursively ~subdir_path_rev: [] dir
+
   (* Same as [find_exact_list] but iterate instead of returning a list
      and support recursively listing directories (so it only returns files).
      Fails if a path denotes a directory. *)
@@ -392,27 +416,12 @@ struct
     match found with
       | Found_file file ->
           f file
-      | Found_dir { dir_path_rev; dir_hash } ->
+      | Found_dir dir ->
           if recursive then
-            (* [dir_path_rev] = path of [dir], in reverse order *)
-            let rec list_whole_dir dir_path_rev (dir: dir) =
-              list_iter_e (Filename_map.bindings dir) @@ fun (filename, dir_entry) ->
-              match dir_entry with
-                | File { hash; size } ->
-                    f {
-                      path = (List.rev dir_path_rev, filename);
-                      hash;
-                      size;
-                    }
-                | Dir { hash = subdir_hash; _ } ->
-                    let* subdir = fetch_or_fail setup subdir_hash in
-                    list_whole_dir (filename :: dir_path_rev) subdir
-            in
-            let* dir = fetch_or_fail setup dir_hash in
-            list_whole_dir dir_path_rev dir
+            iter_dir_files_recursively setup dir @@ fun _ found_file -> f found_file
           else
             failed [
-              sf "%s is a directory" (Device.show_path (List.rev dir_path_rev))
+              sf "%s is a directory" (Device.show_path (List.rev dir.dir_path_rev));
             ]
 
   (* Same as [iter_exact_list_files] but return a list instead of iterating,
@@ -430,7 +439,8 @@ struct
     ok (List.rev !list)
 
   type add_result =
-    | Already_exists
+    | Already_exists_same
+    | Already_exists_different
     | Added of {
         new_dir_hash: dir hash;
         added_file_hash: Repository.file hash;
@@ -460,8 +470,8 @@ struct
           in
           (
             match update_result with
-              | Already_exists ->
-                  ok Already_exists
+              | Already_exists_same | Already_exists_different as x ->
+                  ok x
               | Added {
                   new_dir_hash = new_head_dir_hash;
                   added_file_hash;
@@ -485,7 +495,7 @@ struct
             | Some (File _) ->
                 (* TODO: check if hashes are the same,
                    without calling Repository.store_file *)
-                ok Already_exists
+                ok Already_exists_same
             | None ->
                 let* added_file_hash, added_file_size = get_hash_and_size () in
                 let dir_entry =
@@ -686,7 +696,7 @@ let check ~clone_only ~hash setup =
             let index = ref 0 in
             let progress () =
               Prout.minor @@ fun () ->
-              sf "Checking hashes (%d / %d) (%d%%)" !index !count (!index * 100 / !count)
+              sf "Checking hashes... (%d / %d) (%d%%)" !index !count (!index * 100 / !count)
             in
             progress ();
             list_iter_e hashes @@ fun hash ->
@@ -1160,9 +1170,14 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
       )
   in
   match add_result with
-    | Already_exists ->
+    | Already_exists_same ->
         if verbose then Prout.echo "Already exists: %s" (Device.show_file_path path);
         ok root
+    | Already_exists_different ->
+        failed [
+          sf "a different file with this name already exists: %s"
+            (Device.show_file_path path);
+        ]
     | Added { new_dir_hash = new_root_dir_hash; added_file_hash; _ } ->
         let* new_hash_index_hash, old_paths =
           Hash_index.add setup root added_file_hash path
@@ -1365,16 +1380,180 @@ let remove ~recursive ~yes setup (paths: Device.path list) =
   Prout.echo "Removed %d files." count;
   unit
 
+type copy_or_move = Copy | Move
+
+let copy_or_move_file (action: copy_or_move) ~verbose setup root
+    (source: Dir.found_file) (target_path: Device.file_path) =
+  let* root =
+    match action with
+      | Copy -> ok root
+      | Move -> remove_file setup root source.path
+  in
+  trace ("failed to add file: " ^ Device.show_file_path target_path) @@
+  let* root_dir = fetch_root_dir setup root in
+  let* add_result =
+    Dir.add setup root_dir target_path @@ fun () ->
+    ok (source.hash, source.size)
+  in
+  match add_result with
+    | Already_exists_same ->
+        if verbose then Prout.echo "Already exists: %s" (Device.show_file_path target_path);
+        ok root
+    | Already_exists_different ->
+        failed [ sf "already exists: %s" (Device.show_file_path target_path) ]
+    | Added { new_dir_hash = new_root_dir_hash; added_file_hash; _ } ->
+        let* new_hash_index_hash, _ =
+          Hash_index.add setup root added_file_hash target_path
+        in
+        if verbose then (
+          Prout.echo "%s -> %s"
+            (Device.show_file_path source.path)
+            (Device.show_file_path target_path)
+        );
+        ok (
+          Non_empty {
+            root_dir = new_root_dir_hash;
+            hash_index = new_hash_index_hash;
+          }
+        )
+
+let copy_or_move_files (action: copy_or_move) ~verbose ~yes setup
+    (source_paths: Device.path list) (target: Device.path_with_kind) =
+  let* journal = Repository.fetch_root setup in
+  let* checked_redo = Check_redo.check ~yes journal in
+  let root = journal.head.root in
+  Prout.major "Checking paths...";
+  let* (_: Filename_set.t) =
+    list_fold_e Filename_set.empty source_paths @@ fun set source_path ->
+    match Device.file_path_of_path source_path with
+      | None ->
+          (* It could make sense (moving ./x to target/x for all x).
+             It makes checking for same filenames more complicated though.
+             And it's also complicated in other places below. *)
+          failed [
+            sf "cannot %s the root directory"
+              (match action with Copy -> "copy" | Move -> "move");
+          ]
+      | Some (_, filename) ->
+          if Filename_set.mem filename set then
+            failed [
+              sf "two sources have the same name and would overwrite each other: %s"
+                (Path.Filename.show filename)
+            ]
+          else
+            ok (Filename_set.add filename set)
+  in
+  let* sources = Dir.find_exact_list setup root source_paths in
+  let* mode =
+    let target_path =
+      match target with
+        | File path -> Device.path_of_file_path path
+        | Dir path -> path
+    in
+    let* found_target = Dir.find setup root target_path in
+    match found_target with
+      | Some (Found_dir _) ->
+          ok (`into_dir (sources, target_path))
+      | Some (Found_file _) ->
+          failed [
+            sf "target %s already exists and is a not a directory"
+              (Device.show_path target_path);
+          ]
+      | None ->
+          match sources, target with
+            | [], _ ->
+                (* Prevented by main.ml. *)
+                failed [ "missing source" ]
+            | [ Found_file source ], File target_path ->
+                ok (`as_file (source, target_path))
+            | [ Found_dir source ], File target_path ->
+                ok (`as_dir (source, target_path))
+            | _ :: _:: _, File _
+            | _, Dir _ ->
+                ok (`into_dir (sources, target_path))
+  in
+  Prout.major "Listing files...";
+  let count = ref 0 in
+  let incr_count () =
+    incr count;
+    Prout.minor (fun () -> sf "Listing files... (%d)" !count);
+  in
+  let* files =
+    let list_for_as_dir acc (source: Dir.found_dir) (target_path: Device.file_path) =
+      let acc = ref acc in
+      let* () =
+        Dir.iter_dir_files_recursively setup source @@
+        fun (relative_dir, filename) found_file ->
+        incr_count ();
+        acc := (
+          found_file,
+          ((Device.path_of_file_path target_path @ relative_dir, filename)
+           : Device.file_path)
+        ) :: !acc;
+        unit
+      in
+      ok !acc
+    in
+    match mode with
+      | `as_file (source, target_path) ->
+          incr_count ();
+          ok [ source, target_path ]
+      | `as_dir (source, target_path) ->
+          list_for_as_dir [] source target_path
+      | `into_dir (sources, target_path) ->
+          list_fold_e [] sources @@ fun acc source ->
+          match source with
+            | Found_file ({ path = (_, filename); _ } as file) ->
+                incr_count ();
+                ok ((file, (target_path, filename)) :: acc)
+            | Found_dir { dir_path_rev = []; _ } ->
+                (* Cannot happen because we already filtered those out. *)
+                failed [ "cannot move the root directory" ]
+            | Found_dir ({ dir_path_rev = (filename :: _); _ } as dir) ->
+                list_for_as_dir acc dir (target_path, filename)
+  in
+  let files = List.rev files in
+  let count = !count in
+  Prout.major "%s files..." (match action with Copy -> "Copying" | Move -> "Moving");
+  let* root =
+    let index = ref 0 in
+    list_fold_e root files @@ fun root (source, target_path) ->
+    Prout.major "%s files... (%d / %d) (%d%%)"
+      (match action with Copy -> "Copying" | Move -> "Moving")
+      !index count (!index * 100 / count);
+    incr index;
+    copy_or_move_file action ~verbose setup root source target_path
+  in
+  Prout.major "Storing root...";
+  let* () =
+    store_root ~checked_redo setup root @@
+    String.concat " " (
+      (
+        match action with
+          | Copy -> "cp"
+          | Move -> "mv"
+      )
+      :: List.map Device.show_path source_paths
+      @ [ Device.show_path_with_kind target ]
+    )
+  in
+  (
+    match action with
+      | Copy -> Prout.echo "Copied %d files." count
+      | Move -> Prout.echo "Moved %d files." count
+  );
+  unit
+
 let update setup =
   let* count =
     Prout.major_s "Computing reachable object set...";
     let on_availability_check_progress ~checked ~count =
       Prout.minor @@ fun () ->
-      sf "Checking availability (%d / %d) (%d%%)" checked count (checked * 100 / count)
+      sf "Checking availability... (%d / %d) (%d%%)" checked count (checked * 100 / count)
     in
     let on_copy_progress ~transferred ~count =
       Prout.minor @@ fun () ->
-      sf "Copying (%d / %d) (%d%%)" transferred count (transferred * 100 / count)
+      sf "Copying... (%d / %d) (%d%%)" transferred count (transferred * 100 / count)
     in
     Repository.update ~on_availability_check_progress ~on_copy_progress setup
   in

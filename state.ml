@@ -2,6 +2,7 @@ open Misc
 
 type 'a hash = 'a Repository.hash
 
+module Filename_set = Set.Make (Path.Filename)
 module Filename_map = Map.Make (Path.Filename)
 
 module File_hash =

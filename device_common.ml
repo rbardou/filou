@@ -32,35 +32,6 @@ let device_path_of_path full_path =
   in
   gather [] full_path
 
-let parse_local_path repository_root string =
-  match Path.parse string with
-    | None ->
-        failed [ "invalid path: \"" ^ String.escaped string ^ "\"" ]
-    | Some path ->
-        match
-          Path.Any.to_absolute path
-          |> Path.Any_kind.to_relative ~from: repository_root
-        with
-          | R_empty ->
-              OK []
-          | R_none ->
-              failed [
-                "path denotes a file that is outside of the repository directory: "
-                ^ string
-              ]
-          | R_some (D path) ->
-              (* TODO: some operations in Controller will use the resulting path
-                 as a file if the file exists; if the user explicitely added a /
-                 at the end, maybe we should fail instead? *)
-              device_path_of_path path
-          | R_some (F path) ->
-              device_path_of_path path
-
-let show_path (path: path) =
-  match path with
-    | [] -> "."
-    | _ -> String.concat "/" (List.map Path.Filename.show path)
-
 let path_of_file_path ((path, file): file_path) =
   path @ [ file ]
 
@@ -71,8 +42,44 @@ let file_path_of_path (path: path) =
     | head :: tail ->
         Some (List.rev tail, head)
 
+type path_with_kind =
+  | Dir of path
+  | File of file_path
+
+let parse_local_path repository_root string =
+  match Path.parse string with
+    | None ->
+        failed [ "invalid path: \"" ^ String.escaped string ^ "\"" ]
+    | Some path ->
+        match
+          Path.Any.to_absolute path
+          |> Path.Any_kind.to_relative ~from: repository_root
+        with
+          | R_empty ->
+              OK (Dir [])
+          | R_none ->
+              failed [
+                "path denotes a file that is outside of the repository directory: "
+                ^ string
+              ]
+          | R_some (D path) ->
+              let* path = device_path_of_path path in
+              ok (Dir path)
+          | R_some (F (File (filename, parent))) ->
+              let* parent = device_path_of_path parent in
+              ok (File (parent, filename))
+
+let show_path (path: path) =
+  match path with
+    | [] -> "."
+    | _ -> String.concat "/" (List.map Path.Filename.show path)
+
 let show_file_path path =
   show_path (path_of_file_path path)
+
+let show_path_with_kind = function
+  | Dir path -> show_path path ^ "/"
+  | File path -> show_file_path path
 
 let compare_paths a b = String.compare (show_path a) (show_path b)
 let compare_file_paths a b = compare_paths (path_of_file_path a) (path_of_file_path b)
