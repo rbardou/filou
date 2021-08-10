@@ -211,7 +211,7 @@ struct
                   let* bucket = fetch_or_fail setup bucket_hash in
                   File_hash_map.find_opt hash bucket |> default File_path_set.empty |> ok
               | Node { zero; one } ->
-                  find (bit + 1) (if get_bit hash_bin bit then zero else one)
+                  find (bit + 1) (if get_bit hash_bin bit then one else zero)
           in
           find 0 hash_index
 
