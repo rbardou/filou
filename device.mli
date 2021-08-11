@@ -6,6 +6,8 @@ type location =
   | Local of mode * Device_local.location
   | SSH_filou of mode * Device_ssh_filou.location
 
+val mode: location -> mode
+
 val parse_location: mode -> string -> (location, [> `failed ]) r
 
 val show_location: location -> string
@@ -141,7 +143,8 @@ val file_exists: location -> file_path -> (bool, [> `failed ]) r
 val dir_exists: location -> path -> (bool, [> `failed ]) r
 
 (** Also returns the size. *)
-val hash: location -> file_path -> (Hash.t * int, [> `no_such_file | `failed ]) r
+val hash: on_progress: (bytes: int -> size: int -> unit) ->
+  location -> file_path -> (Hash.t * int, [> `no_such_file | `failed ]) r
 
 (** Copy a file.
 

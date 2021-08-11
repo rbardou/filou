@@ -6,6 +6,11 @@ type location =
   | Local of mode * Device_local.location
   | SSH_filou of mode * Device_ssh_filou.location
 
+let mode = function
+  | Local (mode, _)
+  | SSH_filou (mode, _) ->
+      mode
+
 let parse_location mode string =
   match Device_location_lexer.location (Lexing.from_string string) with
     | `invalid ->
@@ -165,18 +170,32 @@ let dir_exists location (path: path) =
     | OK (File _) ->
         ok false
 
-let hash location path =
-  read_file_incrementally location path @@ fun read ->
-  let bytes = Bytes.create 4096 in
-  let rec loop partial total_length =
-    let* len = read bytes 0 4096 in
-    let total_length = total_length + len in
-    if len <= 0 then
-      ok (Hash.finish partial, total_length)
-    else
-      loop (Hash.feed_bytes partial bytes 0 len) total_length
-  in
-  loop (Hash.start ()) 0
+(* TODO: with ssh+filou, do this on the remote. *)
+let hash ~on_progress location path =
+  let* stat = stat location (path_of_file_path path) in
+  match stat with
+    | Dir ->
+        error `no_such_file [ "no such file: " ^ (show_file_path path) ]
+    | File { size; _ } ->
+        read_file_incrementally location path @@ fun read ->
+        let bytes = Bytes.create 4096 in
+        let rec loop partial total_length =
+          let* len = read bytes 0 4096 in
+          let total_length = total_length + len in
+          if len <= 0 then
+            ok (Hash.finish partial, total_length)
+          else (
+            on_progress ~bytes: total_length ~size;
+            loop (Hash.feed_bytes partial bytes 0 len) total_length
+          )
+        in
+        let* hash, total_length = loop (Hash.start ()) 0 in
+        if total_length <> size then
+          failed [
+            sf "hashed %d bytes, but file size is %d" total_length size;
+          ]
+        else
+          ok (hash, total_length)
 
 let copy_file
     ~on_progress

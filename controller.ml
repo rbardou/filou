@@ -709,7 +709,19 @@ let check ~clone_only ~hash setup =
             in
             progress ();
             list_iter_e hashes @@ fun hash ->
-            let* () = Repository.check_hash setup hash in
+            let* () =
+              let on_progress ~bytes ~size =
+                Prout.minor @@ fun () ->
+                sf "Checking hashes... (%d / %d) (%d%%) %s (%s / %s) (%d%%)"
+                  !index !count (!index * 100 / !count)
+                  (Hash.to_hex hash)
+                  (show_size bytes) (show_size size)
+                  (bytes * 100 / size)
+              in
+              Repository.check_hash
+                ~on_progress
+                setup hash
+            in
             incr index;
             progress ();
             unit
@@ -765,29 +777,6 @@ let check ~clone_only ~hash setup =
         in
         Prout.echo_s "Hash index is consistent with the directory structure.";
         unit
-
-let show_size size =
-  (* By using string_of_int instead of divisions and modulos we
-     are more compatible with 32bit architectures. *)
-  let str = string_of_int size in
-  let len = String.length str in
-  if len <= 3 then
-    Printf.sprintf "%s B" str
-  else
-    let with_unit unit =
-      let f =
-        match String.length str mod 3 with
-          | 1 -> Printf.sprintf "%c.%c%c %s"
-          | 2 -> Printf.sprintf "%c%c.%c %s"
-          | _ -> Printf.sprintf "%c%c%c %s"
-      in
-      f str.[0] str.[1] str.[2] unit
-    in
-    if len <= 6 then with_unit "kB" else
-    if len <= 9 then with_unit "MB" else
-    if len <= 12 then with_unit "GB" else
-    if len <= 14 then with_unit "TB" else
-      Printf.sprintf "%d TB" (size / 1_000_000_000_000)
 
 type merged_dir_entry =
   | MDE_main of State.dir_entry
@@ -1027,7 +1016,15 @@ let tree ~color ~max_depth ~only_main ~only_dirs
                     (* Could also be [Dir] but we'll do the same in both cases. *)
                     ok Cash.Does_not_exist
                 | Some file_path ->
-                    Cash.get setup file_path
+                    let on_progress ~bytes ~size =
+                      Prout.minor @@ fun () ->
+                      sf "Hashing... (%s / %s) (%d%%)"
+                        (show_size bytes) (show_size size)
+                        (bytes * 100 / size)
+                    in
+                    let result = Cash.get ~on_progress setup file_path in
+                    Prout.clear_progress ();
+                    result
             in
             if
               match status with
@@ -1192,23 +1189,37 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
   trace ("failed to push file: " ^ Device.show_file_path path) @@
   let* root_dir = fetch_root_dir setup root in
   let* add_result =
+    let on_hash_progress ~bytes ~size =
+      Prout.minor @@ fun () ->
+      sf "Pushing... (%s / %s) (%d%%) (file %d / %d) - hashing (%s / %s) (%d%%)"
+        (show_size pushed_size) (show_size total_size_to_push)
+        (pushed_size * 100 / total_size_to_push)
+        file_index file_count
+        (show_size bytes) (show_size size)
+        (bytes * 100 / size)
+    in
     let get_hash_and_size () =
-      Repository.store_file
-        ~source: (Clone.workdir setup)
-        ~source_path: path
-        ~target: setup
-        ~on_progress: (
-          fun ~bytes ~size: _ ->
-            let bytes = bytes + pushed_size in
-            let size = total_size_to_push in
-            Prout.minor @@ fun () ->
-            sf "Pushing... (%d / %d) (%d%%) (file %d / %d) %s"
-              bytes size (bytes * 100 / size)
-              file_index file_count (Device.show_file_path path)
-        )
+      let* hash, size =
+        Repository.store_file
+          ~on_hash_progress
+          ~on_copy_progress: (
+            fun ~bytes ~size: _ ->
+              let bytes = bytes + pushed_size in
+              let size = total_size_to_push in
+              Prout.minor @@ fun () ->
+              sf "Pushing... (%s / %s) (%d%%) (file %d / %d) %s"
+                (show_size bytes) (show_size size) (bytes * 100 / size)
+                file_index file_count (Device.show_file_path path)
+          )
+          ~source: (Clone.workdir setup)
+          ~source_path: path
+          ~target: setup
+      in
+      Cash.set setup path (Repository.hash_of_hash hash);
+      ok (hash, size)
     in
     let get_hash_just_checking () =
-      let* status = Cash.get setup path in
+      let* status = Cash.get ~on_progress: on_hash_progress setup path in
       ok (match status with Does_not_exist | Dir -> None | File hash -> Some hash)
     in
     Dir.add setup root_dir path get_hash_and_size get_hash_just_checking
@@ -1290,7 +1301,16 @@ let push ~verbose ~yes setup (paths: Device.path list) =
       | Some (Found_dir _) ->
           failed [ sf "%s already exists as a directory" (Device.show_file_path file_path) ]
       | Some (Found_file { path; hash; _ }) ->
-          let* status = Cash.get setup path in
+          let* status =
+            let on_progress ~bytes ~size =
+              Prout.minor @@ fun () ->
+              sf "Listing files to push... (%d / %d) (%d%%) - hashing (%s / %s) (%d%%)"
+                !file_index file_count (!file_index * 100 / file_count)
+                (show_size size) (show_size bytes)
+                (size * 100 / bytes)
+            in
+            Cash.get ~on_progress setup path
+          in
           match status with
             | Does_not_exist | Dir ->
                 (* This is inconsistent with the list of files we found before. *)
@@ -1345,7 +1365,16 @@ let pull ~verbose setup (paths: Device.path list) =
       sf "Listing files to pull... (%d / %d) (%d%%)"
         !file_index file_count (!file_index * 100 / file_count)
     );
-    let* status = Cash.get setup file.path in
+    let* status =
+      let on_progress ~bytes ~size =
+        Prout.minor @@ fun () ->
+        sf "Listing files to pull... (%d / %d) (%d%%) - hashing (%s / %s) (%d%%)"
+          !file_index file_count (!file_index * 100 / file_count)
+          (show_size size) (show_size bytes)
+          (size * 100 / bytes)
+      in
+      Cash.get ~on_progress setup file.path
+    in
     match status with
       | Does_not_exist ->
           ok true

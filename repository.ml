@@ -130,13 +130,15 @@ sig
   val fetch_raw: t -> Hash.t ->
     (string, [> `failed | `not_available ]) r
 
-  val store_file: source: Device.location -> source_path: Device.file_path -> target: t ->
-    on_progress: (bytes: int -> size: int -> unit) ->
+  val store_file:
+    on_hash_progress: (bytes: int -> size: int -> unit) ->
+    on_copy_progress: (bytes: int -> size: int -> unit) ->
+    source: Device.location -> source_path: Device.file_path -> target: t ->
     (file hash * int, [> `failed ]) r
 
-  val fetch_file: source: t -> file hash ->
-    target: Device.location -> target_path: Device.file_path ->
+  val fetch_file:
     on_progress: (bytes: int -> size: int -> unit) ->
+    source: t -> file hash -> target: Device.location -> target_path: Device.file_path ->
     (unit, [> `failed | `not_available | `already_exists ]) r
 
   val get_file_size: t -> file hash ->
@@ -163,7 +165,8 @@ sig
   val transfer_root: ?on_progress: (int -> unit) -> source: t -> target: t -> unit ->
     (unit, [> `failed ]) r
 
-  val check_hash: t -> Hash.t -> (unit, [> `failed | `corrupted | `not_available ]) r
+  val check_hash: on_progress: (bytes: int -> size: int -> unit) ->
+    t -> Hash.t -> (unit, [> `failed | `corrupted | `not_available ]) r
 
   val get_object_size: t -> Hash.t -> (int, [> `failed | `not_available ]) r
 end
@@ -274,10 +277,14 @@ struct
       | ERROR { code = `failed; _ } | OK _ as x ->
           x
 
-  let store_file ~source ~source_path ~target ~on_progress =
+  let store_file ~on_hash_progress ~on_copy_progress ~source ~source_path ~target =
     trace ("failed to store " ^ Device.show_file_path source_path) @@
     let* hash, size =
-      match Device.hash source source_path with
+      match
+        Device.hash
+          ~on_progress: on_hash_progress
+          source source_path
+      with
         | ERROR { code = (`no_such_file | `failed); msg } ->
             failed msg
         | OK _ as x ->
@@ -289,7 +296,7 @@ struct
       ok (File_hash_with_size (hash, size), size)
     else
       match
-        Device.copy_file ~on_progress: (fun bytes -> on_progress ~bytes ~size)
+        Device.copy_file ~on_progress: (fun bytes -> on_copy_progress ~bytes ~size)
           ~source: (source, source_path) ~target: (target, hash_path)
       with
         | ERROR { code = (`no_such_file | `failed); msg } ->
@@ -297,7 +304,7 @@ struct
         | OK () ->
             ok (File_hash_with_size (hash, size), size)
 
-  let fetch_file ~source hash ~target ~target_path ~on_progress =
+  let fetch_file ~on_progress ~source hash ~target ~target_path =
     trace ("failed to fetch file " ^ Device.show_file_path target_path) @@
     match hash with
     | Value_hash _ ->
@@ -544,11 +551,15 @@ struct
         | OK () as x ->
             x
 
-  let check_hash location (expected_hash: Hash.t) =
+  let check_hash ~on_progress location (expected_hash: Hash.t) =
     let file_path = file_path_of_hash expected_hash in
     let* hash, _ =
       trace (sf "failed to check hash of object %s" (Hash.to_hex expected_hash)) @@
-      match Device.hash location file_path with
+      match
+        Device.hash
+          ~on_progress
+          location file_path
+      with
         | ERROR { code = `no_such_file; msg } ->
             error `not_available msg
         | ERROR { code = `failed; _ } | OK _ as x ->

@@ -107,19 +107,19 @@ struct
       | OK _ as x ->
           x
 
-  let store_file ~source ~source_path ~target ~on_progress =
+  let store_file ~on_hash_progress ~on_copy_progress ~source ~source_path ~target =
     match target.main with
       | None ->
           failed [ "cannot store files in clone-only mode" ]
       | Some main ->
-          R.store_file ~source ~source_path ~target: main ~on_progress
+          R.store_file ~on_hash_progress ~on_copy_progress ~source ~source_path ~target: main
 
-  let fetch_file ~source hash ~target ~target_path ~on_progress =
+  let fetch_file ~on_progress ~source hash ~target ~target_path =
     match source.main with
       | None ->
           failed [ "cannot fetch files in clone-only mode" ]
       | Some main ->
-          R.fetch_file ~source: main hash ~target ~target_path ~on_progress
+          R.fetch_file ~on_progress ~source: main hash ~target ~target_path
 
   let get_file_size setup hash =
     match setup.main with
@@ -240,15 +240,15 @@ struct
           in
           ok (main_count + clone_count, main_size + clone_size)
 
-  let check_hash setup hash =
+  let check_hash ~on_progress setup hash =
     let* () =
       match setup.main with
         | None ->
             unit
         | Some main ->
-            R.check_hash main hash
+            R.check_hash ~on_progress main hash
     in
-    match R.check_hash setup.clone_dot_filou hash with
+    match R.check_hash ~on_progress setup.clone_dot_filou hash with
       | ERROR { code = `not_available; _ } ->
           unit
       | x ->

@@ -83,16 +83,18 @@ sig
     (string, [> `failed | `not_available ]) r
 
   (** Store a file as an object. *)
-  val store_file: source: Device.location -> source_path: Device.file_path -> target: t ->
-    on_progress: (bytes: int -> size: int -> unit) ->
+  val store_file:
+    on_hash_progress: (bytes: int -> size: int -> unit) ->
+    on_copy_progress: (bytes: int -> size: int -> unit) ->
+    source: Device.location -> source_path: Device.file_path -> target: t ->
     (file hash * int, [> `failed ]) r
 
   (** Fetch an object into a file.
 
       Return [false] if the file was not available. *)
-  val fetch_file: source: t -> file hash ->
-    target: Device.location -> target_path: Device.file_path ->
+  val fetch_file:
     on_progress: (bytes: int -> size: int -> unit) ->
+    source: t -> file hash -> target: Device.location -> target_path: Device.file_path ->
     (unit, [> `failed | `not_available | `already_exists ]) r
 
   (** Get the size of a file, given its hash. *)
@@ -142,7 +144,8 @@ sig
     (unit, [> `failed ]) r
 
   (** Check whether an object is corrupted. *)
-  val check_hash: t -> Hash.t -> (unit, [> `failed | `corrupted | `not_available ]) r
+  val check_hash: on_progress: (bytes: int -> size: int -> unit) ->
+    t -> Hash.t -> (unit, [> `failed | `corrupted | `not_available ]) r
 
   (** Get the size of an object on disk. *)
   val get_object_size: t -> Hash.t -> (int, [> `failed | `not_available ]) r

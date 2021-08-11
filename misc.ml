@@ -102,3 +102,26 @@ let rec list_take ?(acc = []) n l =
           List.rev acc
       | head :: tail ->
           list_take ~acc: (head :: acc) (n - 1) tail
+
+let show_size size =
+  (* By using string_of_int instead of divisions and modulos we
+     are more compatible with 32bit architectures. *)
+  let str = string_of_int size in
+  let len = String.length str in
+  if len <= 3 then
+    Printf.sprintf "%s B" str
+  else
+    let with_unit unit =
+      let f =
+        match String.length str mod 3 with
+          | 1 -> Printf.sprintf "%c.%c%c %s"
+          | 2 -> Printf.sprintf "%c%c.%c %s"
+          | _ -> Printf.sprintf "%c%c%c %s"
+      in
+      f str.[0] str.[1] str.[2] unit
+    in
+    if len <= 6 then with_unit "kB" else
+    if len <= 9 then with_unit "MB" else
+    if len <= 12 then with_unit "GB" else
+    if len <= 14 then with_unit "TB" else
+      Printf.sprintf "%d TB" (size / 1_000_000_000_000)
