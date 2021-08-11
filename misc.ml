@@ -88,6 +88,11 @@ let decode_robin_string typ string =
 
 let warn x = Printf.ksprintf (Prout.echo "Warning: %s") x
 
+let warn_msg error_msg x =
+  Printf.ksprintf
+    (fun s -> Prout.echo "Warning: %s: %s" s (String.concat ": " error_msg))
+    x
+
 let rec list_take ?(acc = []) n l =
   if n <= 0 then
     List.rev acc

@@ -88,7 +88,7 @@ let main () =
           ~set_short: 'D'
           ~description:
             "For files that have copies in other directories, print \
-             the total number of copies."
+             the path of those copies."
           false
       in
       let cache =
@@ -262,29 +262,13 @@ let main () =
                The last path of the list is the target path. Other \
                paths are source paths.\n\
                \n\
-               If the target path ends with a directory separator (/) \
-               or is the current directory (.), it is considered to be \
-               a directory path. Else, it is considered to be a file \
-               path. Contrary to the UNIX 'mv' command, Filou will not \
-               try to guess what you mean by testing whether the \
-               target path already exists as a directory.\n\
-               \n\
-               If the target path is a directory path, files and \
-               directories denoted by source paths are moved to this \
-               directory, keeping their original name. If the target \
-               path is a file path, there must be only one source \
-               path, and the file or directory denoted by this source \
-               path is moved with the target path as its new path.\n\
-               \n\
-               For instance, if f is a file and d is a directory \
-               containing two files x and y:\n\
-               \n\
-               mv f t     # f -> t\n\
-               mv f t/    # f -> t/f\n\
-               mv d t     # d/x -> t/x, d/y -> t/y\n\
-               mv d t/    # d/x -> t/d/x, d/y -> t/d/y\n\
-               mv f d t   # error\n\
-               mv f d t/  # f -> t/f, d/x -> t/d/x, d/y -> t/d/y\n"
+               If the target is a directory, or if there are several \
+               sources, sources are moved into this directory. If \
+               there is only one source and the target does not exist, \
+               the behavior depends on whether the target path denotes \
+               a directory (i.e. is '.' or ends with a directory \
+               separator): if it denotes a directory, the source is \
+               moved into this directory. Else, the source is renamed."
             ~placeholder: "PATH"
             ()
         in
@@ -578,7 +562,12 @@ let main () =
   );
   let device_mode = if dry_run then Device.RO else RW in
   let parse_location = Device.parse_location device_mode in
-  let find_local_clone () = Controller.find_local_clone device_mode in
+  let with_local_clone ~clone_only f =
+    let* setup = Controller.find_local_clone ~clone_only device_mode in
+    let result = f setup in
+    Cash.save setup;
+    result
+  in
   let parse_local_path_with_kind setup string =
     match Clone.workdir setup with
       | Local (_, root) ->
@@ -608,7 +597,7 @@ let main () =
           paths, max_depth, only_main, only_dirs, print_size, print_file_count,
           print_duplicates, cache, full_dir_paths
         ) ->
-          let* setup = find_local_clone ~clone_only: cache () in
+          with_local_clone ~clone_only: cache @@ fun setup ->
           let paths =
             match paths with
               | [] -> [ "." ]
@@ -618,7 +607,7 @@ let main () =
           Controller.tree ~color ~max_depth ~only_main ~only_dirs ~print_size
             ~print_file_count ~print_duplicates ~full_dir_paths setup paths
       | `push paths ->
-          let* setup = find_local_clone ~clone_only: false () in
+          with_local_clone ~clone_only: false @@ fun setup ->
           let paths =
             match paths with
               | [] -> [ "." ]
@@ -627,7 +616,7 @@ let main () =
           let* paths = list_map_e paths (parse_local_path setup) in
           Controller.push ~verbose ~yes setup paths
       | `pull paths ->
-          let* setup = find_local_clone ~clone_only: false () in
+          with_local_clone ~clone_only: false @@ fun setup ->
           let paths =
             match paths with
               | [] -> [ "." ]
@@ -637,7 +626,7 @@ let main () =
           Controller.pull ~verbose setup paths
       | `rm (paths, recursive) ->
           (* TODO: show progress "Deleted X files." *)
-          let* setup = find_local_clone ~clone_only: false () in
+          with_local_clone ~clone_only: false @@ fun setup ->
           let* paths = list_map_e paths (parse_local_path setup) in
           Controller.remove ~recursive ~yes setup paths
       | `mv paths | `cp paths as command ->
@@ -650,7 +639,7 @@ let main () =
               | head :: tail ->
                   ok (List.rev tail, head)
           in
-          let* setup = find_local_clone ~clone_only: false () in
+          with_local_clone ~clone_only: false @@ fun setup ->
           let* source_paths = list_map_e source_paths (parse_local_path setup) in
           let* target_path = parse_local_path_with_kind setup target_path in
           let action =
@@ -660,7 +649,7 @@ let main () =
           in
           Controller.copy_or_move_files action ~verbose ~yes setup source_paths target_path
       | `check (cache, hash_all, hash_metadata) ->
-          let* setup = find_local_clone ~clone_only: cache () in
+          with_local_clone ~clone_only: cache @@ fun setup ->
           let hash =
             if hash_all then `all else
             if hash_metadata then `metadata else
@@ -668,32 +657,32 @@ let main () =
           in
           Controller.check ~clone_only: cache ~hash setup
       | `update ->
-          let* setup = find_local_clone ~clone_only: false () in
+          with_local_clone ~clone_only: false @@ fun setup ->
           Controller.update setup
       | `prune (yes, keep_undo, keep_redo, keep) ->
           let keep_undo = max keep_undo keep in
           let keep_redo = max keep_redo keep in
-          let* setup = find_local_clone ~clone_only: false () in
+          with_local_clone ~clone_only: false @@ fun setup ->
           Controller.prune ~yes ~keep_undo ~keep_redo setup
       | `log ->
-          let* setup = find_local_clone ~clone_only: false () in
+          with_local_clone ~clone_only: false @@ fun setup ->
           Controller.log setup
       | `undo count ->
-          let* setup = find_local_clone ~clone_only: false () in
+          with_local_clone ~clone_only: false @@ fun setup ->
           Controller.undo setup ~count
       | `redo count ->
-          let* setup = find_local_clone ~clone_only: false () in
+          with_local_clone ~clone_only: false @@ fun setup ->
           Controller.undo setup ~count: (- count)
       | `diff (before, after) ->
-          let* setup = find_local_clone ~clone_only: false () in
+          with_local_clone ~clone_only: false @@ fun setup ->
           Controller.diff ~color setup ~before ~after
       | `listen ->
           Listen.run ()
       | `stats cache ->
-          let* setup = find_local_clone ~clone_only: cache () in
+          with_local_clone ~clone_only: cache @@ fun setup ->
           Controller.stats setup
       | `show (obj, cache, max_depth) ->
-          let* setup = find_local_clone ~clone_only: cache () in
+          with_local_clone ~clone_only: cache @@ fun setup ->
           Controller.show setup obj ~max_depth
       | `config main ->
           let* main_location = opt_map_e main parse_location in

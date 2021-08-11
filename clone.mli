@@ -10,6 +10,8 @@ val setup:
 
 val main: setup -> Device.location option
 
+val clone_dot_filou: setup -> Device.location
+
 (** Returns the location given to [setup], i.e. not [.filou]. *)
 val workdir: setup -> Device.location
 

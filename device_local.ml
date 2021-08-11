@@ -255,8 +255,8 @@ let stat (location: location) (path: path) =
               failed_to_read_file full_path_string [ Unix.error_message error ]
           | { st_kind = S_DIR; _ } ->
               OK Dir
-          | { st_kind = S_REG; st_size; _ } ->
-              OK (File { size = st_size })
+          | { st_kind = S_REG; st_size; st_mtime; _ } ->
+              OK (File { size = st_size; mtime = st_mtime })
           | { st_kind = (S_CHR | S_BLK | S_LNK | S_FIFO | S_SOCK); _ } ->
               failed [ "not a regular file or a directory: " ^ full_path_string ]
 

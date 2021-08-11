@@ -18,6 +18,7 @@ let setup ~main ~workdir ?clone_dot_filou () =
   }
 
 let main { main; _ } = main
+let clone_dot_filou { clone_dot_filou; _ } = clone_dot_filou
 let workdir { workdir; _ } = workdir
 
 module type S =

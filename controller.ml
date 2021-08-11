@@ -448,7 +448,8 @@ struct
       }
 
   let add setup (root_dir: dir) ((dir_path, filename): Device.file_path)
-      (get_hash_and_size: unit -> (Repository.file Repository.hash * int, _) r):
+      (get_hash_and_size: unit -> (Repository.file Repository.hash * int, _) r)
+      (get_hash_just_checking: unit -> (Hash.t option, _) r):
     (add_result, [> `failed ]) r =
     let rec update_dir dir_path_rev (dir: dir) = function
       | head :: tail ->
@@ -492,10 +493,18 @@ struct
           match Filename_map.find_opt filename dir with
             | Some (Dir _) ->
                 failed [ "file already exists as a directory" ]
-            | Some (File _) ->
-                (* TODO: check if hashes are the same,
-                   without calling Repository.store_file *)
-                ok Already_exists_same
+            | Some (File { hash; _ }) ->
+                let* new_hash = get_hash_just_checking () in
+                (
+                  match new_hash with
+                    | None ->
+                        ok Already_exists_same
+                    | Some new_hash ->
+                        if Hash.compare new_hash (Repository.hash_of_hash hash) = 0 then
+                          ok Already_exists_same
+                        else
+                          ok Already_exists_different
+                )
             | None ->
                 let* added_file_hash, added_file_size = get_hash_and_size () in
                 let dir_entry =
@@ -996,9 +1005,38 @@ let tree ~color ~max_depth ~only_main ~only_dirs
               print_newline ();
               unit
             )
-        | MDE_both (File { hash; size }, File { size = clone_size; _ }) ->
-            (* TODO: also check hash *)
-            if size = clone_size then
+        | MDE_both (File { hash; size }, File _) ->
+            let* status =
+              let file_path =
+                match entry_name with
+                  | TEN_path path ->
+                      (* [dir_path] is not correct in this case. *)
+                      (
+                        match Device.file_path_of_path path with
+                          | None ->
+                              (* This is the root. *)
+                              None
+                          | Some path ->
+                              Some path
+                      )
+                  | TEN_filename filename ->
+                      Some (dir_path, filename)
+              in
+              match file_path with
+                | None ->
+                    (* Could also be [Dir] but we'll do the same in both cases. *)
+                    ok Cash.Does_not_exist
+                | Some file_path ->
+                    Cash.get setup file_path
+            in
+            if
+              match status with
+                | Does_not_exist | Dir ->
+                    (* Inconsistent with what we observed before. *)
+                    false
+                | File workdir_hash ->
+                    Hash.compare workdir_hash (Repository.hash_of_hash hash) = 0
+            then
               (
                 print_prefix_and_filename `file;
                 print_size size;
@@ -1154,20 +1192,26 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
   trace ("failed to push file: " ^ Device.show_file_path path) @@
   let* root_dir = fetch_root_dir setup root in
   let* add_result =
-    Dir.add setup root_dir path @@ fun () ->
-    Repository.store_file
-      ~source: (Clone.workdir setup)
-      ~source_path: path
-      ~target: setup
-      ~on_progress: (
-        fun ~bytes ~size: _ ->
-          let bytes = bytes + pushed_size in
-          let size = total_size_to_push in
-          Prout.minor @@ fun () ->
-          sf "Pushing... (%d / %d) (%d%%) (file %d / %d) %s"
-            bytes size (bytes * 100 / size)
-            file_index file_count (Device.show_file_path path)
-      )
+    let get_hash_and_size () =
+      Repository.store_file
+        ~source: (Clone.workdir setup)
+        ~source_path: path
+        ~target: setup
+        ~on_progress: (
+          fun ~bytes ~size: _ ->
+            let bytes = bytes + pushed_size in
+            let size = total_size_to_push in
+            Prout.minor @@ fun () ->
+            sf "Pushing... (%d / %d) (%d%%) (file %d / %d) %s"
+              bytes size (bytes * 100 / size)
+              file_index file_count (Device.show_file_path path)
+        )
+    in
+    let get_hash_just_checking () =
+      let* status = Cash.get setup path in
+      ok (match status with Does_not_exist | Dir -> None | File hash -> Some hash)
+    in
+    Dir.add setup root_dir path get_hash_and_size get_hash_just_checking
   in
   match add_result with
     | Already_exists_same ->
@@ -1214,7 +1258,7 @@ let push ~verbose ~yes setup (paths: Device.path list) =
         | Dir ->
             Device.iter_read_dir (Clone.workdir setup) path @@ fun filename ->
             add_path (path @ [ filename ])
-        | File { size } ->
+        | File { size; _ } ->
             match Device.file_path_of_path path with
               | None ->
                   (* Should not happen, "." is a directory. *)
@@ -1243,13 +1287,28 @@ let push ~verbose ~yes setup (paths: Device.path list) =
     match found with
       | None ->
           ok true
-      | Some (Found_file _) ->
-          (* TODO: check hash *)
-          if verbose then Prout.echo "Already exists: %s" (Device.show_file_path file_path);
-          ok false
       | Some (Found_dir _) ->
           failed [ sf "%s already exists as a directory" (Device.show_file_path file_path) ]
+      | Some (Found_file { path; hash; _ }) ->
+          let* status = Cash.get setup path in
+          match status with
+            | Does_not_exist | Dir ->
+                (* This is inconsistent with the list of files we found before. *)
+                failed [ sf "%s got removed" (Device.show_file_path path) ]
+            | File new_hash ->
+                if Hash.compare new_hash (Repository.hash_of_hash hash) = 0 then
+                  (
+                    if verbose then
+                      Prout.echo "Already exists: %s" (Device.show_file_path file_path);
+                    ok false
+                  )
+                else
+                  failed [
+                    sf "%s already exists with a different hash"
+                      (Device.show_file_path file_path);
+                  ]
   in
+  let file_count = List.length files_to_push in
   Prout.major_s "Pushing files...";
   let total_size_to_push =
     List.fold_left' 0 files_to_push @@ fun acc (_, size) -> acc + size
@@ -1272,7 +1331,6 @@ let push ~verbose ~yes setup (paths: Device.path list) =
   unit
 
 let pull ~verbose setup (paths: Device.path list) =
-  let workdir = Clone.workdir setup in
   let* root = fetch_root setup in
   Prout.major_s "Listing files...";
   let* files = Dir.find_exact_list_files ~recursive: true setup root paths in
@@ -1287,17 +1345,26 @@ let pull ~verbose setup (paths: Device.path list) =
       sf "Listing files to pull... (%d / %d) (%d%%)"
         !file_index file_count (!file_index * 100 / file_count)
     );
-    match Device.stat workdir (Device.path_of_file_path file.path) with
-      | ERROR { code = `failed; _ } as x ->
-          x
-      | ERROR { code = `no_such_file; _ } ->
+    let* status = Cash.get setup file.path in
+    match status with
+      | Does_not_exist ->
           ok true
-      | OK _ ->
-          (* TODO: check hash *)
-          if verbose then
-            Prout.echo "Already exists: %s"
-              (Device.show_file_path file.path);
-          ok false
+      | Dir ->
+          failed [
+            sf "%s already exists as a directory" (Device.show_file_path file.path);
+          ]
+      | File new_hash ->
+          if Hash.compare new_hash (Repository.hash_of_hash file.hash) = 0 then
+            (
+              if verbose then
+                Prout.echo "Already exists: %s"
+                  (Device.show_file_path file.path);
+              ok false
+            )
+          else
+            failed [
+              sf "%s already exists with a different hash" (Device.show_file_path file.path);
+            ]
   in
   Prout.major_s "Pulling files...";
   let file_count = List.length files_to_pull in
@@ -1392,8 +1459,9 @@ let copy_or_move_file (action: copy_or_move) ~verbose setup root
   trace ("failed to add file: " ^ Device.show_file_path target_path) @@
   let* root_dir = fetch_root_dir setup root in
   let* add_result =
-    Dir.add setup root_dir target_path @@ fun () ->
-    ok (source.hash, source.size)
+    Dir.add setup root_dir target_path
+      (fun () -> ok (source.hash, source.size))
+      (fun () -> ok (Some (Repository.hash_of_hash source.hash)))
   in
   match add_result with
     | Already_exists_same ->

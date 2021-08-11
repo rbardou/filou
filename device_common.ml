@@ -89,7 +89,7 @@ let same_file_paths a b = same_paths (path_of_file_path a) (path_of_file_path b)
 type mode = RW | RO
 
 type stat =
-  | File of { size: int }
+  | File of { size: int; mtime: float }
   | Dir
 
 let failed_to_read_directory path msg =

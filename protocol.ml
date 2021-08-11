@@ -70,8 +70,9 @@ let show_response = function
       "R_ok_read_file_chunk (" ^ string_of_int (String.length data) ^ " bytes)"
   | R_ok_read_file_eof ->
       "R_ok_read_file_eof"
-  | R_ok_stat (File { size }) ->
-      "R_ok_stat (File { size = " ^ string_of_int size ^ " })"
+  | R_ok_stat (File { size; mtime }) ->
+      "R_ok_stat (File { size = " ^ string_of_int size ^
+      "; mtime = " ^ string_of_float mtime ^ " })"
   | R_ok_stat Dir ->
       "R_ok_stat Dir"
   | R_ok_remove_file ->
@@ -123,10 +124,18 @@ let query: query t =
   | Q_remove_file x -> value q_remove_file x
 
 let stat: stat t =
-  let file = case "File" int (fun x -> Device_common.File { size = x }) in
+  let file =
+    let file_stat =
+      record @@
+      ("size", int, fst) @
+      ("mtime", float, snd) @:
+      fun size mtime -> size, mtime
+    in
+    case "File" file_stat (fun (x, y) -> Device_common.File { size = x; mtime = y })
+  in
   let dir = case "Dir" unit (fun () -> Device_common.Dir) in
   variant [ Case file; Case dir ] @@
-  function File { size = x } -> value file x | Dir -> value dir ()
+  function File { size = x; mtime = y } -> value file (x, y) | Dir -> value dir ()
 
 let response: response t =
   let r_failed = case "R_failed" (list string) (fun x -> R_failed x) in

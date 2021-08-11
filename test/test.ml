@@ -858,8 +858,15 @@ let small_repo () =
   Clone.cp [ "."; "bla/bli/" ];
   Clone.check ();
 
-  (* TODO: tree -D, for a large dir, didn't show duplicates...
-     and the --help of -D is wrong *)
+  comment "cash: modify a file (keeping the same size) and try to push it again";
+  Clone.tree ~duplicates: true ();
+  cat "toto";
+  rm "toto";
+  create_file "toto" "TOTTOTTOT";
+  Clone.tree ~duplicates: true ();
+  Clone.push [ "toto" ];
+  Clone.pull [ "toto" ];
+(*   Clone.push ~force: true [ "toto" ]; *) (* TODO *)
 
   comment "Push a file, remove it and re-push it from another clone.";
   rm_rf main;

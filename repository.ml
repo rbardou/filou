@@ -478,7 +478,7 @@ struct
                   garbage_collect_dir sub_path
                 else
                   unit
-          | OK (File { size }) ->
+          | OK (File { size; _ }) ->
               match Hash.of_hex filename_string with
                 | None ->
                     unit
