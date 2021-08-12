@@ -8,11 +8,13 @@ val bin_of_hash: _ hash -> string
 val compare_hashes: _ hash -> _ hash -> int
 val hash_of_hash: _ hash -> Hash.t
 
-module Hash_set: Set.S with type elt = Hash.t
+module Hash_map: Map.S with type key = Hash.t
 
 type file
 
 val file_hash_type: file hash Protype.t
+
+type path_kind = Meta | Data
 
 module type ROOT =
 sig
@@ -118,7 +120,7 @@ sig
   (** Get the set of objects that are reachable from the root.
 
       If [files] is [false], do not return file hashes. Default is [true]. *)
-  val reachable: ?files: bool -> t -> (Hash_set.t, [> `failed ]) r
+  val reachable: ?files: bool -> t -> (path_kind Hash_map.t, [> `failed ]) r
 
   (** Remove unreachable objects.
 
@@ -128,15 +130,16 @@ sig
       If [reachable] is specified, assume that it is the set of reachable
       objects. This can be given to avoid recomputing it if you already
       computed it with [reachable] and did not modify anything in-between. *)
-  val garbage_collect: ?reachable: Hash_set.t -> t -> (int * int, [> `failed ]) r
+  val garbage_collect: ?reachable: path_kind Hash_map.t -> t -> (int * int, [> `failed ]) r
 
   (** Return whether an object is available. *)
-  val available: t -> Hash.t -> (bool, [> `failed ]) r
+  val available: t -> path_kind -> Hash.t -> (bool, [> `failed ]) r
 
   (** Copy an object from a repository to another.
 
       Does nothing if the object is already available in [target]. *)
-  val transfer: ?on_progress: (int -> unit) -> source: t -> target: t -> Hash.t ->
+  val transfer: ?on_progress: (int -> unit) -> source: t -> target: t ->
+    path_kind -> Hash.t ->
     (unit, [> `failed | `not_available ]) r
 
   (** Copy the root from a repository to another. *)
@@ -145,10 +148,12 @@ sig
 
   (** Check whether an object is corrupted. *)
   val check_hash: on_progress: (bytes: int -> size: int -> unit) ->
-    t -> Hash.t -> (unit, [> `failed | `corrupted | `not_available ]) r
+    t -> path_kind -> Hash.t ->
+    (unit, [> `failed | `corrupted | `not_available ]) r
 
   (** Get the size of an object on disk. *)
-  val get_object_size: t -> Hash.t -> (int, [> `failed | `not_available ]) r
+  val get_object_size: t -> path_kind -> Hash.t ->
+    (int, [> `failed | `not_available ]) r
 end
 
 module Make (Root: ROOT): S with type root = Root.t and type t = Device.location

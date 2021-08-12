@@ -82,7 +82,7 @@ struct
               | Some main ->
                   let* () =
                     R.transfer ~source: main ~target: setup.clone_dot_filou
-                      (Repository.hash_of_hash hash)
+                      Meta (Repository.hash_of_hash hash)
                   in
                   R.fetch setup.clone_dot_filou hash
           )
@@ -99,7 +99,9 @@ struct
               | None ->
                   error
               | Some main ->
-                  let* () = R.transfer ~source: main ~target: setup.clone_dot_filou hash in
+                  let* () =
+                    R.transfer ~source: main ~target: setup.clone_dot_filou Meta hash
+                  in
                   R.fetch_raw setup.clone_dot_filou hash
           )
       | ERROR { code = `failed; _ } as x ->
@@ -163,8 +165,8 @@ struct
       | Some main ->
           R.reachable ?files main
 
-  let available setup hash =
-    let* available = R.available setup.clone_dot_filou hash in
+  let available setup kind hash =
+    let* available = R.available setup.clone_dot_filou kind hash in
     if available then
       ok true
     else
@@ -172,9 +174,9 @@ struct
         | None ->
             ok false
         | Some main ->
-            R.available main hash
+            R.available main kind hash
 
-  let transfer ?on_progress: _ ~source: _ ~target: _ _hash =
+  let transfer ?on_progress: _ ~source: _ ~target: _ _kind _hash =
     (* Would we want to transfer to target.main or target.clone_dot_filou? *)
     failed [ "Clone.transfer is not implemented" ]
 
@@ -184,19 +186,19 @@ struct
 
   (* TODO: not very efficient: we read once to decode and compute dependencies,
      and then we read again to copy. We could have R.iter_reachable instead
-     for instance. *)
+     for instance. Or, now that we split meta and data, we could just rsync meta. *)
   let update ~on_availability_check_progress ~on_copy_progress setup =
     match setup.main with
       | None ->
           failed [ "cannot update in clone-only mode" ]
       | Some main ->
           let* hashes = R.reachable ~files: false main in
-          let hashes = Repository.Hash_set.elements hashes in
+          let hashes = Repository.Hash_map.bindings hashes in
           let count = List.length hashes in
           let index = ref 0 in
           let* hashes =
-            list_filter_e hashes @@ fun hash ->
-            let* available = R.available setup.clone_dot_filou hash in
+            list_filter_e hashes @@ fun (hash, kind) ->
+            let* available = R.available setup.clone_dot_filou kind hash in
             incr index;
             on_availability_check_progress ~checked: !index ~count;
             ok (not available)
@@ -204,10 +206,10 @@ struct
           let count = List.length hashes in
           index := 0;
           let* () =
-            list_iter_e hashes @@ fun hash ->
+            list_iter_e hashes @@ fun (hash, kind) ->
             let* () =
               trace (sf "failed to copy %s" (Hash.to_hex hash)) @@
-              match R.transfer ~source: main ~target: setup.clone_dot_filou hash with
+              match R.transfer ~source: main ~target: setup.clone_dot_filou kind hash with
               | ERROR { code = (`not_available | `failed); msg } ->
                   failed msg
               | OK () as x ->
@@ -240,22 +242,22 @@ struct
           in
           ok (main_count + clone_count, main_size + clone_size)
 
-  let check_hash ~on_progress setup hash =
+  let check_hash ~on_progress setup kind hash =
     let* () =
       match setup.main with
         | None ->
             unit
         | Some main ->
-            R.check_hash ~on_progress main hash
+            R.check_hash ~on_progress main kind hash
     in
-    match R.check_hash ~on_progress setup.clone_dot_filou hash with
+    match R.check_hash ~on_progress setup.clone_dot_filou kind hash with
       | ERROR { code = `not_available; _ } ->
           unit
       | x ->
           x
 
-  let get_object_size setup hash =
-    match R.get_object_size setup.clone_dot_filou hash with
+  let get_object_size setup kind hash =
+    match R.get_object_size setup.clone_dot_filou kind hash with
       | OK _ | ERROR { code = `failed; _ } as x ->
           x
       | ERROR { code = `not_available; _ } as not_available ->
@@ -263,6 +265,6 @@ struct
             | None ->
                 not_available
             | Some main ->
-                R.get_object_size main hash
+                R.get_object_size main kind hash
 
 end

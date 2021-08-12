@@ -700,7 +700,7 @@ let check ~clone_only ~hash setup =
           let* () =
             Prout.major_s "Checking hashes: computing the set of reachable objects...";
             let* hashes = Repository.reachable ~files setup in
-            let hashes = Repository.Hash_set.elements hashes in
+            let hashes = Repository.Hash_map.bindings hashes in
             count := List.length hashes;
             let index = ref 0 in
             let progress () =
@@ -708,7 +708,7 @@ let check ~clone_only ~hash setup =
               sf "Checking hashes... (%d / %d) (%d%%)" !index !count (!index * 100 / !count)
             in
             progress ();
-            list_iter_e hashes @@ fun hash ->
+            list_iter_e hashes @@ fun (hash, kind) ->
             let* () =
               let on_progress ~bytes ~size =
                 Prout.minor @@ fun () ->
@@ -720,7 +720,7 @@ let check ~clone_only ~hash setup =
               in
               Repository.check_hash
                 ~on_progress
-                setup hash
+                setup kind hash
             in
             incr index;
             progress ();
@@ -1846,18 +1846,18 @@ let stats setup =
   let* reachable_count, total_bytes, total_disk_usage =
     Prout.major_s "Computing the set of reachable objects...";
     let* hashes = Repository.reachable ~files: false setup in
-    let hashes = Repository.Hash_set.elements hashes in
+    let hashes = Repository.Hash_map.bindings hashes in
     let reachable_count = List.length hashes in
     let* hashes =
       let index = ref 0 in
-      list_map_e hashes @@ fun hash ->
+      list_map_e hashes @@ fun (hash, kind) ->
       incr index;
       (
         Prout.minor @@ fun () ->
         sf "Computing stats... (%d / %d) (%d%%)"
           !index reachable_count (!index * 100 / reachable_count)
       );
-      let* size = Repository.get_object_size setup hash in
+      let* size = Repository.get_object_size setup kind hash in
       ok (hash, size)
     in
     let total_bytes, total_disk_usage =

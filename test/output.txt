@@ -1386,7 +1386,7 @@ $ explore .filou/root
     };
   ];
 }
-$ rm .filou/f8/56/f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
+$ rm .filou/meta/f8/56/f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color update
 Computing reachable object set...
@@ -1397,8 +1397,8 @@ $ main.exe --no-color update
 Computing reachable object set...
 Copied 0 objects.
 Clone is up-to-date.
-$ rm .filou/f8/56/f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
-$ rm .filou/1a/a0/1aa05bf1ef016a9e97f6f3bc2c82cbd8cd2752f930a1cd950f266c97e0cc7146
+$ rm .filou/meta/f8/56/f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
+$ rm .filou/meta/1a/a0/1aa05bf1ef016a9e97f6f3bc2c82cbd8cd2752f930a1cd950f266c97e0cc7146
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color update
 Computing reachable object set...
@@ -1442,111 +1442,112 @@ $ tree -a -s -F
 │   └── [       4096]  blo/
 │       └── [          4]  plouf
 ├── [       4096]  .filou/
-│   ├── [       4096]  00/
-│   │   └── [       4096]  bb/
-│   │       └── [         55]  00bbba45527a63dc06e387bcfa7ba1cff58db18a9be5c02ecdf34b21a06e4ad3
-│   ├── [       4096]  04/
-│   │   └── [       4096]  1b/
-│   │       └── [         87]  041bb80a32e81f618cc49673a5f17a03783377a229b23df5a741a2a768a489aa
-│   ├── [       4096]  0a/
-│   │   └── [       4096]  fa/
-│   │       └── [        146]  0afaf91266bbc2bc41a75ebc88936bcbd318743c215db19affffde5e506219b0
-│   ├── [       4096]  10/
-│   │   └── [       4096]  ea/
-│   │       └── [        248]  10ea1b0380c134e3b9c531db7aa2415e02f07b59238e517c1b4c65233700c1e2
-│   ├── [       4096]  1a/
-│   │   └── [       4096]  a0/
-│   │       └── [         55]  1aa05bf1ef016a9e97f6f3bc2c82cbd8cd2752f930a1cd950f266c97e0cc7146
-│   ├── [       4096]  29/
-│   │   └── [       4096]  92/
-│   │       └── [        289]  2992a334dea55e3c1c56230ee51098b681257eb21639768d15ec9025b434e073
-│   ├── [       4096]  31/
-│   │   └── [       4096]  e7/
-│   │       └── [         55]  31e79206b9420a482daa2db02f6e269a82a8714142c17a1e9203b2b61afb4579
-│   ├── [       4096]  33/
-│   │   ├── [       4096]  65/
-│   │   │   └── [        146]  336516b40325f0cd38f778202ae59d3a232463ef69bf6a32cc8896e9d9d94eb8
-│   │   └── [       4096]  fa/
-│   │       └── [         88]  33fa7d933d2a39bd1db66d2f19c9ff92746adac8b74d3710b594dafa6b814fe0
-│   ├── [       4096]  47/
-│   │   └── [       4096]  23/
-│   │       └── [        247]  4723cddb9030a5d736b781a4e7e20a23190827be1cb5184ceead5e238d65127e
-│   ├── [       4096]  4a/
-│   │   └── [       4096]  f9/
-│   │       └── [        169]  4af93e8267391c302ca27bf4bbf74b97148d615667542f6b9c79175e8073b8b3
-│   ├── [       4096]  5f/
-│   │   └── [       4096]  39/
-│   │       └── [         55]  5f3958fb25b78314cc2ffd423698eb09a21c0bbb58d2084818f300bd08d0a0e3
-│   ├── [       4096]  6f/
-│   │   └── [       4096]  aa/
-│   │       └── [        231]  6faa560d76df81a85379d0fa1c81f6fcf25aeafd5634b55f3cad63ab73b7221e
-│   ├── [       4096]  72/
-│   │   └── [       4096]  34/
-│   │       └── [         97]  7234aa2cce0d88e2989ee3bf636436cb76e6da85d614768bbe384eb3f2a8be43
-│   ├── [       4096]  7d/
-│   │   └── [       4096]  9c/
-│   │       └── [        183]  7d9cb3ee4afef41f386a6b05f2b9538fe6568b49b4b1a51d7acad4c2c5aa0aea
-│   ├── [       4096]  81/
-│   │   └── [       4096]  b1/
-│   │       └── [        297]  81b1442f60655f20cb899c556ffccd6676ee56049c4dc1b493e31dcecfcb2ba9
-│   ├── [       4096]  88/
-│   │   └── [       4096]  14/
-│   │       └── [         88]  88143291117a5d7a915e2b42df089dae05f17b32727e045d93d87ed7249c125c
-│   ├── [       4096]  8f/
-│   │   └── [       4096]  4b/
-│   │       └── [         87]  8f4bf60df203535e6136a7de3f5da6578e6c7753b0dfcd52a9a061ecde694248
-│   ├── [       4096]  90/
-│   │   └── [       4096]  98/
-│   │       └── [        228]  9098d11dc26fe64a32ccd282811ab6ce2f7718832a08f48c3572a2b971e1d384
-│   ├── [       4096]  92/
-│   │   └── [       4096]  0c/
-│   │       └── [        216]  920c172a8e7743d51fe01b08af6950f4f289e16d5f670089d23c48f51b127e0a
-│   ├── [       4096]  96/
-│   │   └── [       4096]  44/
-│   │       └── [         96]  9644f30b737c17c7940b96f741e80fe820ca0435ccd203f49ac427a6e55256ee
-│   ├── [       4096]  9e/
-│   │   └── [       4096]  20/
-│   │       └── [        296]  9e2004f7d7b7e139165ebf9e2a8c0725d4e87fd992c3fbe40f5a8f410c9d3c3e
-│   ├── [       4096]  a2/
-│   │   └── [       4096]  e4/
-│   │       └── [        146]  a2e4306b18f6c3ff89c4493488d6d80b0869c231ac57eb7dbc546e7b4e7a2cc4
-│   ├── [       4096]  ab/
-│   │   └── [       4096]  72/
-│   │       └── [         75]  ab723bb840b48f46fcdb54908bbb958087fad09fd259409607f1a7672cdfb6d7
-│   ├── [       4096]  af/
-│   │   └── [       4096]  0b/
-│   │       └── [         55]  af0b8e52a1f75e2583ef652066d84716fe25d83f587fdabb5b1aaff862c0680b
-│   ├── [       4096]  b3/
-│   │   └── [       4096]  51/
-│   │       └── [         55]  b3511e46440ea5182d9d87882d326588121525dbf79b60e96c02a8ce5fd3bddf
-│   ├── [       4096]  c8/
-│   │   └── [       4096]  e1/
-│   │       └── [         55]  c8e1f1996cd498ec01ecc40590f784a6b52ada9b6a44b1035be9dfda0b40f48d
-│   ├── [       4096]  c9/
-│   │   └── [       4096]  85/
-│   │       └── [         55]  c9853e834c666b6ca58535a3b4b739598ddedcf785d015f25302b41e2edf30ec
 │   ├── [         44]  config
-│   ├── [       4096]  d7/
-│   │   └── [       4096]  81/
-│   │       └── [         96]  d781a8cce39525842da9e53330ae62bcc827cc20817f35383a266914d725011e
-│   ├── [       4096]  e3/
-│   │   ├── [       4096]  b0/
-│   │   │   └── [        183]  e3b04d9c424882cb4d7e6bdf8b26ca3a0efa78a46cd0d6cda698a09733ce516a
-│   │   └── [       4096]  fe/
-│   │       └── [         88]  e3fe3bbcf4c878aa524e1345b9e3dc6f7886c248fad50fc0d82ca6e54cd20930
-│   ├── [       4096]  e5/
-│   │   └── [       4096]  45/
-│   │       └── [         88]  e545af7f5847ba12dfd89827fc5f067530c2fb17b73210d4499de7c0f58e8865
-│   ├── [       4096]  f8/
-│   │   └── [       4096]  56/
-│   │       └── [        297]  f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
+│   ├── [       4096]  meta/
+│   │   ├── [       4096]  00/
+│   │   │   └── [       4096]  bb/
+│   │   │       └── [         55]  00bbba45527a63dc06e387bcfa7ba1cff58db18a9be5c02ecdf34b21a06e4ad3
+│   │   ├── [       4096]  04/
+│   │   │   └── [       4096]  1b/
+│   │   │       └── [         87]  041bb80a32e81f618cc49673a5f17a03783377a229b23df5a741a2a768a489aa
+│   │   ├── [       4096]  0a/
+│   │   │   └── [       4096]  fa/
+│   │   │       └── [        146]  0afaf91266bbc2bc41a75ebc88936bcbd318743c215db19affffde5e506219b0
+│   │   ├── [       4096]  10/
+│   │   │   └── [       4096]  ea/
+│   │   │       └── [        248]  10ea1b0380c134e3b9c531db7aa2415e02f07b59238e517c1b4c65233700c1e2
+│   │   ├── [       4096]  1a/
+│   │   │   └── [       4096]  a0/
+│   │   │       └── [         55]  1aa05bf1ef016a9e97f6f3bc2c82cbd8cd2752f930a1cd950f266c97e0cc7146
+│   │   ├── [       4096]  29/
+│   │   │   └── [       4096]  92/
+│   │   │       └── [        289]  2992a334dea55e3c1c56230ee51098b681257eb21639768d15ec9025b434e073
+│   │   ├── [       4096]  31/
+│   │   │   └── [       4096]  e7/
+│   │   │       └── [         55]  31e79206b9420a482daa2db02f6e269a82a8714142c17a1e9203b2b61afb4579
+│   │   ├── [       4096]  33/
+│   │   │   ├── [       4096]  65/
+│   │   │   │   └── [        146]  336516b40325f0cd38f778202ae59d3a232463ef69bf6a32cc8896e9d9d94eb8
+│   │   │   └── [       4096]  fa/
+│   │   │       └── [         88]  33fa7d933d2a39bd1db66d2f19c9ff92746adac8b74d3710b594dafa6b814fe0
+│   │   ├── [       4096]  47/
+│   │   │   └── [       4096]  23/
+│   │   │       └── [        247]  4723cddb9030a5d736b781a4e7e20a23190827be1cb5184ceead5e238d65127e
+│   │   ├── [       4096]  4a/
+│   │   │   └── [       4096]  f9/
+│   │   │       └── [        169]  4af93e8267391c302ca27bf4bbf74b97148d615667542f6b9c79175e8073b8b3
+│   │   ├── [       4096]  5f/
+│   │   │   └── [       4096]  39/
+│   │   │       └── [         55]  5f3958fb25b78314cc2ffd423698eb09a21c0bbb58d2084818f300bd08d0a0e3
+│   │   ├── [       4096]  6f/
+│   │   │   └── [       4096]  aa/
+│   │   │       └── [        231]  6faa560d76df81a85379d0fa1c81f6fcf25aeafd5634b55f3cad63ab73b7221e
+│   │   ├── [       4096]  72/
+│   │   │   └── [       4096]  34/
+│   │   │       └── [         97]  7234aa2cce0d88e2989ee3bf636436cb76e6da85d614768bbe384eb3f2a8be43
+│   │   ├── [       4096]  7d/
+│   │   │   └── [       4096]  9c/
+│   │   │       └── [        183]  7d9cb3ee4afef41f386a6b05f2b9538fe6568b49b4b1a51d7acad4c2c5aa0aea
+│   │   ├── [       4096]  81/
+│   │   │   └── [       4096]  b1/
+│   │   │       └── [        297]  81b1442f60655f20cb899c556ffccd6676ee56049c4dc1b493e31dcecfcb2ba9
+│   │   ├── [       4096]  88/
+│   │   │   └── [       4096]  14/
+│   │   │       └── [         88]  88143291117a5d7a915e2b42df089dae05f17b32727e045d93d87ed7249c125c
+│   │   ├── [       4096]  8f/
+│   │   │   └── [       4096]  4b/
+│   │   │       └── [         87]  8f4bf60df203535e6136a7de3f5da6578e6c7753b0dfcd52a9a061ecde694248
+│   │   ├── [       4096]  90/
+│   │   │   └── [       4096]  98/
+│   │   │       └── [        228]  9098d11dc26fe64a32ccd282811ab6ce2f7718832a08f48c3572a2b971e1d384
+│   │   ├── [       4096]  92/
+│   │   │   └── [       4096]  0c/
+│   │   │       └── [        216]  920c172a8e7743d51fe01b08af6950f4f289e16d5f670089d23c48f51b127e0a
+│   │   ├── [       4096]  96/
+│   │   │   └── [       4096]  44/
+│   │   │       └── [         96]  9644f30b737c17c7940b96f741e80fe820ca0435ccd203f49ac427a6e55256ee
+│   │   ├── [       4096]  9e/
+│   │   │   └── [       4096]  20/
+│   │   │       └── [        296]  9e2004f7d7b7e139165ebf9e2a8c0725d4e87fd992c3fbe40f5a8f410c9d3c3e
+│   │   ├── [       4096]  a2/
+│   │   │   └── [       4096]  e4/
+│   │   │       └── [        146]  a2e4306b18f6c3ff89c4493488d6d80b0869c231ac57eb7dbc546e7b4e7a2cc4
+│   │   ├── [       4096]  ab/
+│   │   │   └── [       4096]  72/
+│   │   │       └── [         75]  ab723bb840b48f46fcdb54908bbb958087fad09fd259409607f1a7672cdfb6d7
+│   │   ├── [       4096]  af/
+│   │   │   └── [       4096]  0b/
+│   │   │       └── [         55]  af0b8e52a1f75e2583ef652066d84716fe25d83f587fdabb5b1aaff862c0680b
+│   │   ├── [       4096]  b3/
+│   │   │   └── [       4096]  51/
+│   │   │       └── [         55]  b3511e46440ea5182d9d87882d326588121525dbf79b60e96c02a8ce5fd3bddf
+│   │   ├── [       4096]  c8/
+│   │   │   └── [       4096]  e1/
+│   │   │       └── [         55]  c8e1f1996cd498ec01ecc40590f784a6b52ada9b6a44b1035be9dfda0b40f48d
+│   │   ├── [       4096]  c9/
+│   │   │   └── [       4096]  85/
+│   │   │       └── [         55]  c9853e834c666b6ca58535a3b4b739598ddedcf785d015f25302b41e2edf30ec
+│   │   ├── [       4096]  d7/
+│   │   │   └── [       4096]  81/
+│   │   │       └── [         96]  d781a8cce39525842da9e53330ae62bcc827cc20817f35383a266914d725011e
+│   │   ├── [       4096]  e3/
+│   │   │   ├── [       4096]  b0/
+│   │   │   │   └── [        183]  e3b04d9c424882cb4d7e6bdf8b26ca3a0efa78a46cd0d6cda698a09733ce516a
+│   │   │   └── [       4096]  fe/
+│   │   │       └── [         88]  e3fe3bbcf4c878aa524e1345b9e3dc6f7886c248fad50fc0d82ca6e54cd20930
+│   │   ├── [       4096]  e5/
+│   │   │   └── [       4096]  45/
+│   │   │       └── [         88]  e545af7f5847ba12dfd89827fc5f067530c2fb17b73210d4499de7c0f58e8865
+│   │   └── [       4096]  f8/
+│   │       └── [       4096]  56/
+│   │           └── [        297]  f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
 │   └── [       1758]  root
 ├── [          4]  plif
 ├── [          6]  titi
 ├── [          9]  toto
 └── [          3]  tutu
 
-68 directories, 41 files
+69 directories, 41 files
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check --cache
 Directory structure looks ok (total size: 30, file count: 6).
@@ -1881,27 +1882,28 @@ $ tree -a -s -F
 │   └── [       4096]  blo/
 │       └── [          4]  plouf
 ├── [       4096]  .filou/
-│   ├── [       4096]  0a/
-│   │   └── [       4096]  fa/
-│   │       └── [        146]  0afaf91266bbc2bc41a75ebc88936bcbd318743c215db19affffde5e506219b0
 │   ├── [       4096]  cash/
 │   │   └── [       4096]  bla-/
 │   │       └── [       4096]  bli-/
 │   │           └── [        101]  self
 │   ├── [         44]  config
-│   ├── [       4096]  e3/
-│   │   └── [       4096]  fe/
-│   │       └── [         88]  e3fe3bbcf4c878aa524e1345b9e3dc6f7886c248fad50fc0d82ca6e54cd20930
-│   ├── [       4096]  f8/
-│   │   └── [       4096]  56/
-│   │       └── [        297]  f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
+│   ├── [       4096]  meta/
+│   │   ├── [       4096]  0a/
+│   │   │   └── [       4096]  fa/
+│   │   │       └── [        146]  0afaf91266bbc2bc41a75ebc88936bcbd318743c215db19affffde5e506219b0
+│   │   ├── [       4096]  e3/
+│   │   │   └── [       4096]  fe/
+│   │   │       └── [         88]  e3fe3bbcf4c878aa524e1345b9e3dc6f7886c248fad50fc0d82ca6e54cd20930
+│   │   └── [       4096]  f8/
+│   │       └── [       4096]  56/
+│   │           └── [        297]  f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
 │   └── [        175]  root
 ├── [          4]  plif
 ├── [          6]  titi
 ├── [          9]  toto
 └── [          3]  tutu
 
-13 directories, 12 files
+14 directories, 12 files
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color update
 Computing reachable object set...
@@ -1924,17 +1926,17 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color prune --yes
 Removed 10 objects totalling 1.76 kB.
 # Clone: some objects should have been removed, no files should have been added:
-- /tmp/filou-test/clone/.filou/0a/fa/0afaf91266bbc2bc41a75ebc88936bcbd318743c215db19affffde5e506219b0
-- /tmp/filou-test/clone/.filou/1a/a0/1aa05bf1ef016a9e97f6f3bc2c82cbd8cd2752f930a1cd950f266c97e0cc7146
-- /tmp/filou-test/clone/.filou/9e/20/9e2004f7d7b7e139165ebf9e2a8c0725d4e87fd992c3fbe40f5a8f410c9d3c3e
-- /tmp/filou-test/clone/.filou/e3/fe/e3fe3bbcf4c878aa524e1345b9e3dc6f7886c248fad50fc0d82ca6e54cd20930
-- /tmp/filou-test/clone/.filou/f8/56/f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
+- /tmp/filou-test/clone/.filou/meta/0a/fa/0afaf91266bbc2bc41a75ebc88936bcbd318743c215db19affffde5e506219b0
+- /tmp/filou-test/clone/.filou/meta/1a/a0/1aa05bf1ef016a9e97f6f3bc2c82cbd8cd2752f930a1cd950f266c97e0cc7146
+- /tmp/filou-test/clone/.filou/meta/9e/20/9e2004f7d7b7e139165ebf9e2a8c0725d4e87fd992c3fbe40f5a8f410c9d3c3e
+- /tmp/filou-test/clone/.filou/meta/e3/fe/e3fe3bbcf4c878aa524e1345b9e3dc6f7886c248fad50fc0d82ca6e54cd20930
+- /tmp/filou-test/clone/.filou/meta/f8/56/f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
 # Main: should be the same diff:
-- /tmp/filou-test/main/0a/fa/0afaf91266bbc2bc41a75ebc88936bcbd318743c215db19affffde5e506219b0
-- /tmp/filou-test/main/1a/a0/1aa05bf1ef016a9e97f6f3bc2c82cbd8cd2752f930a1cd950f266c97e0cc7146
-- /tmp/filou-test/main/9e/20/9e2004f7d7b7e139165ebf9e2a8c0725d4e87fd992c3fbe40f5a8f410c9d3c3e
-- /tmp/filou-test/main/e3/fe/e3fe3bbcf4c878aa524e1345b9e3dc6f7886c248fad50fc0d82ca6e54cd20930
-- /tmp/filou-test/main/f8/56/f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
+- /tmp/filou-test/main/meta/0a/fa/0afaf91266bbc2bc41a75ebc88936bcbd318743c215db19affffde5e506219b0
+- /tmp/filou-test/main/meta/1a/a0/1aa05bf1ef016a9e97f6f3bc2c82cbd8cd2752f930a1cd950f266c97e0cc7146
+- /tmp/filou-test/main/meta/9e/20/9e2004f7d7b7e139165ebf9e2a8c0725d4e87fd992c3fbe40f5a8f410c9d3c3e
+- /tmp/filou-test/main/meta/e3/fe/e3fe3bbcf4c878aa524e1345b9e3dc6f7886c248fad50fc0d82ca6e54cd20930
+- /tmp/filou-test/main/meta/f8/56/f856f25552b8fc8c6d9e50b7176be4fa4cb39946b3d79c41769e4d795d129286
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 44, file count: 7).
@@ -1967,8 +1969,8 @@ $ explore .filou/root
   };
   undo = [];
 }
-$ rm .filou/5d/1c/5d1cbd2da7c70b70c2a74b432b506e130ed4dadf27fc64a4496d411ee0dcfac2
-$ rm .filou/59/91/5991b49028b00954b9fa769af67c89e030194b25612efff5a864262cfb70a88f
+$ rm .filou/meta/5d/1c/5d1cbd2da7c70b70c2a74b432b506e130ed4dadf27fc64a4496d411ee0dcfac2
+$ rm .filou/meta/59/91/5991b49028b00954b9fa769af67c89e030194b25612efff5a864262cfb70a88f
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color prune --yes
 Removed 0 objects totalling 0 B.
@@ -1982,14 +1984,19 @@ Copied 2 objects.
 Clone is up-to-date.
 # Check that if more objects exist in the clone than in the main, they are removed.
 $ cd /tmp/filou-test/clone
-$ mkdir .filou/01
-$ mkdir .filou/01/23
-$ echo 'dummy object' > .filou/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
+$ mkdir .filou/meta/01
+$ mkdir .filou/meta/01/23
+$ echo 'dummy object' > .filou/meta/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
+$ mkdir .filou/data
+$ mkdir .filou/data/01
+$ mkdir .filou/data/01/23
+$ echo 'dummy object' > .filou/data/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b85a
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color prune --yes
-Removed 1 objects totalling 12 B.
-# Clone: diff should show one removed file:
-- /tmp/filou-test/clone/.filou/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
+Removed 2 objects totalling 24 B.
+# Clone: diff should show one removed meta file and one removed data file:
+- /tmp/filou-test/clone/.filou/data/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b85a
+- /tmp/filou-test/clone/.filou/meta/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
 # Main: diff should be empty:
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
@@ -3825,15 +3832,13 @@ $ main.exe --no-color show -r 1000
         root_dir = b0c9f424feb3ae1cba7fe3807a9ed48aa711d2ee258be31a4d2dd8e275640cd4 =
         [ { File = {
               name = "bla";
-              hash = 20580e3e285f773043630dc3218e4d40339c4e353093c680d54136b5fffcddfa =
-              "";
+              hash = 20580e3e285f773043630dc3218e4d40339c4e353093c680d54136b5fffcddfa;
               size = 30 (hash);
             } } ];
         hash_index = 0f239ca28a64304488fa18e3ffcd2ff424ce29daf73ff562269522207215a332 =
         { Leaf = 7510285b46cec8bca1ba13817a4d0620472d677fbd7cd11545280118fca0d062 =
           [ {
-              hash = 20580e3e285f773043630dc3218e4d40339c4e353093c680d54136b5fffcddfa =
-              "";
+              hash = 20580e3e285f773043630dc3218e4d40339c4e353093c680d54136b5fffcddfa;
               paths = [ [ "bla" ] ];
             } ] };
       } };
@@ -3849,15 +3854,13 @@ $ main.exe --no-color show -r 1000
           root_dir = 9179194f892491c3939217bd61c6ddc1c603bf630cbbe4870a90f97779adf29d =
           [ { File = {
                 name = "bla";
-                hash = 20d3840f86a24fa8883fa9be2c7f9018850bd1855993a300fd6d5572a25bc568 =
-                "";
+                hash = 20d3840f86a24fa8883fa9be2c7f9018850bd1855993a300fd6d5572a25bc568;
                 size = 29;
               } } ];
           hash_index = a00b3532afa8b96f982d13ac61ea2a0066bd30dde320a2807485ddcc42d6b32d =
           { Leaf = d8a56350a217dc077ac9961c126dec7d86b1d16546020deeae7fa5ee43b05a2b =
             [ {
-                hash = 20d3840f86a24fa8883fa9be2c7f9018850bd1855993a300fd6d5572a25bc568 =
-                "";
+                hash = 20d3840f86a24fa8883fa9be2c7f9018850bd1855993a300fd6d5572a25bc568;
                 paths = [ [ "bla" ] ];
               } ] };
         } };

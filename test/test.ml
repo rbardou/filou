@@ -313,8 +313,8 @@ let (=~*) str rex =
     | Some x ->
         x
 
-let dot_filou_hash hash =
-  ".filou" // String.sub hash 0 2 // String.sub hash 2 2 // hash
+let dot_filou_meta_hash hash =
+  ".filou" // "meta" // String.sub hash 0 2 // String.sub hash 2 2 // hash
 
 let small_repo () =
   comment "Initialize a main repository and a clone.";
@@ -548,11 +548,11 @@ let small_repo () =
   let root = explore ".filou/root" in
   let root_dir = root =~* "root_dir = ([0-9a-f]{64})" in
   let hash_index = root =~* "hash_index = ([0-9a-f]{64})" in
-  rm (dot_filou_hash root_dir);
+  rm (dot_filou_meta_hash root_dir);
   Clone.update ();
   Clone.update ();
-  rm (dot_filou_hash root_dir);
-  rm (dot_filou_hash hash_index);
+  rm (dot_filou_meta_hash root_dir);
+  rm (dot_filou_meta_hash hash_index);
   Clone.update ();
   Clone.update ();
   rm_rf (clone // ".filou");
@@ -625,8 +625,8 @@ let small_repo () =
   let root = explore ".filou/root" in
   let root_dir = root =~* "root_dir = ([0-9a-f]{64})" in
   let hash_index = root =~* "hash_index = ([0-9a-f]{64})" in
-  rm (dot_filou_hash root_dir);
-  rm (dot_filou_hash hash_index);
+  rm (dot_filou_meta_hash root_dir);
+  rm (dot_filou_meta_hash hash_index);
   let clone_files_1 = find_files clone in
   let main_files_1 = find_files main in
   Clone.prune ();
@@ -640,17 +640,23 @@ let small_repo () =
   Clone.update ();
   comment "Check that if more objects exist in the clone than in the main, they are removed.";
   cd clone;
-  mkdir ".filou/01";
-  mkdir ".filou/01/23";
+  mkdir ".filou/meta/01";
+  mkdir ".filou/meta/01/23";
   create_file
-    ".filou/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859"
+    ".filou/meta/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859"
+    "dummy object";
+  mkdir ".filou/data";
+  mkdir ".filou/data/01";
+  mkdir ".filou/data/01/23";
+  create_file
+    ".filou/data/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b85a"
     "dummy object";
   let clone_files_1 = find_files clone in
   let main_files_1 = find_files main in
   Clone.prune ();
   let clone_files_2 = find_files clone in
   let main_files_2 = find_files main in
-  comment "Clone: diff should show one removed file:";
+  comment "Clone: diff should show one removed meta file and one removed data file:";
   diff_string_sets clone_files_1 clone_files_2;
   comment "Main: diff should be empty:";
   diff_string_sets main_files_1 main_files_2;

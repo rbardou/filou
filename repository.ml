@@ -15,8 +15,8 @@ open Misc
 type 'a hash_status =
   | Stored
   | Not_stored of {
-      (* Note: the encoded value is also available in the closure, this uses
-         twice the needed amount of memory but also makes it faster to fetch. *)
+      (* TODO: the encoded value is also available in the closure, this uses
+         twice the needed amount of memory. Having [value] makes it faster to fetch though. *)
       value: 'a;
       store: unit -> unit;
     }
@@ -33,6 +33,8 @@ type 'a hash =
   | File_hash_with_size: Hash.t * int -> file hash (* for read-only mode *)
 
 type packed_hash = H: 'a hash -> packed_hash
+
+type path_kind = Meta | Data
 
 let store_not_stored_hash_when_encoding = ref false
 
@@ -100,7 +102,7 @@ let file_hash_type =
   annotate File_hash @@
   convert raw_hash_type ~encode: hash_of_hash ~decode: (fun h -> File_hash h)
 
-module Hash_set = Set.Make (Hash)
+module Hash_map = Map.Make (Hash)
 
 module type ROOT =
 sig
@@ -153,22 +155,25 @@ sig
   val fetch_root_raw: t ->
     (string, [> `failed ]) r
 
-  val reachable: ?files: bool -> t -> (Hash_set.t, [> `failed ]) r
+  val reachable: ?files: bool -> t -> (path_kind Hash_map.t, [> `failed ]) r
 
-  val garbage_collect: ?reachable: Hash_set.t -> t -> (int * int, [> `failed ]) r
+  val garbage_collect: ?reachable: path_kind Hash_map.t -> t -> (int * int, [> `failed ]) r
 
-  val available: t -> Hash.t -> (bool, [> `failed ]) r
+  val available: t -> path_kind -> Hash.t -> (bool, [> `failed ]) r
 
-  val transfer: ?on_progress: (int -> unit) -> source: t -> target: t -> Hash.t ->
+  val transfer: ?on_progress: (int -> unit) -> source: t -> target: t ->
+    path_kind -> Hash.t ->
     (unit, [> `failed | `not_available ]) r
 
   val transfer_root: ?on_progress: (int -> unit) -> source: t -> target: t -> unit ->
     (unit, [> `failed ]) r
 
   val check_hash: on_progress: (bytes: int -> size: int -> unit) ->
-    t -> Hash.t -> (unit, [> `failed | `corrupted | `not_available ]) r
+    t -> path_kind -> Hash.t ->
+    (unit, [> `failed | `corrupted | `not_available ]) r
 
-  val get_object_size: t -> Hash.t -> (int, [> `failed | `not_available ]) r
+  val get_object_size: t -> path_kind -> Hash.t ->
+    (int, [> `failed | `not_available ]) r
 end
 
 exception Failed_to_store_later of string list
@@ -196,18 +201,26 @@ struct
 
   let hash_part_length = 2
 
-  let file_path_of_hash hash =
+  let meta_filename = Path.Filename.parse_exn "meta"
+  let data_filename = Path.Filename.parse_exn "data"
+
+  let file_path_of_hash kind hash =
+    let kind =
+      match kind with
+        | Meta -> meta_filename
+        | Data -> data_filename
+    in
     let hash_string = Hash.to_hex hash in
     (* [Hash.to_hex] always returns a string of length >= 4,
        composed only of valid characters for filenames. *)
     let prefix1 = String.sub hash_string 0 hash_part_length in
     let prefix2 = String.sub hash_string hash_part_length hash_part_length in
-    [ Path.Filename.parse_exn prefix1; Path.Filename.parse_exn prefix2 ],
+    [ kind; Path.Filename.parse_exn prefix1; Path.Filename.parse_exn prefix2 ],
     Path.Filename.parse_exn hash_string
 
   let store_raw_now location hash encoded_value =
     trace ("failed to store object with hash " ^ Hash.to_hex hash) @@
-    let path = file_path_of_hash hash in
+    let path = file_path_of_hash Meta hash in
     let* already_exists = Device.file_exists location path in
     if already_exists then
       unit
@@ -259,7 +272,7 @@ struct
       | Value_hash { status = Not_stored { value; _ }; _ } ->
           ok value
       | Value_hash { status = Stored; hash; typ } ->
-          let path = file_path_of_hash hash in
+          let path = file_path_of_hash Meta hash in
           match Device.read_file location path with
             | ERROR { code = `no_such_file; msg } ->
                 ERROR { code = `not_available; msg }
@@ -270,7 +283,7 @@ struct
 
   let fetch_raw location (hash: Hash.t) =
     trace ("failed to fetch object with hash " ^ Hash.to_hex hash) @@
-    let path = file_path_of_hash hash in
+    let path = file_path_of_hash Meta hash in
     match Device.read_file location path with
       | ERROR { code = `no_such_file; msg } ->
           ERROR { code = `not_available; msg }
@@ -290,7 +303,7 @@ struct
         | OK _ as x ->
             x
     in
-    let hash_path = file_path_of_hash hash in
+    let hash_path = file_path_of_hash Data hash in
     let* already_exists = Device.file_exists target hash_path in
     if already_exists || !read_only then
       ok (File_hash_with_size (hash, size), size)
@@ -314,7 +327,7 @@ struct
            using [Protype.convert] with encoding functions that raise exceptions. *)
         failed [ "this is not a file but a value" ]
     | File_hash hash | File_hash_with_size (hash, _) ->
-        let hash_path = file_path_of_hash hash in
+        let hash_path = file_path_of_hash Data hash in
         match Device.stat source (Device.path_of_file_path hash_path) with
           | ERROR { code = `no_such_file; msg } ->
               error `not_available msg
@@ -345,7 +358,7 @@ struct
   (* TODO: share code with [get_object_size]? *)
   let get_file_size location hash =
     trace ("failed to get file size for " ^ hex_of_hash hash) @@
-    let hash_path = file_path_of_hash (hash_of_hash hash) in
+    let hash_path = file_path_of_hash Data (hash_of_hash hash) in
     match Device.stat location (Device.path_of_file_path hash_path) with
       | ERROR { code = `no_such_file; msg } ->
           if !read_only then
@@ -430,10 +443,15 @@ struct
   let rec reachable_hashes_from_hash: 'a. files: bool -> _ -> _ -> 'a hash -> _ =
     fun (type a) ~files acc location (hash: a hash) ->
     let h = hash_of_hash hash in
-    if Hash_set.mem h acc then
+    if Hash_map.mem h acc then
       ok acc
     else
-      let acc = Hash_set.add h acc in
+      let hash_kind =
+        match hash with
+          | Value_hash _ -> Meta
+          | File_hash _ | File_hash_with_size _ -> Data
+      in
+      let acc = Hash_map.add h hash_kind acc in
       let* direct_deps = direct_hash_dependencies ~files location hash in
       list_fold_e acc direct_deps @@ fun acc (H dep_hash) ->
       reachable_hashes_from_hash ~files acc location dep_hash
@@ -441,7 +459,7 @@ struct
   let reachable ?(files = true) location =
     let* root = fetch_root location in
     let direct_deps = direct_value_dependencies ~files Root.typ root in
-    list_fold_e Hash_set.empty direct_deps @@ fun acc (H dep_hash) ->
+    list_fold_e Hash_map.empty direct_deps @@ fun acc (H dep_hash) ->
     reachable_hashes_from_hash ~files acc location dep_hash
 
   let garbage_collect ?reachable: reachable_set location =
@@ -494,7 +512,7 @@ struct
                       | None ->
                           unit
                       | Some file_path ->
-                          if Hash_set.mem hash reachable || !read_only then
+                          if Hash_map.mem hash reachable || !read_only then
                             unit
                           else
                             let* () = Device.remove_file location file_path in
@@ -502,16 +520,27 @@ struct
                             removed_object_total_size := !removed_object_total_size + size;
                             unit
       in
-      let* () = garbage_collect_dir [] in
+      let* () =
+        match
+          let* () = garbage_collect_dir [ meta_filename ] in
+          garbage_collect_dir [ data_filename ]
+        with
+          | ERROR { code = `no_such_file; _ } ->
+              unit
+          | ERROR { code = `failed; _ } as x ->
+              x
+          | OK () ->
+              unit
+      in
       ok (!removed_object_count, !removed_object_total_size)
     with
-      | ERROR { code = (`no_such_file | `failed); msg } ->
+      | ERROR { code = `failed; msg } ->
           failed msg
       | OK _ as x ->
           x
 
-  let available location hash =
-    let path = file_path_of_hash hash in
+  let available location kind hash =
+    let path = file_path_of_hash kind hash in
     match Device.stat location (Device.path_of_file_path path) with
       | ERROR { code = `no_such_file; _ } ->
           ok false
@@ -522,13 +551,13 @@ struct
       | OK (File _) ->
           ok true
 
-  let transfer ?(on_progress = fun _ -> ()) ~source ~target (hash: Hash.t) =
+  let transfer ?(on_progress = fun _ -> ()) ~source ~target kind (hash: Hash.t) =
     trace ("failed to fetch object with hash " ^ Hash.to_hex hash) @@
-    let* available = available target hash in
+    let* available = available target kind hash in
     if available || !read_only then
       unit
     else
-      let path = file_path_of_hash hash in
+      let path = file_path_of_hash kind hash in
       match
         Device.copy_file ~on_progress ~source: (source, path) ~target: (target, path)
       with
@@ -551,8 +580,8 @@ struct
         | OK () as x ->
             x
 
-  let check_hash ~on_progress location (expected_hash: Hash.t) =
-    let file_path = file_path_of_hash expected_hash in
+  let check_hash ~on_progress location kind (expected_hash: Hash.t) =
+    let file_path = file_path_of_hash kind expected_hash in
     let* hash, _ =
       trace (sf "failed to check hash of object %s" (Hash.to_hex expected_hash)) @@
       match
@@ -575,9 +604,9 @@ struct
     else
       unit
 
-  let get_object_size location hash =
+  let get_object_size location kind hash =
     trace ("failed to get object size for " ^ Hash.to_hex hash) @@
-    let hash_path = file_path_of_hash hash in
+    let hash_path = file_path_of_hash kind hash in
     match Device.stat location (Device.path_of_file_path hash_path) with
       | ERROR { code = `no_such_file; msg } ->
           error `not_available msg
