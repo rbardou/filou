@@ -16,6 +16,8 @@ val compare: t -> t -> int
 
 val hex_of_string: string -> string
 
+val string_of_hex: string -> string option
+
 val string: string -> t
 
 type partial

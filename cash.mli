@@ -8,9 +8,9 @@ type status =
   | File of Hash.t
 
 val get: on_progress: (bytes: int -> size: int -> unit) ->
-  Clone.setup -> Device.file_path -> (status, [> `failed ]) r
+  Setup.t -> Device.file_path -> (status, [> `failed ]) r
 
 (** For when you compute a hash with other means but still want to cache it. *)
-val set: Clone.setup -> Device.file_path -> Hash.t -> unit
+val set: Setup.t -> Device.file_path -> Hash.t -> unit
 
-val save: Clone.setup -> unit
+val save: Setup.t -> unit

@@ -46,9 +46,13 @@ let hex_of_string s =
     hex_char_of_int (Char.code s.[i / 2] land 0xF)
 
 let string_of_hex s =
-  if String.length s mod 2 <> 0 then invalid_arg "string_of_hex: odd length";
-  String.init (String.length s / 2) @@ fun i ->
-  Char.chr ((int_of_hex_char s.[2 * i] lsl 4) lor (int_of_hex_char s.[2 * i + 1]))
+  if String.length s mod 2 <> 0 then
+    None
+  else
+    Some (
+      String.init (String.length s / 2) @@ fun i ->
+      Char.chr ((int_of_hex_char s.[2 * i] lsl 4) lor (int_of_hex_char s.[2 * i + 1]))
+    )
 
 let bin_length = 32
 let hex_length = bin_length * 2
@@ -60,7 +64,7 @@ let of_hex s =
   if String.length s <> hex_length then
     None
   else
-    Some (string_of_hex s)
+    string_of_hex s
 
 let of_bin s =
   if String.length s <> bin_length then

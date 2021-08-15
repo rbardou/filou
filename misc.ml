@@ -6,11 +6,16 @@ let protocol_version = 0xF1100
 
 include Mysc
 
+module W = Rawbin.Write
+module R = Rawbin.Read
+
 (* We don't want to use [echo] but [Prout.echo]. *)
 type do_not_use = Do_not_use
 let echo = Do_not_use
 
 module Path = Typath.UNIX
+
+module Hash_set = Set.Make (Hash)
 
 let (//) = Path.concat
 
@@ -85,6 +90,18 @@ let decode_robin_string typ string =
         ok value
     | Error error ->
         failed [ Protype_robin.Decode.show_error error ]
+
+exception Failed of string list
+
+let decode_rawbin_string read string =
+  let buffer = R.from_string string in
+  try
+    ok (read buffer)
+  with
+    | Failed msg ->
+        failed msg
+    | End_of_file ->
+        failed [ "end of file" ]
 
 let warn x = Printf.ksprintf (Prout.echo "Warning: %s") x
 

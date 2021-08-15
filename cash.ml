@@ -19,31 +19,29 @@ module Filename_map = Map.Make (Path.Filename)
 
 type dir = dir_entry Filename_map.t
 
-module T =
-struct
+let write_dir buffer (value: dir) =
+  W.(string @@ fun _ _ -> ()) buffer "Fcashdi1";
+  W.int_32 buffer (Filename_map.cardinal value);
+  Filename_map.iter' value @@ fun filename { hash; size; mtime } ->
+  State.Object.write_filename buffer filename;
+  State.Object.write_concrete_hash buffer hash;
+  W.int_64 buffer size;
+  W.float_64 buffer mtime
 
-  open Protype
-  open Device_common.T
-
-  let hash: Hash.t t =
-    convert_partial string
-      ~encode: Hash.to_bin
-      ~decode: Hash.of_bin
-
-  let dir: dir t =
-    let dir_entry: (Path.Filename.t * dir_entry) t =
-      record @@
-      ("filename", filename, fst) @
-      ("hash", hash, fun (_, x) -> x.hash) @
-      ("size", int, fun (_, x) -> x.size) @
-      ("mtime", float, fun (_, x) -> x.mtime) @:
-      fun filename hash size mtime -> filename, { hash; size; mtime }
-    in
-    convert (list dir_entry)
-      ~encode: Filename_map.bindings
-      ~decode: Filename_map.of_list
-
-end
+let read_dir buffer: dir =
+  let typ = R.(string @@ fun _ -> 8) buffer in
+  if typ <> "Fcashdi1" then
+    raise (Failed [ sf "unknown cash dir file type: %S" typ ]);
+  let count = R.int_32 buffer in
+  let result = ref Filename_map.empty in
+  for _ = 1 to count do
+    let filename = State.Object.read_filename buffer in
+    let hash = State.Object.read_concrete_hash buffer in
+    let size = R.int_64 buffer in
+    let mtime = R.float_64 buffer in
+    result := Filename_map.add filename { hash; size; mtime } !result
+  done;
+  !result
 
 module Device_path =
 struct
@@ -73,24 +71,25 @@ let self (dir_path: Device.path): Device.file_path =
   cash_filename :: List.map add_dash dir_path, self_filename
 
 let save setup =
-  match Device.mode (Clone.clone_dot_filou setup) with
+  match Device.mode (Setup.clone_dot_filou setup) with
     | RO ->
         ()
     | RW ->
         (
           Path_map.iter' !modified @@ fun dir_path dir ->
           if Filename_map.is_empty dir then
-            match Device.remove_file (Clone.clone_dot_filou setup) (self dir_path) with
+            match Device.remove_file (Setup.clone_dot_filou setup) (self dir_path) with
               | ERROR { code = `failed; msg } ->
                   warn_msg msg "failed to remove hash cash"
               | ERROR { code = `no_such_file; _ } | OK () ->
                   ()
           else
             let contents =
-              Protype_robin.Encode.to_string ~version: State.Root.version T.dir dir
+              W.to_string @@ fun buffer ->
+              write_dir buffer dir
             in
             match
-              Device.write_file (Clone.clone_dot_filou setup) (self dir_path) contents
+              Device.write_file (Setup.clone_dot_filou setup) (self dir_path) contents
             with
               | ERROR { code = `failed; msg } ->
                   warn_msg msg "failed to write hash cash"
@@ -121,14 +120,14 @@ let read_cache_for_dir setup (dir_path: Device.path) =
           | Some dir ->
               dir
           | None ->
-              match Device.read_file (Clone.clone_dot_filou setup) (self dir_path) with
+              match Device.read_file (Setup.clone_dot_filou setup) (self dir_path) with
                 | ERROR { code = `failed; msg } ->
                     warn_msg msg "failed to read hash cash";
                     Filename_map.empty
                 | ERROR { code = `no_such_file; _ } ->
                     Filename_map.empty
                 | OK contents ->
-                    match decode_robin_string T.dir contents with
+                    match decode_rawbin_string read_dir contents with
                       | ERROR { code = `failed; msg } ->
                           warn_msg msg "failed to decode hash cash";
                           Filename_map.empty
@@ -152,7 +151,7 @@ let set_cache setup ((dir_path, filename): Device.file_path) (value: dir_entry o
   maybe_save setup
 
 let get ~on_progress setup ((dir_path, filename) as file_path: Device.file_path) =
-  match Device.stat (Clone.workdir setup) (Device.path_of_file_path file_path) with
+  match Device.stat (Setup.workdir setup) (Device.path_of_file_path file_path) with
     | ERROR { code = `failed; _ } as x ->
         x
     | ERROR { code = `no_such_file; _ } ->
@@ -178,7 +177,7 @@ let get ~on_progress setup ((dir_path, filename) as file_path: Device.file_path)
           | None ->
               (* TODO: progress *)
               match
-                Device.hash ~on_progress (Clone.workdir setup) file_path
+                Device.hash ~on_progress (Setup.workdir setup) file_path
               with
                 | ERROR { code = `failed; _ } as x ->
                     x
@@ -190,7 +189,7 @@ let get ~on_progress setup ((dir_path, filename) as file_path: Device.file_path)
                     ok (File hash)
 
 let set setup file_path hash =
-  match Device.stat (Clone.workdir setup) (Device.path_of_file_path file_path) with
+  match Device.stat (Setup.workdir setup) (Device.path_of_file_path file_path) with
     | ERROR { code = (`failed | `no_such_file); _ } | OK Dir ->
         ()
     | OK (File { size; mtime }) ->

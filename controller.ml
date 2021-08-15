@@ -22,39 +22,163 @@ let prompt_for_confirmation prompt =
 
 let empty_dir: dir = Filename_map.empty
 
-let fetch_or_fail setup hash =
-  match Repository.fetch setup hash with
-    | ERROR { code = (`not_available | `failed); msg } ->
-        failed msg
+let fetch_or_fail setup typ hash =
+  match Repo.fetch (Setup.clone_dot_filou setup) typ hash with
     | OK _ as x ->
         x
+    | ERROR { code = `failed; _ } as x ->
+        x
+    | ERROR { code = `not_available; msg } ->
+        match Setup.main setup with
+          | None ->
+              failed msg
+          | Some main ->
+              (* If [R.fetch] failed, the object is stored, so [concrete_hash_or_fail]
+                 will not fail. *)
+              let* concrete_hash = Repository.concrete_hash_or_fail hash in
+              let* () =
+                let on_progress ~bytes =
+                  Prout.minor @@ fun () ->
+                  sf "Transferring object: %s (%s)" (Hash.to_hex concrete_hash)
+                    (show_size bytes)
+                in
+                (* TODO: do we really want [transfer_object] to manipulate concrete hashes? *)
+                Repo.transfer_object ~source: main ~target: (Setup.clone_dot_filou setup)
+                  concrete_hash ~on_progress
+              in
+              Repo.fetch (Setup.clone_dot_filou setup) typ hash
 
-let on_copy_progress prefix ~bytes ~size =
-  Prout.minor (fun () -> sf "%s (%d / %d) (%d%%)" prefix bytes size (bytes * 100 / size))
+let fetch_raw_or_fail setup concrete_hash =
+  match Repo.fetch_raw (Setup.clone_dot_filou setup) concrete_hash with
+    | OK _ as x ->
+        x
+    | ERROR { code = `failed; _ } as x ->
+        x
+    | ERROR { code = `not_available; msg } ->
+        match Setup.main setup with
+          | None ->
+              failed msg
+          | Some main ->
+              let* () =
+                let on_progress ~bytes =
+                  Prout.minor @@ fun () ->
+                  sf "Transferring object: %s (%s)" (Hash.to_hex concrete_hash)
+                    (show_size bytes)
+                in
+                Repo.transfer_object ~source: main ~target: (Setup.clone_dot_filou setup)
+                  concrete_hash ~on_progress
+              in
+              Repo.fetch_raw (Setup.clone_dot_filou setup) concrete_hash
 
 let init (location: Device.location) =
-  Bare.store_root location {
+  Repo.write_root location @@ Repo.hash {
     redo = [];
-    head = { command = "init"; root = Empty };
+    head = { command = "init"; state = Empty };
     undo = [];
   }
 
-let write_clone_config ~clone_location config =
-  Device.write_file clone_location dot_filou_config
-    (Protype_robin.Encode.to_string ~version: Root.version T.clone_config config)
+type clone_config =
+  {
+    main_location: Device.location;
+  }
+
+let write_clone_config ~clone_location { main_location } =
+  let encoded =
+    W.to_string @@ fun buffer ->
+    W.(string int_u16) buffer (Device.show_location main_location)
+  in
+  Device.write_file clone_location dot_filou_config encoded
 
 let read_clone_config ~clone_location =
   trace "failed to read configuration file" @@
-  let* contents = Device.read_file clone_location dot_filou_config in
-  decode_robin_string T.clone_config contents
+  let* encoded = Device.read_file clone_location dot_filou_config in
+  let read_clone_config buffer =
+    let main_location = R.(string int_u16) buffer in
+    match Device.parse_location RW main_location with
+      | ERROR { code = `failed; msg } ->
+          raise (Failed msg)
+      | OK main_location ->
+          { main_location }
+  in
+  decode_rawbin_string read_clone_config encoded
+
+let read_root_hash setup =
+  let* root_hash_option, read_from_main =
+    match Setup.main setup with
+      | None ->
+          let* root = Repo.read_root (Setup.clone_dot_filou setup) in
+          ok (root, false)
+      | Some main ->
+          let* root = Repo.read_root main in
+          ok (root, true)
+  in
+  match root_hash_option with
+    | None ->
+        failed [ "failed to read root"; "no root" ]
+    | Some root_hash ->
+        let* () =
+          if read_from_main then
+            Repo.write_root (Setup.clone_dot_filou setup) root_hash
+          else
+            unit
+        in
+        ok root_hash
+
+let store_journal setup journal =
+  let journal_hash = Repo.hash journal in
+  let* () =
+    match Setup.main setup with
+      | None ->
+          unit
+      | Some main ->
+          Repo.write_root main journal_hash
+  in
+  Repo.write_root (Setup.clone_dot_filou setup) journal_hash
+
+let get_object_size setup (hash: Hash.t) =
+  match Repo.get_object_size (Setup.clone_dot_filou setup) hash with
+    | ERROR { code = `failed; _ } | OK _ as x ->
+        x
+    | ERROR { code = `not_available; _ } as x ->
+        match Setup.main setup with
+          | None ->
+              x
+          | Some main ->
+              Repo.get_object_size main hash
+
+let get_file_size setup (hash: Repository.file_hash) =
+  match Setup.main setup with
+    | None ->
+        failed [ "cannot get file sizes in clone-only mode" ]
+    | Some main ->
+        (* Files are not stored in clones, at least not with their hash. *)
+        Repo.get_file_size main hash
+
+let print_journal ?(only_redo = false) { redo; head; undo } =
+  let redo = List.mapi (fun i x -> - i - 1, x) redo in
+  (
+    List.iter' (List.rev redo) @@ fun (i, { command; _ }) ->
+    Prout.echo "    %2d %s" i command;
+  );
+  if not only_redo then (
+    Prout.echo "-->  0 %s" head.command;
+    List.iteri' undo @@ fun i { command; _ } ->
+    Prout.echo "    %2d %s" (i + 1) command
+  )
 
 let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
   Prout.echo "Cloning %s into: %s" (Device.show_location main_location)
     (Device.show_location clone_location);
   (* Check that the remote repository is readable. *)
-  let* _ = Bare.fetch_root main_location in
-  (* Initialize the clone. *)
-  write_clone_config ~clone_location { main_location }
+  let* root_hash_option = Repo.read_root main_location in
+  match root_hash_option with
+    | None ->
+        failed [ sf "%s is not a main Filou repository" (Device.show_location main_location) ]
+    | Some root ->
+        (* Initialize the clone. *)
+        let* () = write_clone_config ~clone_location { main_location } in
+        let setup = Setup.make ~main: (Some main_location) ~workdir: clone_location () in
+        Repo.write_root (Setup.clone_dot_filou setup) root
 
 let find_local_clone_config mode =
   let rec find current =
@@ -77,25 +201,7 @@ let find_local_clone ~clone_only mode =
     else
       Some config.main_location
   in
-  ok (Clone.setup ~main ~workdir: clone_location ())
-
-let store_later = Repository.store_later
-
-let fetch_root setup =
-  let* journal = Repository.fetch_root setup in
-  ok journal.head.root
-
-let print_journal ?(only_redo = false) { redo; head; undo } =
-  let redo = List.mapi (fun i x -> - i - 1, x) redo in
-  (
-    List.iter' (List.rev redo) @@ fun (i, { command; _ }) ->
-    Prout.echo "    %2d %s" i command;
-  );
-  if not only_redo then (
-    Prout.echo "-->  0 %s" head.command;
-    List.iteri' undo @@ fun i { command; _ } ->
-    Prout.echo "    %2d %s" (i + 1) command
-  )
+  ok (Setup.make ~main ~workdir: clone_location ())
 
 module Check_redo:
 sig
@@ -124,24 +230,32 @@ struct
           unit
 end
 
-let store_root ~checked_redo: (_: Check_redo.t) setup root command =
+let fetch_journal setup =
+  let* root_hash = read_root_hash setup in
+  fetch_or_fail setup Journal root_hash
+
+let store_state ~checked_redo: (_: Check_redo.t) setup state command =
   (* TODO: store journal in memory to avoid re-reading it *)
-  let* journal = Repository.fetch_root setup in
+  let* journal = fetch_journal setup in
   let new_journal =
     {
       redo = [];
-      head = { command; root };
+      head = { command; state };
       undo = journal.head :: journal.undo;
     }
   in
-  Repository.store_root setup new_journal
+  store_journal setup new_journal
 
-let fetch_root_dir setup (root: root) =
-  match root with
+let fetch_state setup =
+  let* journal = fetch_journal setup in
+  ok journal.head.state
+
+let fetch_root_dir setup (state: state) =
+  match state with
     | Empty ->
         ok Filename_map.empty
-    | Non_empty root ->
-        fetch_or_fail setup root.root_dir
+    | Non_empty state ->
+        fetch_or_fail setup Dir state.root_dir
 
 module Hash_index =
 struct
@@ -179,17 +293,18 @@ struct
      It starts to be too big in memory after 10M files? *)
   let fetch_all setup
       (hash_index_hash: hash_index hash): (File_path_set.t File_hash_map.t, [> `failed ]) r =
-    let* hash_index = fetch_or_fail setup hash_index_hash in
+    let* hash_index = fetch_or_fail setup Hash_index hash_index_hash in
     let rec gather prefix_rev acc (hash_index: hash_index) =
       match hash_index with
         | Leaf bucket_hash ->
-            let* bucket = fetch_or_fail setup bucket_hash in
+            let* bucket = fetch_or_fail setup Hash_index_bucket bucket_hash in
             list_fold_e acc (File_hash_map.bindings bucket) @@ fun acc (hash, paths) ->
             (* This helper is used by [check], so we can fail if we see something weird.
                Otherwise we could assume that hashes appear only in one bucket. *)
-            let* () = check_prefix (Repository.bin_of_hash hash) (List.rev prefix_rev) in
+            let concrete_hash = Repository.concrete_file_hash hash in
+            let* () = check_prefix (Hash.to_bin concrete_hash) (List.rev prefix_rev) in
             if File_hash_map.mem hash acc then
-              failed [ sf "hash %s appears in two buckets" (Repository.hex_of_hash hash) ]
+              failed [ sf "hash %s appears in two buckets" (Hash.to_hex concrete_hash) ]
             else
               ok (File_hash_map.add hash paths acc)
         | Node { zero; one } ->
@@ -198,17 +313,18 @@ struct
     in
     gather [] File_hash_map.empty hash_index
 
-  let get setup (root: root) (hash: Repository.file hash): (File_path_set.t, [> `failed ]) r =
-    match root with
+  let get setup (state: state) (hash: Repository.file_hash):
+    (File_path_set.t, [> `failed ]) r =
+    match state with
       | Empty ->
           ok File_path_set.empty
-      | Non_empty root ->
-          let* hash_index = fetch_or_fail setup root.hash_index in
-          let hash_bin = Repository.bin_of_hash hash in
+      | Non_empty state ->
+          let* hash_index = fetch_or_fail setup Hash_index state.hash_index in
+          let hash_bin = Hash.to_bin (Repository.concrete_file_hash hash) in
           let rec find bit (hash_index: hash_index) =
             match hash_index with
               | Leaf bucket_hash ->
-                  let* bucket = fetch_or_fail setup bucket_hash in
+                  let* bucket = fetch_or_fail setup Hash_index_bucket bucket_hash in
                   File_hash_map.find_opt hash bucket |> default File_path_set.empty |> ok
               | Node { zero; one } ->
                   find (bit + 1) (if get_bit hash_bin bit then one else zero)
@@ -216,20 +332,20 @@ struct
           find 0 hash_index
 
   (* Also returns the old list of paths that were associated to this hash. *)
-  let add setup (root: root) (added_file_hash: Repository.file hash)
+  let add setup (state: state) (added_file_hash: Repository.file_hash)
       (path: Device.file_path): (hash_index hash * File_path_set.t, [> `failed ]) r =
-    match root with
+    match state with
       | Empty ->
           let bucket =
             File_hash_map.singleton added_file_hash (File_path_set.singleton path)
           in
-          let* bucket_hash = store_later setup T.hash_index_bucket bucket in
+          let bucket_hash = Repo.hash bucket in
           let hash_index = Leaf bucket_hash in
-          let* hash_index_hash = store_later setup T.hash_index hash_index in
+          let hash_index_hash = Repo.hash hash_index in
           ok (hash_index_hash, File_path_set.empty)
       | Non_empty root ->
-          let* hash_index = fetch_or_fail setup root.hash_index in
-          let hash_bin = Repository.bin_of_hash added_file_hash in
+          let* hash_index = fetch_or_fail setup Hash_index root.hash_index in
+          let hash_bin = Hash.to_bin (Repository.concrete_file_hash added_file_hash) in
           let add_to_bucket bucket =
             let old_paths =
               File_hash_map.find_opt added_file_hash bucket
@@ -241,7 +357,7 @@ struct
           let rec add_to bit (hash_index: hash_index): (hash_index * File_path_set.t, _) r =
             match hash_index with
               | Leaf bucket_hash ->
-                  let* bucket = fetch_or_fail setup bucket_hash in
+                  let* bucket = fetch_or_fail setup Hash_index_bucket bucket_hash in
                   (* One could think that storing the size of each bucket in
                      the [hash_index] would allow to make the following test
                      without having to read the bucket, but we'll have to read it
@@ -249,7 +365,7 @@ struct
                   if File_hash_map.cardinal bucket < max_bucket_size then
                     (* Bucket has room for more hashes. *)
                     let new_bucket, old_paths = add_to_bucket bucket in
-                    let* new_bucket_hash = store_later setup T.hash_index_bucket new_bucket in
+                    let new_bucket_hash = Repo.hash new_bucket in
                     ok (Leaf new_bucket_hash, old_paths)
                   else
                     (* Bucket is too big, split it.
@@ -260,7 +376,7 @@ struct
                        happens, nothing will break anyway. *)
                     let one, zero =
                       File_hash_map.partition' bucket @@ fun hash _ ->
-                      get_bit (Repository.bin_of_hash hash) bit
+                      get_bit (Hash.to_bin (Repository.concrete_file_hash hash)) bit
                     in
                     let one, zero, old_paths =
                       if get_bit hash_bin bit then
@@ -270,8 +386,8 @@ struct
                         let zero, old_paths = add_to_bucket zero in
                         one, zero, old_paths
                     in
-                    let* one_hash = store_later setup T.hash_index_bucket one in
-                    let* zero_hash = store_later setup T.hash_index_bucket zero in
+                    let one_hash = Repo.hash one in
+                    let zero_hash = Repo.hash zero in
                     ok (Node { zero = Leaf zero_hash; one = Leaf one_hash }, old_paths)
               | Node { zero; one } ->
                   if get_bit hash_bin bit then
@@ -282,17 +398,17 @@ struct
                     ok (Node { zero = new_zero; one }, old_paths)
           in
           let* new_hash_index, old_paths = add_to 0 hash_index in
-          let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
+          let new_hash_index_hash = Repo.hash new_hash_index in
           ok (new_hash_index_hash, old_paths)
 
   (* Does not actually store the result so that one can bulk remove. *)
-  let remove setup (hash_index: hash_index) (hash: Repository.file hash)
+  let remove setup (hash_index: hash_index) (hash: Repository.file_hash)
       (path: Device.file_path): (hash_index, [> `failed ]) r =
-    let hash_bin = Repository.bin_of_hash hash in
+    let hash_bin = Hash.to_bin (Repository.concrete_file_hash hash) in
     let rec remove_from bit (hash_index: hash_index): (hash_index, _) r =
       match hash_index with
         | Leaf bucket_hash ->
-            let* bucket = fetch_or_fail setup bucket_hash in
+            let* bucket = fetch_or_fail setup Hash_index_bucket bucket_hash in
             let old_paths =
               File_hash_map.find_opt hash bucket |> default File_path_set.empty
             in
@@ -304,7 +420,7 @@ struct
                 File_hash_map.add hash new_paths bucket
             in
             (* TODO: if bucket becomes too small, merge it with its neighbor, if any. *)
-            let* new_bucket_hash = store_later setup T.hash_index_bucket new_bucket in
+            let new_bucket_hash = Repo.hash new_bucket in
             ok (Leaf new_bucket_hash)
         | Node { zero; one } ->
             if get_bit hash_bin bit then
@@ -324,7 +440,7 @@ struct
   type found_file =
     {
       path: Device.file_path;
-      hash: Repository.file hash;
+      hash: Repository.file_hash;
       size: int;
     }
 
@@ -338,8 +454,8 @@ struct
     | Found_file of found_file
     | Found_dir of found_dir
 
-  let find setup (root: root) (path: Device.path): (found option, _) r =
-    match root with
+  let find setup (state: state) (path: Device.path): (found option, _) r =
+    match state with
       | Empty ->
           ok None
       | Non_empty { root_dir; _ } ->
@@ -348,7 +464,7 @@ struct
               | [] ->
                   ok (Some (Found_dir { dir_path_rev; dir_hash }))
               | head :: tail ->
-                  let* dir = fetch_or_fail setup dir_hash in
+                  let* dir = fetch_or_fail setup Dir dir_hash in
                   match Filename_map.find_opt head dir, tail with
                     | None, _
                     | Some (File _), _ :: _ ->
@@ -370,10 +486,10 @@ struct
 
   (* Convert [paths] to a list of [found].
      Fail if one of the [paths] do not denote something that exists. *)
-  let find_exact_list setup (root: root) (paths: Device.path list): (found list, _) r =
+  let find_exact_list setup (state: state) (paths: Device.path list): (found list, _) r =
     let* list =
       list_fold_e [] paths @@ fun acc path ->
-      let* found = find setup root path in
+      let* found = find setup state path in
       match found with
         | None ->
             failed [ sf "no such file or directory: %s" (Device.show_path path) ]
@@ -397,20 +513,20 @@ struct
               size;
             }
         | Dir { hash = subdir_hash; _ } ->
-            let* subdir = fetch_or_fail setup subdir_hash in
+            let* subdir = fetch_or_fail setup Dir subdir_hash in
             iter_dir_files_recursively ~subdir_path_rev: (filename :: subdir_path_rev) subdir
     in
-    let* dir = fetch_or_fail setup found_dir.dir_hash in
+    let* dir = fetch_or_fail setup Dir found_dir.dir_hash in
     iter_dir_files_recursively ~subdir_path_rev: [] dir
 
   (* Same as [find_exact_list] but iterate instead of returning a list
      and support recursively listing directories (so it only returns files).
      Fails if a path denotes a directory. *)
-  let iter_exact_list_files ~recursive setup (root: root) (paths: Device.path list)
+  let iter_exact_list_files ~recursive setup (state: state) (paths: Device.path list)
       (f: found_file -> (unit, _) r) =
     (* First, find [paths]. If one doesn't exist we don't want to
        iterate nor recurse at all, we want to fail early. *)
-    let* found = find_exact_list setup root paths in
+    let* found = find_exact_list setup state paths in
     (* Then, actually iterate. *)
     list_iter_e found @@ fun found ->
     match found with
@@ -443,12 +559,12 @@ struct
     | Already_exists_different
     | Added of {
         new_dir_hash: dir hash;
-        added_file_hash: Repository.file hash;
+        added_file_hash: Repository.file_hash;
         added_file_size: int;
       }
 
   let add setup (root_dir: dir) ((dir_path, filename): Device.file_path)
-      (get_hash_and_size: unit -> (Repository.file Repository.hash * int, _) r)
+      (get_hash_and_size: unit -> (Repository.file_hash * int, _) r)
       (get_hash_just_checking: unit -> (Hash.t option, _) r):
     (add_result, [> `failed ]) r =
     let rec update_dir dir_path_rev (dir: dir) = function
@@ -463,7 +579,7 @@ struct
                     (Device.show_file_path (List.rev dir_path_rev, head));
                   ]
               | Some (Dir { hash = head_dir_hash; total_size; total_file_count }) ->
-                  let* dir = fetch_or_fail setup head_dir_hash in
+                  let* dir = fetch_or_fail setup Dir head_dir_hash in
                   ok (dir, total_size, total_file_count)
           in
           let* update_result =
@@ -486,7 +602,7 @@ struct
                     }
                   in
                   let new_dir = Filename_map.add head head_dir_entry dir in
-                  let* new_dir_hash = store_later setup T.dir new_dir in
+                  let new_dir_hash = Repo.hash new_dir in
                   ok (Added { new_dir_hash; added_file_hash; added_file_size })
           )
       | [] ->
@@ -500,7 +616,7 @@ struct
                     | None ->
                         ok Already_exists_same
                     | Some new_hash ->
-                        if Hash.compare new_hash (Repository.hash_of_hash hash) = 0 then
+                        if Hash.compare new_hash (Repository.concrete_file_hash hash) = 0 then
                           ok Already_exists_same
                         else
                           ok Already_exists_different
@@ -514,7 +630,7 @@ struct
                   }
                 in
                 let new_dir = Filename_map.add filename dir_entry dir in
-                let* new_dir_hash = store_later setup T.dir new_dir in
+                let new_dir_hash = Repo.hash new_dir in
                 ok (Added { new_dir_hash; added_file_hash; added_file_size })
     in
     update_dir [] root_dir dir_path
@@ -524,7 +640,7 @@ struct
     | Is_a_directory
     | Removed of {
         new_dir_hash: dir Repository.hash option; (* [None] if dir is now empty *)
-        removed_file_hash: Repository.file hash;
+        removed_file_hash: Repository.file_hash;
         removed_file_size: int;
       }
 
@@ -541,7 +657,7 @@ struct
               | Some (Dir { hash; total_size; total_file_count }) ->
                   (* Requested to remove [head/tail] from [dir]. *)
                   (* Find [subdir] named [head] in [dir]. *)
-                  let* subdir = fetch_or_fail setup hash in
+                  let* subdir = fetch_or_fail setup Dir hash in
                   (* Remove [tail] from [subdir]. *)
                   let* remove_result =
                     remove_from_dir subdir (head :: dir_path_rev) tail
@@ -574,7 +690,7 @@ struct
                               ok None
                             else
                               (* TODO: share with below? *)
-                              let* new_dir_hash = store_later setup T.dir new_dir in
+                              let new_dir_hash = Repo.hash new_dir in
                               ok (Some new_dir_hash)
                           in
                           ok (
@@ -601,7 +717,7 @@ struct
                           if Filename_map.is_empty new_dir then
                             ok None
                           else
-                            let* new_dir_hash = store_later setup T.dir new_dir in
+                            let new_dir_hash = Repo.hash new_dir in
                             ok (Some new_dir_hash)
                         in
                         ok (
@@ -619,7 +735,7 @@ end
 (* Recursively check sizes, file counts, and whether reachable files are available. *)
 let rec check_dir ~clone_only expected_hash_index setup
     (path: Device.path) (dir: dir hash) =
-  let* dir = fetch_or_fail setup dir in
+  let* dir = fetch_or_fail setup Dir dir in
   if Filename_map.is_empty dir then
     warn "directory %s is empty, it should just not exist"
       (Device.show_path path);
@@ -635,14 +751,14 @@ let rec check_dir ~clone_only expected_hash_index setup
           in
           if size <> expected_size then
             failed [
-              sf "wrong size for %s (%s): expected %d, found %d"
-                (Device.show_path entry_path) (Repository.hex_of_hash hash)
+              sf "wrong size for %s: expected %d, found %d"
+                (Device.show_path entry_path)
                 expected_size size;
             ]
           else if file_count <> expected_file_count then
             failed [
-              sf "wrong file count for %s (%s): expected %d, found %d"
-                (Device.show_path entry_path) (Repository.hex_of_hash hash)
+              sf "wrong file count for %s: expected %d, found %d"
+                (Device.show_path entry_path)
                 expected_file_count file_count;
             ]
           else (
@@ -656,12 +772,13 @@ let rec check_dir ~clone_only expected_hash_index setup
               (* Cannot get file sizes in clone-only mode. *)
               ok expected_size
             else
-              Repository.get_file_size setup hash
+              get_file_size setup hash
           with
             | ERROR { code = `not_available; msg } ->
                 failed (
                   sf "file %s (%s) is unvailable"
-                    (Device.show_path entry_path) (Repository.hex_of_hash hash) ::
+                    (Device.show_path entry_path)
+                    (Hash.to_hex (Repository.concrete_file_hash hash)) ::
                   msg
                 )
             | ERROR { code = `failed; _ } as x ->
@@ -670,7 +787,8 @@ let rec check_dir ~clone_only expected_hash_index setup
                 if size <> expected_size then
                   failed [
                     sf "wrong size for %s (%s): expected %d, found %d"
-                      (Device.show_path entry_path) (Repository.hex_of_hash hash)
+                      (Device.show_path entry_path)
+                      (Hash.to_hex (Repository.concrete_file_hash hash))
                       expected_size size;
                   ]
                 else (
@@ -691,46 +809,70 @@ let rec check_dir ~clone_only expected_hash_index setup
 
 let check ~clone_only ~hash setup =
   let* () =
+    let check_hashes description iter_hashes check_hash =
+      Prout.major "Listing %ss..." description;
+      let hashes = ref [] in
+      let* () =
+        let count = ref 0 in
+        iter_hashes @@ fun hash ->
+        Prout.minor (fun () -> sf "Listing %ss (%d)..." description !count);
+        hashes := hash :: !hashes;
+        unit
+      in
+      let hashes = !hashes in
+      Prout.major "Checking %s hashes..." description;
+      let count = List.length hashes in
+      let index = ref 0 in
+      let* () =
+        list_iter_e hashes @@ fun hash ->
+        incr index;
+        let on_progress ~bytes ~size =
+          Prout.minor @@ fun () ->
+          sf "Checking %s hashes... (%d / %d) (%d%%) %s (%s / %s) (%d%%)"
+            description
+            !index count (!index * 100 / count)
+            (Hash.to_hex hash)
+            (show_size bytes) (show_size size)
+            (bytes * 100 / size)
+        in
+        check_hash ~on_progress hash
+      in
+      if count = 1 then
+        Prout.echo "Only 1 %s, which is not corrupted." description
+      else
+        Prout.echo "None of the %d %ss are corrupted." count description;
+      unit
+    in
+    let check_objects () =
+      let* () =
+        match Setup.main setup with
+          | None ->
+              unit
+          | Some main ->
+              check_hashes "main object" (Repo.iter_objects main)
+                (Repo.check_object_hash main)
+      in
+      let clone = Setup.clone_dot_filou setup in
+      check_hashes "clone object" (Repo.iter_objects clone) (Repo.check_object_hash clone)
+    in
+    let check_files () =
+      match Setup.main setup with
+        | None ->
+            unit
+        | Some main ->
+            check_hashes "file" (Repo.iter_files main) (Repo.check_file_hash main)
+    in
     match hash with
       | `no ->
           unit
-      | `metadata | `all as x ->
-          let files = match x with `metadata -> false | `all -> true in
-          let count = ref 0 in
-          let* () =
-            Prout.major_s "Checking hashes: computing the set of reachable objects...";
-            let* hashes = Repository.reachable ~files setup in
-            let hashes = Repository.Hash_map.bindings hashes in
-            count := List.length hashes;
-            let index = ref 0 in
-            let progress () =
-              Prout.minor @@ fun () ->
-              sf "Checking hashes... (%d / %d) (%d%%)" !index !count (!index * 100 / !count)
-            in
-            progress ();
-            list_iter_e hashes @@ fun (hash, kind) ->
-            let* () =
-              let on_progress ~bytes ~size =
-                Prout.minor @@ fun () ->
-                sf "Checking hashes... (%d / %d) (%d%%) %s (%s / %s) (%d%%)"
-                  !index !count (!index * 100 / !count)
-                  (Hash.to_hex hash)
-                  (show_size bytes) (show_size size)
-                  (bytes * 100 / size)
-              in
-              Repository.check_hash
-                ~on_progress
-                setup kind hash
-            in
-            incr index;
-            progress ();
-            unit
-          in
-          Prout.echo "No reachable object is corrupted (object count: %d)." !count;
-          unit
+      | `metadata ->
+          check_objects ()
+      | `all ->
+          let* () = check_objects () in
+          check_files ()
   in
-  let* root = fetch_root setup in
-  match root with
+  let* state = fetch_state setup in
+  match state with
     | Empty ->
         Prout.echo_s "Repository is empty.";
         unit
@@ -758,13 +900,13 @@ let check ~clone_only ~hash setup =
                   (String.concat ", "
                      (List.map Device.show_file_path
                         (File_path_set.elements missing)))
-                  (Repository.hex_of_hash hash)
+                  (Hash.to_hex (Repository.concrete_file_hash hash))
               else if not (File_path_set.is_empty unexpected) then
                 inconsistent "unexpected path(s) %s for %s"
                   (String.concat ", "
                      (List.map Device.show_file_path
                         (File_path_set.elements unexpected)))
-                  (Repository.hex_of_hash hash)
+                  (Hash.to_hex (Repository.concrete_file_hash hash))
               else
                 None
             in
@@ -789,13 +931,13 @@ type tree_entry_name =
 
 let tree ~color ~max_depth ~only_main ~only_dirs
     ~print_size ~print_file_count ~print_duplicates ~full_dir_paths
-    (setup: Clone.setup) (paths: Device.path list) =
-  let workdir = Clone.workdir setup in
-  let* root = fetch_root setup in
-  let* root_dir = fetch_root_dir setup root in
+    setup (paths: Device.path list) =
+  let workdir = Setup.workdir setup in
+  let* state = fetch_state setup in
+  let* root_dir = fetch_root_dir setup state in
   let find_path path =
     let* dir_entry =
-      match root with
+      match state with
         | Empty ->
             ok None
         | Non_empty root ->
@@ -834,13 +976,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
                           | [] ->
                               ok dir_entry
                           | _ :: _ ->
-                              let* subdir =
-                                trace (
-                                  sf "failed to fetch directory object %s"
-                                    (Repository.hex_of_hash hash)
-                                ) @@
-                                fetch_or_fail setup hash
-                              in
+                              let* subdir = fetch_or_fail setup Dir hash in
                               find subdir tail
             in
             find root_dir path
@@ -944,7 +1080,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
               trace (
                 sf "failed to look up duplicates for %s" (Device.show_file_path file_path)
               ) @@
-              let* paths = Hash_index.get setup root hash in
+              let* paths = Hash_index.get setup state hash in
               ok (File_path_set.remove file_path paths)
     in
     let print_duplicate_paths duplicates =
@@ -971,7 +1107,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
               ok Filename_map.empty
           | Some hash ->
               trace (sf "failed to recurse into %s" (Device.show_path subdir_path)) @@
-              fetch_or_fail setup hash
+              fetch_or_fail setup Dir hash
       in
       tree_dir
         (if is_root then "" else if last then prefix ^ "    " else prefix ^ "│   ")
@@ -1032,7 +1168,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
                     (* Inconsistent with what we observed before. *)
                     false
                 | File workdir_hash ->
-                    Hash.compare workdir_hash (Repository.hash_of_hash hash) = 0
+                    Hash.compare workdir_hash (Repository.concrete_file_hash hash) = 0
             then
               (
                 print_prefix_and_filename `file;
@@ -1184,10 +1320,10 @@ let tree ~color ~max_depth ~only_main ~only_dirs
         print_merged_entry ~last: true head
 
 let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
-    (setup: Clone.setup) (root: root) (path: Device.file_path):
-  (root, [> `failed ]) r =
+    setup (state: state) (path: Device.file_path):
+  (state, [> `failed ]) r =
   trace ("failed to push file: " ^ Device.show_file_path path) @@
-  let* root_dir = fetch_root_dir setup root in
+  let* root_dir = fetch_root_dir setup state in
   let* add_result =
     let on_hash_progress ~bytes ~size =
       Prout.minor @@ fun () ->
@@ -1200,7 +1336,14 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
     in
     let get_hash_and_size () =
       let* hash, size =
-        Repository.store_file
+        let* main =
+          match Setup.main setup with
+            | None ->
+                failed [ "cannot store files in clone-only mode" ]
+            | Some main ->
+                ok main
+        in
+        Repo.store_file
           ~on_hash_progress
           ~on_copy_progress: (
             fun ~bytes ~size: _ ->
@@ -1211,11 +1354,11 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
                 (show_size bytes) (show_size size) (bytes * 100 / size)
                 file_index file_count (Device.show_file_path path)
           )
-          ~source: (Clone.workdir setup)
+          ~source: (Setup.workdir setup)
           ~source_path: path
-          ~target: setup
+          ~target: main
       in
-      Cash.set setup path (Repository.hash_of_hash hash);
+      Cash.set setup path (Repository.concrete_file_hash hash);
       ok (hash, size)
     in
     let get_hash_just_checking () =
@@ -1227,7 +1370,7 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
   match add_result with
     | Already_exists_same ->
         if verbose then Prout.echo "Already exists: %s" (Device.show_file_path path);
-        ok root
+        ok state
     | Already_exists_different ->
         failed [
           sf "a different file with this name already exists: %s"
@@ -1235,7 +1378,7 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
         ]
     | Added { new_dir_hash = new_root_dir_hash; added_file_hash; _ } ->
         let* new_hash_index_hash, old_paths =
-          Hash_index.add setup root added_file_hash path
+          Hash_index.add setup state added_file_hash path
         in
         if verbose then (
           if File_path_set.is_empty old_paths then
@@ -1255,7 +1398,7 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
         )
 
 let push ~verbose ~yes setup (paths: Device.path list) =
-  let* journal = Repository.fetch_root setup in
+  let* journal = fetch_journal setup in
   let* checked_redo = Check_redo.check ~yes journal in
   Prout.major_s "Listing files...";
   let files = ref [] in
@@ -1264,10 +1407,10 @@ let push ~verbose ~yes setup (paths: Device.path list) =
     if Device.same_paths path [ dot_filou ] then
       unit
     else
-      let* stat = Device.stat (Clone.workdir setup) path in
+      let* stat = Device.stat (Setup.workdir setup) path in
       match stat with
         | Dir ->
-            Device.iter_read_dir (Clone.workdir setup) path @@ fun filename ->
+            Device.iter_read_dir (Setup.workdir setup) path @@ fun filename ->
             add_path (path @ [ filename ])
         | File { size; _ } ->
             match Device.file_path_of_path path with
@@ -1284,11 +1427,11 @@ let push ~verbose ~yes setup (paths: Device.path list) =
   let files = List.rev !files in
   let file_count = !file_count in
   Prout.major_s "Listing files to push...";
-  let root = journal.head.root in
+  let state = journal.head.state in
   let* files_to_push =
     let file_index = ref 0 in
     list_filter_e files @@ fun ((file_path: Device.file_path), _) ->
-    let* found = Dir.find setup root (Device.path_of_file_path file_path) in
+    let* found = Dir.find setup state (Device.path_of_file_path file_path) in
     incr file_index;
     (
       Prout.minor @@ fun () ->
@@ -1316,7 +1459,7 @@ let push ~verbose ~yes setup (paths: Device.path list) =
                 (* This is inconsistent with the list of files we found before. *)
                 failed [ sf "%s got removed" (Device.show_file_path path) ]
             | File new_hash ->
-                if Hash.compare new_hash (Repository.hash_of_hash hash) = 0 then
+                if Hash.compare new_hash (Repository.concrete_file_hash hash) = 0 then
                   (
                     if verbose then
                       Prout.echo "Already exists: %s" (Device.show_file_path file_path);
@@ -1333,27 +1476,27 @@ let push ~verbose ~yes setup (paths: Device.path list) =
   let total_size_to_push =
     List.fold_left' 0 files_to_push @@ fun acc (_, size) -> acc + size
   in
-  let* root, _ =
+  let* state, _ =
     let file_index = ref 0 in
-    list_fold_e (root, 0) files_to_push @@ fun (root, pushed_size) (path, size) ->
+    list_fold_e (state, 0) files_to_push @@ fun (state, pushed_size) (path, size) ->
     incr file_index;
-    let* root =
+    let* state =
       push_file ~verbose ~pushed_size ~total_size_to_push ~file_index: !file_index ~file_count
-        setup root path
+        setup state path
     in
-    ok (root, pushed_size + size)
+    ok (state, pushed_size + size)
   in
   let* () =
-    store_root ~checked_redo setup root @@
+    store_state ~checked_redo setup state @@
     String.concat " " ("push" :: List.map Device.show_path paths)
   in
   Prout.echo "Pushed %d files (%s)." file_count (show_size total_size_to_push);
   unit
 
 let pull ~verbose setup (paths: Device.path list) =
-  let* root = fetch_root setup in
+  let* state = fetch_state setup in
   Prout.major_s "Listing files...";
-  let* files = Dir.find_exact_list_files ~recursive: true setup root paths in
+  let* files = Dir.find_exact_list_files ~recursive: true setup state paths in
   Prout.major_s "Listing files to pull...";
   let* files_to_pull =
     let file_count = List.length files in
@@ -1383,7 +1526,7 @@ let pull ~verbose setup (paths: Device.path list) =
             sf "%s already exists as a directory" (Device.show_file_path file.path);
           ]
       | File new_hash ->
-          if Hash.compare new_hash (Repository.hash_of_hash file.hash) = 0 then
+          if Hash.compare new_hash (Repository.concrete_file_hash file.hash) = 0 then
             (
               if verbose then
                 Prout.echo "Already exists: %s"
@@ -1405,8 +1548,16 @@ let pull ~verbose setup (paths: Device.path list) =
     list_fold_e 0 files_to_pull @@ fun pulled_size file ->
     incr file_index;
     let* () =
-      Repository.fetch_file ~source: setup file.hash
-        ~target: (Clone.workdir setup)
+      let* main =
+        match Setup.main setup with
+          | None ->
+              failed [ "cannot store files in clone-only mode" ]
+          | Some main ->
+              ok main
+      in
+      Repo.fetch_file file.hash
+        ~source: main
+        ~target: (Setup.workdir setup)
         ~target_path: file.path
         ~on_progress: (
           fun ~bytes ~size: _ ->
@@ -1425,12 +1576,12 @@ let pull ~verbose setup (paths: Device.path list) =
   Prout.echo "Pulled %d files (%s)." file_count (show_size total_size_pulled);
   unit
 
-let remove_file setup (root: root) (path: Device.file_path): (root, _) r =
-  match root with
+let remove_file setup (state: state) (path: Device.file_path): (state, _) r =
+  match state with
     | Empty ->
         failed [ sf "no such file: %s" (Device.show_file_path path) ]
     | Non_empty root ->
-        let* root_dir = fetch_or_fail setup root.root_dir in
+        let* root_dir = fetch_or_fail setup Dir root.root_dir in
         let* remove_result = Dir.remove setup root_dir path in
         match remove_result with
           | File_does_not_exist ->
@@ -1440,25 +1591,25 @@ let remove_file setup (root: root) (path: Device.file_path): (root, _) r =
           | Removed { new_dir_hash = None; _ } ->
               ok Empty
           | Removed { new_dir_hash = Some new_dir_hash; removed_file_hash; _ } ->
-              let* hash_index = fetch_or_fail setup root.hash_index in
+              let* hash_index = fetch_or_fail setup Hash_index root.hash_index in
               let* new_hash_index =
                 Hash_index.remove setup hash_index removed_file_hash path
               in
-              let* new_hash_index_hash = store_later setup T.hash_index new_hash_index in
+              let new_hash_index_hash = Repo.hash new_hash_index in
               let new_root = { root_dir = new_dir_hash; hash_index = new_hash_index_hash } in
               ok (Non_empty new_root)
 
 let remove ~recursive ~yes setup (paths: Device.path list) =
-  let* journal = Repository.fetch_root setup in
+  let* journal = fetch_journal setup in
   let* checked_redo = Check_redo.check ~yes journal in
-  let root = journal.head.root in
+  let state = journal.head.state in
   Prout.major "Listing files...";
-  let* files_to_remove = Dir.find_exact_list_files ~recursive setup root paths in
+  let* files_to_remove = Dir.find_exact_list_files ~recursive setup state paths in
   Prout.major "Removing files...";
   let count = List.length files_to_remove in
-  let* root =
+  let* state =
     let index = ref 0 in
-    list_fold_e root files_to_remove @@ fun root { path; _ } ->
+    list_fold_e state files_to_remove @@ fun root { path; _ } ->
     incr index;
     (
       Prout.minor @@ fun () ->
@@ -1468,7 +1619,7 @@ let remove ~recursive ~yes setup (paths: Device.path list) =
   in
   Prout.major "Storing root...";
   let* () =
-    store_root ~checked_redo setup root @@
+    store_state ~checked_redo setup state @@
     String.concat " " (
       "rm" :: (if recursive then [ "-r" ] else []) @ List.map Device.show_path paths
     )
@@ -1490,7 +1641,7 @@ let copy_or_move_file (action: copy_or_move) ~verbose setup root
   let* add_result =
     Dir.add setup root_dir target_path
       (fun () -> ok (source.hash, source.size))
-      (fun () -> ok (Some (Repository.hash_of_hash source.hash)))
+      (fun () -> ok (Some (Repository.concrete_file_hash source.hash)))
   in
   match add_result with
     | Already_exists_same ->
@@ -1516,9 +1667,9 @@ let copy_or_move_file (action: copy_or_move) ~verbose setup root
 
 let copy_or_move_files (action: copy_or_move) ~verbose ~yes setup
     (source_paths: Device.path list) (target: Device.path_with_kind) =
-  let* journal = Repository.fetch_root setup in
+  let* journal = fetch_journal setup in
   let* checked_redo = Check_redo.check ~yes journal in
-  let root = journal.head.root in
+  let state = journal.head.state in
   Prout.major "Checking paths...";
   let* (_: Filename_set.t) =
     list_fold_e Filename_set.empty source_paths @@ fun set source_path ->
@@ -1540,14 +1691,14 @@ let copy_or_move_files (action: copy_or_move) ~verbose ~yes setup
           else
             ok (Filename_set.add filename set)
   in
-  let* sources = Dir.find_exact_list setup root source_paths in
+  let* sources = Dir.find_exact_list setup state source_paths in
   let* mode =
     let target_path =
       match target with
         | File path -> Device.path_of_file_path path
         | Dir path -> path
     in
-    let* found_target = Dir.find setup root target_path in
+    let* found_target = Dir.find setup state target_path in
     match found_target with
       | Some (Found_dir _) ->
           ok (`into_dir (sources, target_path))
@@ -1612,18 +1763,18 @@ let copy_or_move_files (action: copy_or_move) ~verbose ~yes setup
   let files = List.rev files in
   let count = !count in
   Prout.major "%s files..." (match action with Copy -> "Copying" | Move -> "Moving");
-  let* root =
+  let* state =
     let index = ref 0 in
-    list_fold_e root files @@ fun root (source, target_path) ->
+    list_fold_e state files @@ fun state (source, target_path) ->
     Prout.major "%s files... (%d / %d) (%d%%)"
       (match action with Copy -> "Copying" | Move -> "Moving")
       !index count (!index * 100 / count);
     incr index;
-    copy_or_move_file action ~verbose setup root source target_path
+    copy_or_move_file action ~verbose setup state source target_path
   in
   Prout.major "Storing root...";
   let* () =
-    store_root ~checked_redo setup root @@
+    store_state ~checked_redo setup state @@
     String.concat " " (
       (
         match action with
@@ -1642,67 +1793,197 @@ let copy_or_move_files (action: copy_or_move) ~verbose ~yes setup
   unit
 
 let update setup =
-  let* count =
-    Prout.major_s "Computing reachable object set...";
-    let on_availability_check_progress ~checked ~count =
-      Prout.minor @@ fun () ->
-      sf "Checking availability... (%d / %d) (%d%%)" checked count (checked * 100 / count)
-    in
-    let on_copy_progress ~transferred ~count =
-      Prout.minor @@ fun () ->
-      sf "Copying... (%d / %d) (%d%%)" transferred count (transferred * 100 / count)
-    in
-    Repository.update ~on_availability_check_progress ~on_copy_progress setup
-  in
-  Prout.echo "Copied %d objects." count;
-  Prout.echo_s "Clone is up-to-date.";
-  unit
+  match Setup.main setup with
+    | None ->
+        failed [ "cannot update in clone-only mode" ]
+    | Some main ->
+        Prout.major_s "Transferring root...";
+        let* root_hash = Repo.read_root main in
+        let* () =
+          match root_hash with
+            | None ->
+                failed [ "main repository is not initialized" ]
+            | Some root_hash ->
+                Repo.write_root (Setup.clone_dot_filou setup) root_hash
+        in
+        Prout.major_s "Listing objects...";
+        let count = ref 0 in
+        let* object_hashes =
+          let result = ref [] in
+          let* () =
+            Repo.iter_objects main @@ fun hash ->
+            Prout.minor (fun () -> sf "Listing objects... (%d)" !count);
+            result := hash :: !result;
+            unit
+          in
+          ok !result
+        in
+        let count = !count in
+        Prout.major_s "Checking availability...";
+        let* object_hashes_to_transfer =
+          let index = ref 0 in
+          list_filter_e object_hashes @@ fun hash ->
+          let* available = Repo.object_is_available (Setup.clone_dot_filou setup) hash in
+          incr index;
+          (
+            Prout.minor @@ fun () ->
+            sf "Checking availability... (%d / %d) (%d%%)"
+              !index count (!index * 100 / count)
+          );
+          ok (not available)
+        in
+        let to_transfer_count = List.length object_hashes_to_transfer in
+        Prout.major "Transferring objects...";
+        let* () =
+          let index = ref 0 in
+          list_iter_e object_hashes_to_transfer @@ fun hash ->
+          let on_progress ~bytes =
+            Prout.minor @@ fun () ->
+            sf "Transferring objects... (%d / %d) (%d%%) %s (%s)"
+              !index to_transfer_count (!index * 100 / to_transfer_count)
+              (Hash.to_hex hash) (show_size bytes)
+          in
+          let* () =
+            Repo.transfer_object ~source: main ~target: (Setup.clone_dot_filou setup)
+              hash ~on_progress
+          in
+          incr index;
+          unit
+        in
+        Prout.echo "Transferred %d objects." to_transfer_count;
+        Prout.echo_s "Clone is up-to-date.";
+        unit
 
 let prune ~yes ~keep_undo ~keep_redo setup =
-  let* journal = Repository.fetch_root setup in
-  let new_journal =
-    {
-      redo = list_take keep_redo journal.redo;
-      head = journal.head;
-      undo = list_take keep_undo journal.undo;
-    }
-  in
-  let* yes =
-    if yes then
-      ok true
-    else (
-      Prout.echo_s "/!\\ THIS OPERATION CANNOT BE UNDONE /!\\";
-      Prout.echo_s "After this, the history will look like this:";
-      Prout.echo_s "";
-      print_journal new_journal;
-      Prout.echo_s "";
-      Prout.echo_s "Repositories:";
-      Prout.echo_s "";
-      (
-        Option.iter' (Clone.main setup) @@ fun location ->
-        Prout.echo "  Main repository: %s" (Device.show_location location);
-      );
-      Prout.echo "            Clone: %s" (Device.show_location (Clone.workdir setup));
-      Prout.echo "";
-      prompt_for_confirmation "Prune main repository and its clone?"
-    )
-  in
-  if not yes then
-    unit
-  else
-    let* () = Repository.store_root setup new_journal in
-    let* (count, size) = Repository.garbage_collect setup in
-    Prout.echo "Removed %d objects totalling %s." count (show_size size);
-    unit
+  match Setup.main setup with
+    | None ->
+        (* TODO: we could garbage-collect the clone, without changing the journal? *)
+        failed [ "cannot prune in clone-only mode" ]
+    | Some main ->
+        let* journal = fetch_journal setup in
+        let new_journal =
+          {
+            redo = list_take keep_redo journal.redo;
+            head = journal.head;
+            undo = list_take keep_undo journal.undo;
+          }
+        in
+        let* yes =
+          if yes then
+            ok true
+          else (
+            Prout.echo_s "/!\\ THIS OPERATION CANNOT BE UNDONE /!\\";
+            Prout.echo_s "After this, the history will look like this:";
+            Prout.echo_s "";
+            print_journal new_journal;
+            Prout.echo_s "";
+            Prout.echo_s "Repositories:";
+            Prout.echo_s "";
+            (
+              Option.iter' (Setup.main setup) @@ fun location ->
+              Prout.echo "  Main repository: %s" (Device.show_location location);
+            );
+            Prout.echo "            Clone: %s" (Device.show_location (Setup.workdir setup));
+            Prout.echo "";
+            prompt_for_confirmation "Prune main repository and its clone?"
+          )
+        in
+        if not yes then
+          unit
+        else
+          let* () = store_journal setup new_journal in
+          Prout.major_s "Computing reachable set...";
+          let* reachable_objects_hashes, reachable_file_hashes =
+            let on_progress ~object_count ~file_count =
+              Prout.minor @@ fun () ->
+              sf "Computing reachable set (%d objects, %d files)..."
+                object_count file_count
+            in
+            Repo.get_reachable_hashes ~on_progress main
+          in
+          let reachable_hashes =
+            Hash_set.union reachable_objects_hashes reachable_file_hashes
+          in
+          let list_unreachable_hashes description iter_hashes =
+            Prout.major "Listing %ss..." description;
+            let hashes = ref [] in
+            let* () =
+              let count = ref 0 in
+              iter_hashes @@ fun hash ->
+              Prout.minor (fun () -> sf "Listing %ss (%d)..." description !count);
+              if not (Hash_set.mem hash reachable_hashes) then
+                hashes := hash :: !hashes;
+              unit
+            in
+            ok !hashes
+          in
+          let* unreachable_clone_object_hashes =
+            list_unreachable_hashes "clone object"
+              (Repo.iter_objects (Setup.clone_dot_filou setup))
+          in
+          let* unreachable_main_object_hashes =
+            list_unreachable_hashes "main object"
+              (Repo.iter_objects main)
+          in
+          let* unreachable_file_hashes =
+            list_unreachable_hashes "file"
+              (Repo.iter_files main)
+          in
+          let remove_list description from get_size remove_hash hashes =
+            Prout.major "Removing unreachable %s from %s..." description from;
+            let count = List.length hashes in
+            let index = ref 0 in
+            let total_size = ref 0 in
+            let* () =
+              list_iter_e hashes @@ fun hash ->
+              let* size =
+                match get_size hash with
+                  | ERROR { code = `failed | `not_available; msg } ->
+                      failed msg
+                  | OK _ as x ->
+                      x
+              in
+              let* () = remove_hash hash in
+              (
+                Prout.minor @@ fun () ->
+                sf "Removing unreachable %s from %s... (%d / %d) (%d%%)"
+                  description from !index count (!index * 100 / count)
+              );
+              total_size := !total_size + size;
+              unit
+            in
+            Prout.echo "Removed %d %ss from %s totalling %s." count description from
+              (show_size !total_size);
+            unit
+          in
+          let* () =
+            remove_list "object" "clone"
+              (Repo.get_object_size (Setup.clone_dot_filou setup))
+              (Repo.remove_object (Setup.clone_dot_filou setup))
+              unreachable_clone_object_hashes
+          in
+          let* () =
+            remove_list "object" "main"
+              (Repo.get_object_size main)
+              (Repo.remove_object main)
+              unreachable_main_object_hashes
+          in
+          let* () =
+            remove_list "file" "main"
+              (fun hash -> Repo.get_file_size main (Repository.stored_file_hash hash))
+              (Repo.remove_file main)
+              unreachable_file_hashes
+          in
+          unit
 
 let log setup =
-  let* journal = Repository.fetch_root setup in
+  let* journal = fetch_journal setup in
   print_journal journal;
   unit
 
 let undo setup ~count =
   let undo count =
-    let* journal = Repository.fetch_root setup in
+    let* journal = fetch_journal setup in
     if List.compare_length_with journal.undo count < 0 then
       failed [ sf "journal has less than %d undo entries" count ]
     else
@@ -1724,10 +2005,10 @@ let undo setup ~count =
           journal
       in
       let journal = undo journal count in
-      Repository.store_root setup journal
+      store_journal setup journal
   in
   let redo count =
-    let* journal = Repository.fetch_root setup in
+    let* journal = fetch_journal setup in
     if List.compare_length_with journal.redo count < 0 then
       failed [ sf "journal has less than %d redo entries" count ]
     else
@@ -1749,14 +2030,14 @@ let undo setup ~count =
           journal
       in
       let journal = redo journal count in
-      Repository.store_root setup journal
+      store_journal setup journal
   in
   if count > 0 then undo count else
   if count < 0 then redo (- count) else
     unit
 
 let diff ~color setup ~before ~after =
-  let* journal = Repository.fetch_root setup in
+  let* journal = fetch_journal setup in
   let get_root index =
     if index > 0 then
       match List.nth_opt journal.undo (index - 1) with
@@ -1775,8 +2056,8 @@ let diff ~color setup ~before ~after =
   in
   let* root_before = get_root before in
   let* root_after = get_root after in
-  let* dir_before = fetch_root_dir setup root_before.root in
-  let* dir_after = fetch_root_dir setup root_after.root in
+  let* dir_before = fetch_root_dir setup root_before.state in
+  let* dir_after = fetch_root_dir setup root_after.state in
   let rec diff_dirs dir_path (before: dir) (after: dir) =
     let merged =
       Filename_map.merge' before after @@ fun _ before after ->
@@ -1810,16 +2091,23 @@ let diff ~color setup ~before ~after =
       | None, None ->
           unit
       | Some (File { hash = hash_before; _ }), Some (File { hash = hash_after; _ }) ->
-          if Repository.compare_hashes hash_before hash_after = 0 then
+          if
+            Hash.compare
+              (Repository.concrete_file_hash hash_before)
+              (Repository.concrete_file_hash hash_after)
+            = 0
+          then
             unit
           else
             status `differs `file
       | Some (Dir { hash = hash_before; _ }), Some (Dir { hash = hash_after; _ }) ->
-          if Repository.compare_hashes hash_before hash_after = 0 then
+          let* concrete_hash_before = Repository.concrete_hash_or_fail hash_before in
+          let* concrete_hash_after = Repository.concrete_hash_or_fail hash_after in
+          if Hash.compare concrete_hash_before concrete_hash_after = 0 then
             unit
           else
-            let* dir_before = fetch_or_fail setup hash_before in
-            let* dir_after = fetch_or_fail setup hash_after in
+            let* dir_before = fetch_or_fail setup Dir hash_before in
+            let* dir_after = fetch_or_fail setup Dir hash_after in
             diff_dirs path dir_before dir_after
       | Some (File _), Some (Dir _) ->
           status `differs `inconsistent
@@ -1844,20 +2132,34 @@ let disk_usage size =
 
 let stats setup =
   let* reachable_count, total_bytes, total_disk_usage =
-    Prout.major_s "Computing the set of reachable objects...";
-    let* hashes = Repository.reachable ~files: false setup in
-    let hashes = Repository.Hash_map.bindings hashes in
+    Prout.major_s "Computing reachable set...";
+    let* reachable_object_hashes, _ =
+      let location =
+        match Setup.main setup with
+          | None ->
+              Setup.clone_dot_filou setup
+          | Some main ->
+              main
+      in
+      let on_progress ~object_count ~file_count =
+        Prout.minor @@ fun () ->
+        sf "Computing reachable set (%d objects, %d files)..."
+          object_count file_count
+      in
+      Repo.get_reachable_hashes ~on_progress location
+    in
+    let hashes = Hash_set.elements reachable_object_hashes in
     let reachable_count = List.length hashes in
     let* hashes =
       let index = ref 0 in
-      list_map_e hashes @@ fun (hash, kind) ->
+      list_map_e hashes @@ fun hash ->
       incr index;
       (
         Prout.minor @@ fun () ->
         sf "Computing stats... (%d / %d) (%d%%)"
           !index reachable_count (!index * 100 / reachable_count)
       );
-      let* size = Repository.get_object_size setup kind hash in
+      let* size = get_object_size setup hash in
       ok (hash, size)
     in
     let total_bytes, total_disk_usage =
@@ -1874,7 +2176,7 @@ let stats setup =
     (total_bytes * 100 / total_disk_usage);
   unit
 
-let show setup obj ~max_depth =
+let show setup obj =
   let* obj =
     match obj with
       | "journal" -> ok `journal
@@ -1887,65 +2189,32 @@ let show setup obj ~max_depth =
             | Some hash ->
                 ok (`hash hash)
   in
-  let rec pp_value ~indent ~max_depth fmt (value: Robin.Value.t) =
-    Protype_robin.Explore.pp_value_gen ~custom ~indent ?max_depth () fmt value
-  and custom ~indent ~max_depth fmt (value: Robin.Value.t) =
-    match value with
-      | String s ->
-          (
-            match Hash.of_bin s with
-              | None ->
-                  false
-              | Some hash ->
-                  match Repository.fetch_raw setup hash with
-                    | ERROR _ ->
-                        false
-                    | OK encoded_value ->
-                        match Robin.Decode.from_string encoded_value with
-                          | Error _ ->
-                              false
-                          | Ok value ->
-                              (* TODO: indentation is broken here *)
-                              Format.fprintf fmt "%s =\n%s%a" (Hash.to_hex hash)
-                                (String.make indent ' ')
-                                (pp_value ~indent ~max_depth) value;
-                              true
-          )
-      | _ ->
-          false
-  in
-  let show_encoded_object encoded_value =
-    match Robin.Decode.from_string encoded_value with
-      | Error _ ->
-          print_string encoded_value;
-          flush stdout
-      | Ok value ->
-          Format.printf "%a@." (pp_value ~indent: 0 ~max_depth: (Some max_depth)) value
+  let show_hash hash =
+    let* encoded = fetch_raw_or_fail setup hash in
+    let* value = Object.decode_any encoded in
+    Prout.echo "%s" (Pretty.show (Pretty.value_of_object value));
+    unit
   in
   match obj with
     | `hash hash ->
-        let* encoded_object = Repository.fetch_raw setup hash in
-        show_encoded_object encoded_object;
-        unit
+        show_hash hash
     | `journal ->
-        let* encoded_object = Repository.fetch_root_raw setup in
-        show_encoded_object encoded_object;
-        unit
+        let* root_hash = read_root_hash setup in
+        let* concrete_hash = Repository.concrete_hash_or_fail root_hash in
+        show_hash concrete_hash
     | `root_dir | `hash_index as obj ->
-        let* root = Repository.fetch_root setup in
-        match root.head.root with
+        let* state = fetch_state setup in
+        match state with
           | Empty ->
               Prout.echo_s "empty";
               unit
           | Non_empty non_empty_root ->
-              let hash =
+              let* hash =
                 match obj with
-                  | `root_dir -> Repository.hash_of_hash non_empty_root.root_dir
-                  | `hash_index -> Repository.hash_of_hash non_empty_root.hash_index
+                  | `root_dir -> Repository.concrete_hash_or_fail non_empty_root.root_dir
+                  | `hash_index -> Repository.concrete_hash_or_fail non_empty_root.hash_index
               in
-              let* encoded_object = Repository.fetch_raw setup hash in
-              show_encoded_object encoded_object;
-              unit
+              show_hash hash
 
 let config ~mode ~main_location =
   let* clone_location, config = find_local_clone_config mode in

@@ -517,14 +517,6 @@ let main () =
                repository."
             false
         in
-        let max_depth =
-          Clap.default_int
-            ~long: "depth"
-            ~short: 'r'
-            ~description:
-              "Show the objects referenced by OBJECT, recursively, with maximum depth DEPTH."
-            3
-        in
         let obj =
           Clap.default_string
             ~description:
@@ -533,7 +525,7 @@ let main () =
             ~placeholder: "OBJECT"
             "journal"
         in
-        `show (obj, cache, max_depth)
+        `show (obj, cache)
       );
       (
         Clap.case
@@ -557,8 +549,7 @@ let main () =
      - set device to RO even though [Repository] will not even try to write;
      - set both [Bare] and [Repository] to RO even though [Repository] calls [Bare]. *)
   if dry_run then (
-    State.Bare.set_read_only ();
-    State.Repository.set_read_only ();
+    State.Repo.set_read_only ();
   );
   let device_mode = if dry_run then Device.RO else RW in
   let parse_location = Device.parse_location device_mode in
@@ -569,7 +560,7 @@ let main () =
     result
   in
   let parse_local_path_with_kind setup string =
-    match Clone.workdir setup with
+    match Setup.workdir setup with
       | Local (_, root) ->
           Device.parse_local_path root string
       | SSH_filou _ ->
@@ -681,9 +672,9 @@ let main () =
       | `stats cache ->
           with_local_clone ~clone_only: cache @@ fun setup ->
           Controller.stats setup
-      | `show (obj, cache, max_depth) ->
+      | `show (obj, cache) ->
           with_local_clone ~clone_only: cache @@ fun setup ->
-          Controller.show setup obj ~max_depth
+          Controller.show setup obj
       | `config main ->
           let* main_location = opt_map_e main parse_location in
           Controller.config ~mode: device_mode ~main_location

@@ -98,6 +98,31 @@ let cmd executable args =
     | WSIGNALED n -> echo "Killed by signal: %d" n
     | WSTOPPED n -> echo "Stopped by signal: %d" n
 
+let cmd_and_read executable args =
+  (* Print command. *)
+  print_string "$ ";
+  print_string (Filename.quote_if_needed executable);
+  List.iter' args (fun arg -> print_char ' '; print_string (Filename.quote_if_needed arg));
+  print_newline ();
+  (* Execute command. *)
+  let stdout, stderr, status =
+    try
+      Run_and_read.run_and_read executable args
+    with Unix.Unix_error (error, _, _) ->
+      echo "Failed to execute: %s" (Unix.error_message error);
+      exit 1
+  in
+  print_string stdout;
+  print_string stderr;
+  (
+    match status with
+      | WEXITED 0 -> ()
+      | WEXITED n -> echo "Exit code: %d" n
+      | WSIGNALED n -> echo "Killed by signal: %d" n
+      | WSTOPPED n -> echo "Stopped by signal: %d" n
+  );
+  stdout, stderr
+
 let create_file path contents =
   echo "$ echo %s > %s" (Filename.quote_if_needed contents) (Filename.quote_if_needed path);
   let ch = open_out path in
@@ -167,6 +192,15 @@ struct
       flag (not color) "--no-color"
     in
     cmd filou_exe (flags @ args)
+
+  let run_and_read ?(v = false) ?(dry_run = false) ?(color = false) args =
+    Option.iter cd P.path;
+    let flags =
+      flag v "-v" @
+      flag dry_run "--dry-run" @
+      flag (not color) "--no-color"
+    in
+    cmd_and_read filou_exe (flags @ args)
 
   let init ?v ?dry_run ?color ?main () =
     run ?v ?dry_run ?color ("init" :: list_of_option main)
@@ -243,6 +277,13 @@ struct
       list_of_option what @
       list_of_option ~name: "-r" (Option.map string_of_int r)
     )
+
+  let show_and_read ?v ?dry_run ?color ?what ?r () =
+    run_and_read ?v ?dry_run ?color (
+      "show" ::
+      list_of_option what @
+      list_of_option ~name: "-r" (Option.map string_of_int r)
+    )
 end
 
 module Main = Make_filou (struct let path = Some main end)
@@ -259,39 +300,6 @@ let main_tree () =
 let clone_tree () =
   cd clone;
   tree ()
-
-(* let trees () = *)
-(*   main_tree (); *)
-(*   clone_tree () *)
-
-(* let hash path = cmd "sha256sum" [ path ] *)
-
-let explore path =
-  echo "$ explore %s" path;
-  let contents = read_file path in
-  Format.fprintf Format.str_formatter "%a@." Protype_robin.Explore.pp_string contents;
-  let string = Format.flush_str_formatter () in
-  print_string string;
-  string
-
-(* let explore_main path = *)
-(*   cd main; *)
-(*   explore path *)
-
-let explore_clone path =
-  cd clone;
-  explore (".filou" // path)
-
-(* let explore_hash hash = *)
-(*   explore (String.sub hash 0 2 // String.sub hash 2 2 // hash) *)
-
-(* let explore_main_hash hash = *)
-(*   cd main; *)
-(*   explore_hash hash *)
-
-(* let explore_clone_hash hash = *)
-(*   cd clone; *)
-(*   explore_hash hash *)
 
 let rec find_files ?(acc = Set.String.empty) path =
   if not (Sys.is_directory path) then
@@ -314,13 +322,18 @@ let (=~*) str rex =
         x
 
 let dot_filou_meta_hash hash =
-  ".filou" // "meta" // String.sub hash 0 2 // String.sub hash 2 2 // hash
+  ".filou" // "meta" // String.sub hash 0 2 // hash
+
+let hexdump file =
+  cmd "hexdump" [ "-C"; file ]
+
+let explore _ = "" (* TODO *)
 
 let small_repo () =
   comment "Initialize a main repository and a clone.";
   Filou.init ~main ();
   Filou.clone ~main ~clone ();
-  let _ = explore_clone "config" in
+  hexdump (clone // ".filou/config");
   Clone.check ();
   Clone.tree ();
   Clone.log ();
@@ -368,6 +381,7 @@ let small_repo () =
   Clone.push ~dry_run: true [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
+  Clone.update (); (* TODO: annoying that we have to do that *)
   Clone.check ~cache: true ();
   Clone.log ();
   Clone.diff ~before: 3 ();
@@ -545,9 +559,9 @@ let small_repo () =
   comment "Test update.";
   Clone.update ();
   cd clone;
-  let root = explore ".filou/root" in
-  let root_dir = root =~* "root_dir = ([0-9a-f]{64})" in
-  let hash_index = root =~* "hash_index = ([0-9a-f]{64})" in
+  let stdout, _ = Clone.show_and_read () in
+  let root_dir = stdout =~* "root_dir = ([0-9a-f]{64})" in
+  let hash_index = stdout =~* "hash_index = ([0-9a-f]{64})" in
   rm (dot_filou_meta_hash root_dir);
   Clone.update ();
   Clone.update ();
@@ -609,12 +623,21 @@ let small_repo () =
   comment "Test prune on the clone.";
   create_file "bla/bli/truc" "this is a truc";
   Clone.push [ "bla/bli" ];
+  Clone.update (); (* TODO: annoying that we have to do that *)
   let clone_files_1 = find_files clone in
   let main_files_1 = find_files main in
   Clone.prune ();
   let clone_files_2 = find_files clone in
   let main_files_2 = find_files main in
-  comment "Clone: some objects should have been removed, no files should have been added:";
+  cat (main // "root");
+  comment "Clone:";
+  comment "- some meta files should have been removed";
+  comment "- none should have been added, except the new journal (see above cat)";
+  comment "- no data files should have been removed";
+  (* TODO: currently, the clone doesn't have the same diff,
+     because the new journal is missing
+     because Repository.store only stores in the main, not the clone
+     (see "annoying that we have to do that": this is also why we update) *)
   diff_string_sets clone_files_1 clone_files_2;
   comment "Main: should be the same diff:";
   diff_string_sets main_files_1 main_files_2;
@@ -622,9 +645,9 @@ let small_repo () =
   Clone.tree ();
   comment "Check that if some files are missing from the cache, they are not added.";
   cd clone;
-  let root = explore ".filou/root" in
-  let root_dir = root =~* "root_dir = ([0-9a-f]{64})" in
-  let hash_index = root =~* "hash_index = ([0-9a-f]{64})" in
+  let stdout, _ = Clone.show_and_read () in
+  let root_dir = stdout =~* "root_dir = ([0-9a-f]{64})" in
+  let hash_index = stdout =~* "hash_index = ([0-9a-f]{64})" in
   rm (dot_filou_meta_hash root_dir);
   rm (dot_filou_meta_hash hash_index);
   let clone_files_1 = find_files clone in
@@ -641,24 +664,22 @@ let small_repo () =
   comment "Check that if more objects exist in the clone than in the main, they are removed.";
   cd clone;
   mkdir ".filou/meta/01";
-  mkdir ".filou/meta/01/23";
   create_file
-    ".filou/meta/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859"
+    ".filou/meta/01/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859"
     "dummy object";
-  mkdir ".filou/data";
-  mkdir ".filou/data/01";
-  mkdir ".filou/data/01/23";
+  mkdir (main // "data/01");
+  mkdir (main // "data/01/23");
   create_file
-    ".filou/data/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b85a"
+    (main // "data/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b85a")
     "dummy object";
   let clone_files_1 = find_files clone in
   let main_files_1 = find_files main in
   Clone.prune ();
   let clone_files_2 = find_files clone in
   let main_files_2 = find_files main in
-  comment "Clone: diff should show one removed meta file and one removed data file:";
+  comment "Clone: diff should show one removed meta file:";
   diff_string_sets clone_files_1 clone_files_2;
-  comment "Main: diff should be empty:";
+  comment "Main: diff should show one removed data file:";
   diff_string_sets main_files_1 main_files_2;
   Clone.log ();
 
@@ -872,7 +893,6 @@ let small_repo () =
   Clone.tree ~duplicates: true ();
   Clone.push [ "toto" ];
   Clone.pull [ "toto" ];
-(*   Clone.push ~force: true [ "toto" ]; *) (* TODO *)
 
   comment "Push a file, remove it and re-push it from another clone.";
   rm_rf main;
@@ -890,8 +910,11 @@ let small_repo () =
   Clone.tree ();
   Clone.check ();
 
-  comment "Test the show command with large recursivity.";
-  Clone.show ~r: 1000 ();
+  comment "Test the show command.";
+  Clone.show ();
+  let hash, _ = Clone.show_and_read ~what: "hash_index" () in
+  Clone.show ~what: (String.trim hash) ();
+  Clone.show ~what: "root_dir" ();
   ()
 
 let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
@@ -941,5 +964,5 @@ let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
 
 let () =
   small_repo ();
-(*   large_repo ~files: 10000 ~dirs: 200 (); *)
+(*   large_repo ~files: 10000 ~dirs: 500 (); *)
   ()
