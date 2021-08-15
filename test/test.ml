@@ -381,7 +381,6 @@ let small_repo () =
   Clone.push ~dry_run: true [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
-  Clone.update (); (* TODO: annoying that we have to do that *)
   Clone.check ~cache: true ();
   Clone.log ();
   Clone.diff ~before: 3 ();
@@ -623,7 +622,6 @@ let small_repo () =
   comment "Test prune on the clone.";
   create_file "bla/bli/truc" "this is a truc";
   Clone.push [ "bla/bli" ];
-  Clone.update (); (* TODO: annoying that we have to do that *)
   let clone_files_1 = find_files clone in
   let main_files_1 = find_files main in
   Clone.prune ();
@@ -634,10 +632,6 @@ let small_repo () =
   comment "- some meta files should have been removed";
   comment "- none should have been added, except the new journal (see above cat)";
   comment "- no data files should have been removed";
-  (* TODO: currently, the clone doesn't have the same diff,
-     because the new journal is missing
-     because Repository.store only stores in the main, not the clone
-     (see "annoying that we have to do that": this is also why we update) *)
   diff_string_sets clone_files_1 clone_files_2;
   comment "Main: should be the same diff:";
   diff_string_sets main_files_1 main_files_2;

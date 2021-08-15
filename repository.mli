@@ -42,7 +42,7 @@ sig
 
   val hash: 'a -> 'a hash
 
-  val store: Device.location -> 'a object_type -> 'a hash -> (unit, [> `failed ]) r
+  val store: Device.location list -> 'a object_type -> 'a hash -> (unit, [> `failed ]) r
 
   val fetch: Device.location -> 'a object_type -> 'a hash ->
     ('a, [> `failed | `not_available ]) r
@@ -69,7 +69,7 @@ sig
 
   val get_file_size: Device.location -> file_hash -> (int, [> `failed ]) r
 
-  val write_root: Device.location -> root hash -> (unit, [> `failed ]) r
+  val write_root: Device.location list -> root hash -> (unit, [> `failed ]) r
 
   val read_root: Device.location -> (root hash option, [> `failed ]) r
 

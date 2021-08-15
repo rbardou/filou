@@ -59,7 +59,7 @@ sig
 
   val hash: 'a -> 'a hash
 
-  val store: Device.location -> 'a object_type -> 'a hash -> (unit, [> `failed ]) r
+  val store: Device.location list -> 'a object_type -> 'a hash -> (unit, [> `failed ]) r
 
   val fetch: Device.location -> 'a object_type -> 'a hash ->
     ('a, [> `failed | `not_available ]) r
@@ -86,7 +86,7 @@ sig
 
   val get_file_size: Device.location -> file_hash -> (int, [> `failed ]) r
 
-  val write_root: Device.location -> root hash -> (unit, [> `failed ]) r
+  val write_root: Device.location list -> root hash -> (unit, [> `failed ]) r
 
   val read_root: Device.location -> (root hash option, [> `failed ]) r
 
@@ -166,11 +166,11 @@ struct
     { status = Not_stored value }
 
   let rec store: 'a. _ -> 'a Object.t -> 'a hash -> _ =
-    fun (type a) location (typ: a Object.t) (hash: a hash) ->
-    match hash.status with
-      | Stored _ ->
+    fun (type a) locations (typ: a Object.t) (hash: a hash) ->
+    match hash.status, locations with
+      | Stored _, _ | _, [] ->
           unit
-      | Not_stored value ->
+      | Not_stored value, _ :: _ ->
           (* Store dependencies.
              We may need their hash before encoding. *)
           let* () =
@@ -180,14 +180,15 @@ struct
                   (* Files are always stored immediately. *)
                   unit
               | Object (typ, hash) ->
-                  store location typ hash
+                  store locations typ hash
           in
           (* Encode, hash and write the file. *)
           let encoded = Object.encode typ value in
           let concrete_hash = Hash.string encoded in
           let path = file_path_of_object_hash concrete_hash in
-          let* already_exists = Device.file_exists location path in
           let* () =
+            list_iter_e locations @@ fun location ->
+            let* already_exists = Device.file_exists location path in
             if already_exists || !read_only then
               unit
             else
@@ -311,15 +312,16 @@ struct
      TODO: turn into a map from device location? *)
   let current_root = ref None
 
-  let write_root location (hash: Object.root hash) =
+  let write_root locations (hash: Object.root hash) =
     if !read_only then
       (
         current_root := Some hash;
         unit
       )
     else
-      let* () = store location Object.root hash in
+      let* () = store locations Object.root hash in
       let* concrete_hash = concrete_hash_or_fail hash in
+      list_iter_e locations @@ fun location ->
       Device.write_file location root_path (Hash.to_hex concrete_hash)
 
   let read_root location: (Object.root hash option, _) r =

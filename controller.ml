@@ -71,7 +71,7 @@ let fetch_raw_or_fail setup concrete_hash =
               Repo.fetch_raw (Setup.clone_dot_filou setup) concrete_hash
 
 let init (location: Device.location) =
-  Repo.write_root location @@ Repo.hash {
+  Repo.write_root [ location ] @@ Repo.hash {
     redo = [];
     head = { command = "init"; state = Empty };
     undo = [];
@@ -118,7 +118,7 @@ let read_root_hash setup =
     | Some root_hash ->
         let* () =
           if read_from_main then
-            Repo.write_root (Setup.clone_dot_filou setup) root_hash
+            Repo.write_root [ Setup.clone_dot_filou setup ] root_hash
           else
             unit
         in
@@ -126,14 +126,11 @@ let read_root_hash setup =
 
 let store_journal setup journal =
   let journal_hash = Repo.hash journal in
-  let* () =
-    match Setup.main setup with
-      | None ->
-          unit
-      | Some main ->
-          Repo.write_root main journal_hash
-  in
-  Repo.write_root (Setup.clone_dot_filou setup) journal_hash
+  match Setup.main setup with
+    | None ->
+        unit
+    | Some main ->
+        Repo.write_root [ main; Setup.clone_dot_filou setup ] journal_hash
 
 let get_object_size setup (hash: Hash.t) =
   match Repo.get_object_size (Setup.clone_dot_filou setup) hash with
@@ -178,7 +175,7 @@ let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
         (* Initialize the clone. *)
         let* () = write_clone_config ~clone_location { main_location } in
         let setup = Setup.make ~main: (Some main_location) ~workdir: clone_location () in
-        Repo.write_root (Setup.clone_dot_filou setup) root
+        Repo.write_root [ Setup.clone_dot_filou setup ] root
 
 let find_local_clone_config mode =
   let rec find current =
@@ -1804,7 +1801,7 @@ let update setup =
             | None ->
                 failed [ "main repository is not initialized" ]
             | Some root_hash ->
-                Repo.write_root (Setup.clone_dot_filou setup) root_hash
+                Repo.write_root [ Setup.clone_dot_filou setup ] root_hash
         in
         Prout.major_s "Listing objects...";
         let count = ref 0 in
