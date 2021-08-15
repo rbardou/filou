@@ -8,6 +8,7 @@ type connection =
     ssh_pid: int;
     stdin: out_channel;
     stdout: in_channel;
+    stdout_buffer: R.buffer;
   }
 
 (* Must be in a separate record so that we can copy [location] in [sublocation]. *)
@@ -39,9 +40,7 @@ let send connection (query: Protocol.query) =
     | None ->
         failed [ "cannot send"; "connection is closed" ]
     | Some status ->
-        let string =
-          Protype_robin.Encode.to_string ~version: protocol_version Protocol.query query
-        in
+        let string = Protocol.encode_query query in
         match output_string status.stdin string with
           | exception Sys_error message ->
               failed [ "failed to send query through SSH"; message ]
@@ -56,17 +55,10 @@ let receive ?query connection filter =
     | None ->
         failed [ "cannot receive"; "connection is closed" ]
     | Some status ->
-        match
-          Protype_robin.Decode.value ~ignore_unknown_fields: true Protocol.response
-          @@ fun len ->
-          let len =
-            input status.stdout receive_bytes 0 (min (Bytes.length receive_bytes) len)
-          in
-          Bytes.sub_string receive_bytes 0 len
-        with
+        match Protocol.decode_response status.stdout_buffer with
           | exception Sys_error message ->
               failed [ "failed to receive response through SSH"; message ]
-          | Error { error = Robin_error End_of_file; _ } ->
+          | ERROR { code = `end_of_file; _ } ->
               (
                 match Unix.waitpid [] status.ssh_pid with
                   | exception Unix.Unix_error (error, _, _) ->
@@ -85,9 +77,9 @@ let receive ?query connection filter =
                       in
                       failed [ "end of file"; status ]
               )
-          | Error error ->
-              failed [ "failed to decode response"; Protype_robin.Decode.show_error error ]
-          | Ok response ->
+          | ERROR { code = `failed; msg } ->
+              failed ("failed to decode response" :: msg)
+          | OK response ->
               match response with
                 | R_failed message ->
                     failed ("remote responded with an error" :: message)
@@ -216,6 +208,7 @@ let connect location =
             ssh_pid;
             stdin;
             stdout;
+            stdout_buffer = R.from_channel ~buffer_capacity: 8192 stdout;
           }
         in
         location.connection.status <- Some connection;

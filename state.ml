@@ -158,12 +158,12 @@ struct
   let write_path buffer (path: Device.path) =
     W.(list int_u16) write_filename buffer path
 
+  let read_path buffer: Device.path =
+    R.(list int_u16) read_filename buffer
+
   let write_file_path buffer ((dir_path, filename): Device.file_path) =
     write_path buffer dir_path;
     write_filename buffer filename
-
-  let read_path buffer: Device.path =
-    R.(list int_u16) read_filename buffer
 
   let read_file_path buffer: Device.file_path =
     let dir_path = read_path buffer in

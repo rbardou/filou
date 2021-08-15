@@ -1,9 +1,5 @@
 (* TODO: remove what's not actually used *)
 
-(* We use version numbers starting from 0xF1100, which is supposed to look like "FILOU".
-   This acts as a kind of magic number. *)
-let protocol_version = 0xF1100
-
 include Mysc
 
 module W = Rawbin.Write
@@ -82,19 +78,18 @@ let trace error_message = function
 let dot_filou = Path.Filename.parse_exn ".filou"
 let dot_filou_config = [ dot_filou ], Path.Filename.parse_exn "config"
 
-let decode_robin_string typ string =
-  match
-    Protype_robin.Decode.from_string ~ignore_unknown_fields: true typ string
-  with
-    | Ok value ->
-        ok value
-    | Error error ->
-        failed [ Protype_robin.Decode.show_error error ]
-
 exception Failed of string list
 
-let decode_rawbin_string read string =
-  let buffer = R.from_string string in
+let decode_rawbin_or_eof read buffer =
+  try
+    ok (read buffer)
+  with
+    | Failed msg ->
+        failed msg
+    | End_of_file ->
+        error `end_of_file [ "end of file" ]
+
+let decode_rawbin read buffer =
   try
     ok (read buffer)
   with
@@ -102,6 +97,10 @@ let decode_rawbin_string read string =
         failed msg
     | End_of_file ->
         failed [ "end of file" ]
+
+let decode_rawbin_string read string =
+  let buffer = R.from_string string in
+  decode_rawbin read buffer
 
 let warn x = Printf.ksprintf (Prout.echo "Warning: %s") x
 

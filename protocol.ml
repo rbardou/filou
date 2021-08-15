@@ -78,101 +78,198 @@ let show_response = function
   | R_ok_remove_file ->
       "R_ok_remove_file"
 
-open Protype
-open Device_common.T
+(* TODO: share the following functions that were copy-pasted from State?
+   Or maybe it's safer that way, in case we want to change it for one protocol only? *)
 
-let dir_path: Path.dir Path.any_relativity t =
-  let decode string =
-    Option.map' (Path.parse string) @@ fun path ->
-    path |> Path.Any.to_dir
-  in
-  convert_partial string ~encode: Path.Any_relativity.show ~decode
+let write_filename buffer (value: Path.Filename.t) =
+  W.(string int_u16) buffer (Path.Filename.show value)
 
-let query: query t =
-  let q_hello = case "Q_hello" dir_path (fun x -> Q_hello x) in
-  let q_lock = case "Q_lock" file_path (fun x -> Q_lock x) in
-  let q_unlock = case "Q_unlock" unit (fun () -> Q_unlock) in
-  let q_read_dir = case "Q_read_dir" path (fun x -> Q_read_dir x) in
-  let q_write_file = case "Q_write_file" file_path (fun x -> Q_write_file x) in
-  let q_write_file_chunk = case "Q_write_file_chunk" string (fun x -> Q_write_file_chunk x) in
-  let q_write_file_eof = case "Q_write_file_eof" unit (fun () -> Q_write_file_eof) in
-  let q_read_file = case "Q_read_file" file_path (fun x -> Q_read_file x) in
-  let q_stat = case "Q_stat" path (fun x -> Q_stat x) in
-  let q_remove_file = case "Q_remove_file" file_path (fun x -> Q_remove_file x) in
-  variant [
-    Case q_hello;
-    Case q_lock;
-    Case q_unlock;
-    Case q_read_dir;
-    Case q_write_file;
-    Case q_write_file_chunk;
-    Case q_write_file_eof;
-    Case q_read_file;
-    Case q_stat;
-    Case q_remove_file;
-  ] @@
-  function
-  | Q_hello x -> value q_hello x
-  | Q_lock x -> value q_lock x
-  | Q_unlock -> value q_unlock ()
-  | Q_read_dir x -> value q_read_dir x
-  | Q_write_file x -> value q_write_file x
-  | Q_write_file_chunk x -> value q_write_file_chunk x
-  | Q_write_file_eof -> value q_write_file_eof ()
-  | Q_read_file x -> value q_read_file x
-  | Q_stat x -> value q_stat x
-  | Q_remove_file x -> value q_remove_file x
+let read_filename buffer: Path.Filename.t =
+  let filename = R.(string int_u16) buffer in
+  match Path.Filename.parse filename with
+    | None ->
+        raise (Failed [ sf "invalid filename: %S" filename ])
+    | Some filename ->
+        filename
 
-let stat: stat t =
-  let file =
-    let file_stat =
-      record @@
-      ("size", int, fst) @
-      ("mtime", float, snd) @:
-      fun size mtime -> size, mtime
-    in
-    case "File" file_stat (fun (x, y) -> Device_common.File { size = x; mtime = y })
-  in
-  let dir = case "Dir" unit (fun () -> Device_common.Dir) in
-  variant [ Case file; Case dir ] @@
-  function File { size = x; mtime = y } -> value file (x, y) | Dir -> value dir ()
+let write_path buffer (path: Device_common.path) =
+  W.(list int_u16) write_filename buffer path
 
-let response: response t =
-  let r_failed = case "R_failed" (list string) (fun x -> R_failed x) in
-  let r_no_such_file = case "R_no_such_file" (list string) (fun x -> R_no_such_file x) in
-  let r_ok_hello = case "R_ok_hello" unit (fun () -> R_ok_hello) in
-  let r_ok_lock = case "R_ok_lock" unit (fun () -> R_ok_lock) in
-  let r_ok_unlock = case "R_ok_unlock" unit (fun () -> R_ok_unlock) in
-  let r_ok_read_dir = case "R_ok_read_dir" (list filename) (fun x -> R_ok_read_dir x) in
-  let r_ok_write_file_eof = case "R_ok_write_file_eof" unit (fun () -> R_ok_write_file_eof) in
-  let r_ok_read_file_chunk =
-    case "R_ok_read_file_chunk" string (fun x -> R_ok_read_file_chunk x)
-  in
-  let r_ok_read_file = case "R_ok_read_file_eof" unit (fun () -> R_ok_read_file_eof) in
-  let r_ok_stat = case "R_ok_stat" stat (fun x -> R_ok_stat x) in
-  let r_ok_remove_file = case "R_ok_remove_file" unit (fun () -> R_ok_remove_file) in
-  variant [
-    Case r_failed;
-    Case r_no_such_file;
-    Case r_ok_hello;
-    Case r_ok_lock;
-    Case r_ok_unlock;
-    Case r_ok_read_dir;
-    Case r_ok_write_file_eof;
-    Case r_ok_read_file_chunk;
-    Case r_ok_read_file;
-    Case r_ok_stat;
-    Case r_ok_remove_file;
-  ] @@
-  function
-  | R_failed x -> value r_failed x
-  | R_no_such_file x -> value r_no_such_file x
-  | R_ok_hello -> value r_ok_hello ()
-  | R_ok_lock -> value r_ok_lock ()
-  | R_ok_unlock -> value r_ok_unlock ()
-  | R_ok_read_dir x -> value r_ok_read_dir x
-  | R_ok_write_file_eof -> value r_ok_write_file_eof ()
-  | R_ok_read_file_chunk x -> value r_ok_read_file_chunk x
-  | R_ok_read_file_eof -> value r_ok_read_file ()
-  | R_ok_stat x -> value r_ok_stat x
-  | R_ok_remove_file -> value r_ok_remove_file ()
+let read_path buffer: Device_common.path =
+  R.(list int_u16) read_filename buffer
+
+let write_file_path buffer ((dir_path, filename): Device_common.file_path) =
+  write_path buffer dir_path;
+  write_filename buffer filename
+
+let read_file_path buffer: Device_common.file_path =
+  let dir_path = read_path buffer in
+  let filename = read_filename buffer in
+  dir_path, filename
+
+let write_query buffer = function
+  | Q_hello path ->
+      W.(string @@ fun _ _ -> ()) buffer "FQhello1";
+      W.(string int_u16) buffer (Path.Any_relativity.show path)
+  | Q_lock file_path ->
+      W.(string @@ fun _ _ -> ()) buffer "FQlock01";
+      write_file_path buffer file_path
+  | Q_unlock ->
+      W.(string @@ fun _ _ -> ()) buffer "FQunlok1"
+  | Q_read_dir path ->
+      W.(string @@ fun _ _ -> ()) buffer "FQrddir1";
+      write_path buffer path
+  | Q_write_file file_path ->
+      W.(string @@ fun _ _ -> ()) buffer "FQwrfil1";
+      write_file_path buffer file_path
+  | Q_write_file_chunk chunk ->
+      W.(string @@ fun _ _ -> ()) buffer "FQwfchk1";
+      W.(string int_32) buffer chunk
+  | Q_write_file_eof ->
+      W.(string @@ fun _ _ -> ()) buffer "FQwfeof1"
+  | Q_read_file file_path ->
+      W.(string @@ fun _ _ -> ()) buffer "FQrdfil1";
+      write_file_path buffer file_path
+  | Q_stat path ->
+      W.(string @@ fun _ _ -> ()) buffer "FQstat01";
+      write_path buffer path
+  | Q_remove_file file_path ->
+      W.(string @@ fun _ _ -> ()) buffer "FQrmfil1";
+      write_file_path buffer file_path
+
+let read_query buffer =
+  let tag = R.(string @@ fun _ -> 8) buffer in
+  match tag with
+    | "FQhello1" ->
+        let path = R.(string int_u16) buffer in
+        let path =
+          match Path.parse path with
+            | None ->
+                raise (Failed [ sf "invalid path: %S" path ])
+            | Some path ->
+                Path.Any.to_dir path
+        in
+        Q_hello path
+    | "FQlock01" ->
+        let file_path = read_file_path buffer in
+        Q_lock file_path
+    | "FQunlok1" ->
+        Q_unlock
+    | "FQrddir1" ->
+        let path = read_path buffer in
+        Q_read_dir path
+    | "FQwrfil1" ->
+        let file_path = read_file_path buffer in
+        Q_write_file file_path
+    | "FQwfchk1" ->
+        let chunk = R.(string int_32) buffer in
+        Q_write_file_chunk chunk
+    | "FQwfeof1" ->
+        Q_write_file_eof
+    | "FQrdfil1" ->
+        let file_path = read_file_path buffer in
+        Q_read_file file_path
+    | "FQstat01" ->
+        let path = read_path buffer in
+        Q_stat path
+    | "FQrmfil1" ->
+        let file_path = read_file_path buffer in
+        Q_remove_file file_path
+    | _ ->
+        raise (Failed [ sf "unknown query tag: %S" tag ])
+
+let write_stat buffer (stat: Device_common.stat) =
+  match stat with
+    | File { size; mtime } ->
+        W.int_u8 buffer 0;
+        W.int_64 buffer size;
+        W.float_64 buffer mtime
+    | Dir ->
+        W.int_u8 buffer 1
+
+let read_stat buffer: Device_common.stat =
+  match R.int_u8 buffer with
+    | 0 ->
+        let size = R.int_64 buffer in
+        let mtime = R.float_64 buffer in
+        File { size; mtime }
+    | 1 ->
+        Dir
+    | tag ->
+        raise (Failed [ sf "unknown stat tag: %d" tag ])
+
+let write_response buffer = function
+  | R_failed msg ->
+      W.(string @@ fun _ _ -> ()) buffer "FRfaild1";
+      W.(list int_u8 (string int_u16)) buffer msg
+  | R_no_such_file msg ->
+      W.(string @@ fun _ _ -> ()) buffer "FRnofil1";
+      W.(list int_u8 (string int_u16)) buffer msg
+  | R_ok_hello ->
+      W.(string @@ fun _ _ -> ()) buffer "FRhello1"
+  | R_ok_lock ->
+      W.(string @@ fun _ _ -> ()) buffer "FRlock01"
+  | R_ok_unlock ->
+      W.(string @@ fun _ _ -> ()) buffer "FRunlok1"
+  | R_ok_read_dir filenames ->
+      W.(string @@ fun _ _ -> ()) buffer "FRrddir1";
+      W.(list int_u16 write_filename) buffer filenames
+  | R_ok_write_file_eof ->
+      W.(string @@ fun _ _ -> ()) buffer "FRwreof1"
+  | R_ok_read_file_chunk chunk  ->
+      W.(string @@ fun _ _ -> ()) buffer "FRrfchk1";
+      W.(string int_32) buffer chunk
+  | R_ok_read_file_eof ->
+      W.(string @@ fun _ _ -> ()) buffer "FRrdeof1"
+  | R_ok_stat stat ->
+      W.(string @@ fun _ _ -> ()) buffer "FRstat01";
+      write_stat buffer stat
+  | R_ok_remove_file ->
+      W.(string @@ fun _ _ -> ()) buffer "FRrmfil1"
+
+let read_response buffer =
+  let tag = R.(string @@ fun _ -> 8) buffer in
+  match tag with
+    | "FRfaild1" ->
+        let msg = R.(list int_u8 (string int_u16)) buffer in
+        R_failed msg
+    | "FRnofil1" ->
+        let msg = R.(list int_u8 (string int_u16)) buffer in
+        R_no_such_file msg
+    | "FRhello1" ->
+        R_ok_hello
+    | "FRlock01" ->
+        R_ok_lock
+    | "FRunlok1" ->
+        R_ok_unlock
+    | "FRrddir1" ->
+        let filenames = R.(list int_u16 read_filename) buffer in
+        R_ok_read_dir filenames
+    | "FRwreof1" ->
+        R_ok_write_file_eof
+    | "FRrfchk1" ->
+        let chunk = R.(string int_32) buffer in
+        R_ok_read_file_chunk chunk
+    | "FRrdeof1" ->
+        R_ok_read_file_eof
+    | "FRstat01" ->
+        let stat = read_stat buffer in
+        R_ok_stat stat
+    | "FRrmfil1" ->
+        R_ok_remove_file
+    | _ ->
+        raise (Failed [ sf "unknown response tag: %S" tag ])
+
+let encode_query query =
+  W.to_string @@ fun buffer ->
+  write_query buffer query
+
+let decode_query buffer =
+  decode_rawbin_or_eof read_query buffer
+
+let encode_response response =
+  W.to_string @@ fun buffer ->
+  write_response buffer response
+
+let decode_response buffer =
+  decode_rawbin_or_eof read_response buffer

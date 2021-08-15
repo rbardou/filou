@@ -5,23 +5,17 @@ let debug = Sys.getenv_opt "FILOU_DEBUG" = Some "yes"
 (* Can't print on stdout as we use it to output responses. *)
 let debug_log x = Printf.ksprintf prerr_endline x
 
-let read_bytes = Bytes.create 8192
+let read_buffer = R.from_channel ~buffer_capacity: 8192 stdin
 
 let read_query () =
-  match
-    Protype_robin.Decode.value ~ignore_unknown_fields: true Protocol.query @@ fun len ->
-    let len =
-      input stdin read_bytes 0 (min (Bytes.length read_bytes) len)
-    in
-    Bytes.sub_string read_bytes 0 len
-  with
+  match Protocol.decode_query read_buffer with
     | exception Sys_error message ->
         failed [ "failed to receive response through SSH"; message ]
-    | Error ({ error = Robin_error End_of_file; _ } as e) ->
-        error `query_end_of_file [ Protype_robin.Decode.show_error e ]
-    | Error error ->
-        failed [ "failed to decode response"; Protype_robin.Decode.show_error error ]
-    | Ok query ->
+    | ERROR { code = `end_of_file; msg } ->
+        error `query_end_of_file msg
+    | ERROR { code = `failed; msg } ->
+        failed ("failed to decode response" :: msg)
+    | OK query ->
         ok query
 
 let read_query () =
@@ -38,9 +32,7 @@ let read_query () =
 
 let respond response =
   if debug then debug_log "responding with: %s" (Protocol.show_response response);
-  let string =
-    Protype_robin.Encode.to_string ~version: protocol_version Protocol.response response
-  in
+  let string = Protocol.encode_response response in
   match
     print_string string;
     flush stdout
