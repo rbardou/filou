@@ -50,6 +50,15 @@ let clone2 =
     ~placeholder: "PATH"
     "/tmp/filou-test/clone2"
 
+let use_ssh =
+  Clap.flag ~set_long: "ssh" ~description: "Configure clones to use SSH." false
+
+let tests_to_run =
+  Clap.list_string
+    ~description: "Names of the tests to run."
+    ~placeholder: "TEST_NAME"
+    ()
+
 let () =
   Clap.close ()
 
@@ -206,6 +215,12 @@ struct
     run ?v ?dry_run ?color ("init" :: list_of_option main)
 
   let clone ?v ?dry_run ?color ?main ?clone () =
+    let main =
+      if use_ssh then
+        Option.map (fun main -> "filou+ssh://localhost/" ^ main) main
+      else
+        main
+    in
     run ?v ?dry_run ?color ("clone" :: list_of_option main @ list_of_option clone)
 
   let push ?(v = true) ?dry_run ?color paths =
@@ -269,6 +284,12 @@ struct
     run ?v ?dry_run ?color [ "stats" ]
 
   let config ?v ?dry_run ?color ?main () =
+    let main =
+      if use_ssh then
+        Option.map (fun main -> "filou+ssh://localhost/" ^ main) main
+      else
+        main
+    in
     run ?v ?dry_run ?color ("config" :: list_of_option ~name: "--main" main)
 
   let show ?v ?dry_run ?color ?what ?r () =
@@ -957,6 +978,8 @@ let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
   ()
 
 let () =
-  small_repo ();
-(*   large_repo ~files: 10000 ~dirs: 500 (); *)
+  if List.mem "small" tests_to_run then
+    small_repo ();
+  if List.mem "large" tests_to_run then
+    large_repo ~files: 10000 ~dirs: 500 ();
   ()
