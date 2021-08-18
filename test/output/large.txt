@@ -1,0 +1,67 @@
+# Create clone with 500 directories and 10000 files.
+# Initialize main and clone.
+$ main.exe --no-color init /tmp/filou-test/main
+$ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
+Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone/
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├++ dir1/
+├++ dir2/
+├++ dir4/
+├++ dir7/
+├++ file1249
+├++ file1423
+├++ file3125
+├++ file3215
+├++ file3442
+├++ file3883
+├++ file4427
+├++ file4453
+├++ file5173
+├++ file5634
+├++ file5824
+├++ file5854
+├++ file6090
+├++ file6522
+├++ file6768
+├++ file7050
+├++ file7124
+├++ file716
+├++ file7263
+├++ file7516
+├++ file7660
+├++ file7704
+├++ file7822
+├++ file8108
+├++ file8316
+├++ file8896
+├++ file904
+├++ file9046
+├++ file9227
+├++ file9266
+├++ file9506
+├++ file9583
+├++ file9828
+├++ file9846
+└++ file9935
+# Push.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push --yes
+Listing files...
+Listing files to push...
+Pushing files...
+Pushed 10000 files (631 kB).
+time(push) = 0.72337s
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 631199, file count: 10000).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color stats
+Computing reachable set...
+Reachable object count: 534
+Total size of reachable objects: 1.40 MB
+Disk usage of reachable objects: 2.98 MB
+Efficiency (total size / disk usage): 46%
