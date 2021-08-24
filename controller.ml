@@ -242,7 +242,7 @@ let find_local_clone ~clone_only mode =
           {
             main_dot_filou;
             clone_dot_filou = Some (Device.sublocation clone_location dot_filou);
-            workdir = clone_location;
+            workdir = Some clone_location;
           }
         in
         ok setup
@@ -981,7 +981,6 @@ type tree_entry_name =
 let tree ~color ~max_depth ~only_main ~only_dirs
     ~print_size ~print_file_count ~print_duplicates ~full_dir_paths
     (setup: Setup.t) (paths: Device.path list) =
-  let workdir = setup.workdir in
   let* state = fetch_state setup in
   let* root_dir = fetch_root_dir setup state in
   let find_path path =
@@ -1031,18 +1030,22 @@ let tree ~color ~max_depth ~only_main ~only_dirs
             find root_dir path
     in
     let* stat =
-      match Device.stat workdir path with
-        | ERROR { code = `failed; msg } ->
-            failed (
-              sf "failed to get path type for %s in %s"
-                (Device.show_path path)
-                (Device.show_location workdir)
-              :: msg
-            )
-        | ERROR { code = `no_such_file; _ } ->
+      match setup.workdir with
+        | None ->
             ok None
-        | OK stat ->
-            ok (Some stat)
+        | Some workdir ->
+            match Device.stat workdir path with
+              | ERROR { code = `failed; msg } ->
+                  failed (
+                    sf "failed to get path type for %s in %s"
+                      (Device.show_path path)
+                      (Device.show_location workdir)
+                    :: msg
+                  )
+              | ERROR { code = `no_such_file; _ } ->
+                  ok None
+              | OK stat ->
+                  ok (Some stat)
     in
     ok (path, dir_entry, stat)
   in
@@ -1280,34 +1283,38 @@ let tree ~color ~max_depth ~only_main ~only_dirs
       unit
     else
       let* work_dir =
-        let* filenames =
-          match Device.read_dir workdir dir_path with
-            | ERROR { code = `failed; _ } | OK _ as x ->
-                x
-            | ERROR { code = `no_such_file; _ } ->
-                ok []
-        in
-        let* list =
-          list_map_e filenames @@ fun filename ->
-          let path = dir_path @ [ filename ] in
-          match Device.stat workdir path with
-            | ERROR { code = (`no_such_file | `failed); msg } ->
-                failed (
-                  sf "failed to get path type for %s in %s"
-                    (Device.show_path path)
-                    (Device.show_location workdir)
-                  :: msg
-                )
-            | OK stat ->
-                ok (filename, stat)
-        in
-        let list =
-          if Device.same_paths dir_path [] then
-            List.filter (fun (f, _) -> Path.Filename.compare f dot_filou <> 0) list
-          else
-            list
-        in
-        ok (Filename_map.of_list list)
+        match setup.workdir with
+          | None ->
+              ok Filename_map.empty
+          | Some workdir ->
+              let* filenames =
+                match Device.read_dir workdir dir_path with
+                  | ERROR { code = `failed; _ } | OK _ as x ->
+                      x
+                  | ERROR { code = `no_such_file; _ } ->
+                      ok []
+              in
+              let* list =
+                list_map_e filenames @@ fun filename ->
+                let path = dir_path @ [ filename ] in
+                match Device.stat workdir path with
+                  | ERROR { code = (`no_such_file | `failed); msg } ->
+                      failed (
+                        sf "failed to get path type for %s in %s"
+                          (Device.show_path path)
+                          (Device.show_location workdir)
+                        :: msg
+                      )
+                  | OK stat ->
+                      ok (filename, stat)
+              in
+              let list =
+                if Device.same_paths dir_path [] then
+                  List.filter (fun (f, _) -> Path.Filename.compare f dot_filou <> 0) list
+                else
+                  list
+              in
+              ok (Filename_map.of_list list)
       in
       let merged_dir =
         Filename_map.merge' dir work_dir @@ fun _ dir_entry stat ->
@@ -1371,259 +1378,274 @@ let tree ~color ~max_depth ~only_main ~only_dirs
 let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
     (setup: Setup.t) (state: state) (path: Device.file_path):
   (state, [> `failed ]) r =
-  trace ("failed to push file: " ^ Device.show_file_path path) @@
-  let* root_dir = fetch_root_dir setup state in
-  let* add_result =
-    let on_hash_progress ~bytes ~size =
-      Prout.minor @@ fun () ->
-      sf "Pushing... (%s / %s) (%d%%) (file %d / %d) - hashing (%s / %s) (%d%%)"
-        (show_size pushed_size) (show_size total_size_to_push)
-        (pushed_size * 100 / total_size_to_push)
-        file_index file_count
-        (show_size bytes) (show_size size)
-        (bytes * 100 / size)
-    in
-    let get_hash_and_size () =
-      let* hash, size =
-        let* main =
-          match setup.main_dot_filou with
-            | None ->
-                failed [ "cannot store files in clone-only mode" ]
-            | Some main_dot_filou ->
-                ok main_dot_filou
+  match setup.workdir with
+    | None ->
+        operation_not_available [ "cannot push with no work directory" ]
+    | Some workdir ->
+        trace ("failed to push file: " ^ Device.show_file_path path) @@
+        let* root_dir = fetch_root_dir setup state in
+        let* add_result =
+          let on_hash_progress ~bytes ~size =
+            Prout.minor @@ fun () ->
+            sf "Pushing... (%s / %s) (%d%%) (file %d / %d) - hashing (%s / %s) (%d%%)"
+              (show_size pushed_size) (show_size total_size_to_push)
+              (pushed_size * 100 / total_size_to_push)
+              file_index file_count
+              (show_size bytes) (show_size size)
+              (bytes * 100 / size)
+          in
+          let get_hash_and_size () =
+            let* hash, size =
+              let* main =
+                match setup.main_dot_filou with
+                  | None ->
+                      failed [ "cannot store files in clone-only mode" ]
+                  | Some main_dot_filou ->
+                      ok main_dot_filou
+              in
+              Repo.store_file
+                ~on_hash_progress
+                ~on_copy_progress: (
+                  fun ~bytes ~size: _ ->
+                    let bytes = bytes + pushed_size in
+                    let size = total_size_to_push in
+                    Prout.minor @@ fun () ->
+                    sf "Pushing... (%s / %s) (%d%%) (file %d / %d) %s"
+                      (show_size bytes) (show_size size) (bytes * 100 / size)
+                      file_index file_count (Device.show_file_path path)
+                )
+                ~source: workdir
+                ~source_path: path
+                ~target: main
+            in
+            Cash.set setup path (Repository.concrete_file_hash hash);
+            ok (hash, size)
+          in
+          let get_hash_just_checking () =
+            let* status = Cash.get ~on_progress: on_hash_progress setup path in
+            ok (match status with Does_not_exist | Dir -> None | File hash -> Some hash)
+          in
+          Dir.add setup root_dir path get_hash_and_size get_hash_just_checking
         in
-        Repo.store_file
-          ~on_hash_progress
-          ~on_copy_progress: (
-            fun ~bytes ~size: _ ->
-              let bytes = bytes + pushed_size in
-              let size = total_size_to_push in
-              Prout.minor @@ fun () ->
-              sf "Pushing... (%s / %s) (%d%%) (file %d / %d) %s"
-                (show_size bytes) (show_size size) (bytes * 100 / size)
-                file_index file_count (Device.show_file_path path)
-          )
-          ~source: setup.workdir
-          ~source_path: path
-          ~target: main
-      in
-      Cash.set setup path (Repository.concrete_file_hash hash);
-      ok (hash, size)
-    in
-    let get_hash_just_checking () =
-      let* status = Cash.get ~on_progress: on_hash_progress setup path in
-      ok (match status with Does_not_exist | Dir -> None | File hash -> Some hash)
-    in
-    Dir.add setup root_dir path get_hash_and_size get_hash_just_checking
-  in
-  match add_result with
-    | Already_exists_same ->
-        if verbose then Prout.echo "Already exists: %s" (Device.show_file_path path);
-        ok state
-    | Already_exists_different ->
-        failed [
-          sf "a different file with this name already exists: %s"
-            (Device.show_file_path path);
-        ]
-    | Added { new_dir_hash = new_root_dir_hash; added_file_hash; _ } ->
-        let* new_hash_index_hash, old_paths =
-          Hash_index.add setup state added_file_hash path
-        in
-        if verbose then (
-          if File_path_set.is_empty old_paths then
-            Prout.echo "Pushed: %s" (Device.show_file_path path)
-          else
-            Prout.echo "Pushed: %s (duplicate of: %s)" (Device.show_file_path path) (
-              File_path_set.elements old_paths
-              |> List.map Device.show_file_path
-              |> String.concat ", "
-            );
-        );
-        ok (
-          Non_empty {
-            root_dir = new_root_dir_hash;
-            hash_index = new_hash_index_hash;
-          }
-        )
+        match add_result with
+          | Already_exists_same ->
+              if verbose then Prout.echo "Already exists: %s" (Device.show_file_path path);
+              ok state
+          | Already_exists_different ->
+              failed [
+                sf "a different file with this name already exists: %s"
+                  (Device.show_file_path path);
+              ]
+          | Added { new_dir_hash = new_root_dir_hash; added_file_hash; _ } ->
+              let* new_hash_index_hash, old_paths =
+                Hash_index.add setup state added_file_hash path
+              in
+              if verbose then (
+                if File_path_set.is_empty old_paths then
+                  Prout.echo "Pushed: %s" (Device.show_file_path path)
+                else
+                  Prout.echo "Pushed: %s (duplicate of: %s)" (Device.show_file_path path) (
+                    File_path_set.elements old_paths
+                    |> List.map Device.show_file_path
+                    |> String.concat ", "
+                  );
+              );
+              ok (
+                Non_empty {
+                  root_dir = new_root_dir_hash;
+                  hash_index = new_hash_index_hash;
+                }
+              )
 
-let push ~verbose ~yes setup (paths: Device.path list) =
-  let* journal = fetch_journal setup in
-  let* checked_redo = Check_redo.check ~yes journal in
-  Prout.major_s "Listing files...";
-  let files = ref [] in
-  let file_count = ref 0 in
-  let rec add_path (path: Device.path) =
-    if Device.same_paths path [ dot_filou ] then
-      unit
-    else
-      let* stat = Device.stat setup.workdir path in
-      match stat with
-        | Dir ->
-            Device.iter_read_dir setup.workdir path @@ fun filename ->
-            add_path (path @ [ filename ])
-        | File { size; _ } ->
-            match Device.file_path_of_path path with
-              | None ->
-                  (* Should not happen, "." is a directory. *)
-                  unit
-              | Some path ->
-                  files := (path, size) :: !files;
-                  incr file_count;
-                  Prout.minor (fun () -> sf "Listing files... (%d)" !file_count);
-                  unit
-  in
-  let* () = list_iter_e paths add_path in
-  let files = List.rev !files in
-  let file_count = !file_count in
-  Prout.major_s "Listing files to push...";
-  let state = journal.head.state in
-  let* files_to_push =
-    let file_index = ref 0 in
-    list_filter_e files @@ fun ((file_path: Device.file_path), _) ->
-    let* found = Dir.find setup state (Device.path_of_file_path file_path) in
-    incr file_index;
-    (
-      Prout.minor @@ fun () ->
-      sf "Listing files to push... (%d / %d) (%d%%)"
-        !file_index file_count (!file_index * 100 / file_count)
-    );
-    match found with
-      | None ->
-          ok true
-      | Some (Found_dir _) ->
-          failed [ sf "%s already exists as a directory" (Device.show_file_path file_path) ]
-      | Some (Found_file { path; hash; _ }) ->
+let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
+  match setup.workdir with
+    | None ->
+        operation_not_available [ "cannot push with no work directory" ]
+    | Some workdir ->
+        let* journal = fetch_journal setup in
+        let* checked_redo = Check_redo.check ~yes journal in
+        Prout.major_s "Listing files...";
+        let files = ref [] in
+        let file_count = ref 0 in
+        let rec add_path (path: Device.path) =
+          if Device.same_paths path [ dot_filou ] then
+            unit
+          else
+            let* stat = Device.stat workdir path in
+            match stat with
+              | Dir ->
+                  Device.iter_read_dir workdir path @@ fun filename ->
+                  add_path (path @ [ filename ])
+              | File { size; _ } ->
+                  match Device.file_path_of_path path with
+                    | None ->
+                        (* Should not happen, "." is a directory. *)
+                        unit
+                    | Some path ->
+                        files := (path, size) :: !files;
+                        incr file_count;
+                        Prout.minor (fun () -> sf "Listing files... (%d)" !file_count);
+                        unit
+        in
+        let* () = list_iter_e paths add_path in
+        let files = List.rev !files in
+        let file_count = !file_count in
+        Prout.major_s "Listing files to push...";
+        let state = journal.head.state in
+        let* files_to_push =
+          let file_index = ref 0 in
+          list_filter_e files @@ fun ((file_path: Device.file_path), _) ->
+          let* found = Dir.find setup state (Device.path_of_file_path file_path) in
+          incr file_index;
+          (
+            Prout.minor @@ fun () ->
+            sf "Listing files to push... (%d / %d) (%d%%)"
+              !file_index file_count (!file_index * 100 / file_count)
+          );
+          match found with
+            | None ->
+                ok true
+            | Some (Found_dir _) ->
+                failed [
+                  sf "%s already exists as a directory" (Device.show_file_path file_path);
+                ]
+            | Some (Found_file { path; hash; _ }) ->
+                let* status =
+                  let on_progress ~bytes ~size =
+                    Prout.minor @@ fun () ->
+                    sf "Listing files to push... (%d / %d) (%d%%) - hashing (%s / %s) (%d%%)"
+                      !file_index file_count (!file_index * 100 / file_count)
+                      (show_size size) (show_size bytes)
+                      (size * 100 / bytes)
+                  in
+                  Cash.get ~on_progress setup path
+                in
+                match status with
+                  | Does_not_exist | Dir ->
+                      (* This is inconsistent with the list of files we found before. *)
+                      failed [ sf "%s got removed" (Device.show_file_path path) ]
+                  | File new_hash ->
+                      if Hash.compare new_hash (Repository.concrete_file_hash hash) = 0 then
+                        (
+                          if verbose then
+                            Prout.echo "Already exists: %s" (Device.show_file_path file_path);
+                          ok false
+                        )
+                      else
+                        failed [
+                          sf "%s already exists with a different hash"
+                            (Device.show_file_path file_path);
+                        ]
+        in
+        let file_count = List.length files_to_push in
+        Prout.major_s "Pushing files...";
+        let total_size_to_push =
+          List.fold_left' 0 files_to_push @@ fun acc (_, size) -> acc + size
+        in
+        let* state, _ =
+          let file_index = ref 0 in
+          list_fold_e (state, 0) files_to_push @@ fun (state, pushed_size) (path, size) ->
+          incr file_index;
+          let* state =
+            push_file ~verbose ~pushed_size ~total_size_to_push ~file_index: !file_index
+              ~file_count setup state path
+          in
+          ok (state, pushed_size + size)
+        in
+        let* () =
+          store_state ~checked_redo setup state @@
+          String.concat " " ("push" :: List.map Device.show_path paths)
+        in
+        Prout.echo "Pushed %d files (%s)." file_count (show_size total_size_to_push);
+        unit
+
+let pull ~verbose (setup: Setup.t) (paths: Device.path list) =
+  match setup.workdir with
+    | None ->
+        operation_not_available [ "cannot pull with no work directory" ]
+    | Some workdir ->
+        let* state = fetch_state setup in
+        Prout.major_s "Listing files...";
+        let* files = Dir.find_exact_list_files ~recursive: true setup state paths in
+        Prout.major_s "Listing files to pull...";
+        let* files_to_pull =
+          let file_count = List.length files in
+          let file_index = ref 0 in
+          list_filter_e files @@ fun file ->
+          incr file_index;
+          (
+            Prout.minor @@ fun () ->
+            sf "Listing files to pull... (%d / %d) (%d%%)"
+              !file_index file_count (!file_index * 100 / file_count)
+          );
           let* status =
             let on_progress ~bytes ~size =
               Prout.minor @@ fun () ->
-              sf "Listing files to push... (%d / %d) (%d%%) - hashing (%s / %s) (%d%%)"
+              sf "Listing files to pull... (%d / %d) (%d%%) - hashing (%s / %s) (%d%%)"
                 !file_index file_count (!file_index * 100 / file_count)
                 (show_size size) (show_size bytes)
                 (size * 100 / bytes)
             in
-            Cash.get ~on_progress setup path
+            Cash.get ~on_progress setup file.path
           in
           match status with
-            | Does_not_exist | Dir ->
-                (* This is inconsistent with the list of files we found before. *)
-                failed [ sf "%s got removed" (Device.show_file_path path) ]
+            | Does_not_exist ->
+                ok true
+            | Dir ->
+                failed [
+                  sf "%s already exists as a directory" (Device.show_file_path file.path);
+                ]
             | File new_hash ->
-                if Hash.compare new_hash (Repository.concrete_file_hash hash) = 0 then
+                if Hash.compare new_hash (Repository.concrete_file_hash file.hash) = 0 then
                   (
                     if verbose then
-                      Prout.echo "Already exists: %s" (Device.show_file_path file_path);
+                      Prout.echo "Already exists: %s"
+                        (Device.show_file_path file.path);
                     ok false
                   )
                 else
                   failed [
                     sf "%s already exists with a different hash"
-                      (Device.show_file_path file_path);
+                      (Device.show_file_path file.path);
                   ]
-  in
-  let file_count = List.length files_to_push in
-  Prout.major_s "Pushing files...";
-  let total_size_to_push =
-    List.fold_left' 0 files_to_push @@ fun acc (_, size) -> acc + size
-  in
-  let* state, _ =
-    let file_index = ref 0 in
-    list_fold_e (state, 0) files_to_push @@ fun (state, pushed_size) (path, size) ->
-    incr file_index;
-    let* state =
-      push_file ~verbose ~pushed_size ~total_size_to_push ~file_index: !file_index ~file_count
-        setup state path
-    in
-    ok (state, pushed_size + size)
-  in
-  let* () =
-    store_state ~checked_redo setup state @@
-    String.concat " " ("push" :: List.map Device.show_path paths)
-  in
-  Prout.echo "Pushed %d files (%s)." file_count (show_size total_size_to_push);
-  unit
-
-let pull ~verbose setup (paths: Device.path list) =
-  let* state = fetch_state setup in
-  Prout.major_s "Listing files...";
-  let* files = Dir.find_exact_list_files ~recursive: true setup state paths in
-  Prout.major_s "Listing files to pull...";
-  let* files_to_pull =
-    let file_count = List.length files in
-    let file_index = ref 0 in
-    list_filter_e files @@ fun file ->
-    incr file_index;
-    (
-      Prout.minor @@ fun () ->
-      sf "Listing files to pull... (%d / %d) (%d%%)"
-        !file_index file_count (!file_index * 100 / file_count)
-    );
-    let* status =
-      let on_progress ~bytes ~size =
-        Prout.minor @@ fun () ->
-        sf "Listing files to pull... (%d / %d) (%d%%) - hashing (%s / %s) (%d%%)"
-          !file_index file_count (!file_index * 100 / file_count)
-          (show_size size) (show_size bytes)
-          (size * 100 / bytes)
-      in
-      Cash.get ~on_progress setup file.path
-    in
-    match status with
-      | Does_not_exist ->
-          ok true
-      | Dir ->
-          failed [
-            sf "%s already exists as a directory" (Device.show_file_path file.path);
-          ]
-      | File new_hash ->
-          if Hash.compare new_hash (Repository.concrete_file_hash file.hash) = 0 then
-            (
-              if verbose then
-                Prout.echo "Already exists: %s"
-                  (Device.show_file_path file.path);
-              ok false
-            )
-          else
-            failed [
-              sf "%s already exists with a different hash" (Device.show_file_path file.path);
-            ]
-  in
-  Prout.major_s "Pulling files...";
-  let file_count = List.length files_to_pull in
-  let* total_size_pulled =
-    let file_index = ref 0 in
-    let total_size_to_pull =
-      List.fold_left' 0 files_to_pull (fun acc file -> acc + file.size)
-    in
-    list_fold_e 0 files_to_pull @@ fun pulled_size file ->
-    incr file_index;
-    let* () =
-      let* main_dot_filou =
-        match setup.main_dot_filou with
-          | None ->
-              failed [ "cannot store files in clone-only mode" ]
-          | Some main_dot_filou ->
-              ok main_dot_filou
-      in
-      Repo.fetch_file file.hash
-        ~source: main_dot_filou
-        ~target: setup.workdir
-        ~target_path: file.path
-        ~on_progress: (
-          fun ~bytes ~size: _ ->
-            let bytes = bytes + pulled_size in
-            let size = total_size_to_pull in
-            Prout.minor @@ fun () ->
-            sf "Pulling... (%d / %d) (%d%%) (file %d / %d) %s"
-              bytes size (bytes * 100 / size)
-              !file_index file_count (Device.show_file_path file.path)
-        )
-    in
-    if verbose then
-      Prout.echo "Pulled: %s" (Device.show_file_path file.path);
-    ok (pulled_size + file.size)
-  in
-  Prout.echo "Pulled %d files (%s)." file_count (show_size total_size_pulled);
-  unit
+        in
+        Prout.major_s "Pulling files...";
+        let file_count = List.length files_to_pull in
+        let* total_size_pulled =
+          let file_index = ref 0 in
+          let total_size_to_pull =
+            List.fold_left' 0 files_to_pull (fun acc file -> acc + file.size)
+          in
+          list_fold_e 0 files_to_pull @@ fun pulled_size file ->
+          incr file_index;
+          let* () =
+            let* main_dot_filou =
+              match setup.main_dot_filou with
+                | None ->
+                    failed [ "cannot store files in clone-only mode" ]
+                | Some main_dot_filou ->
+                    ok main_dot_filou
+            in
+            Repo.fetch_file file.hash
+              ~source: main_dot_filou
+              ~target: workdir
+              ~target_path: file.path
+              ~on_progress: (
+                fun ~bytes ~size: _ ->
+                  let bytes = bytes + pulled_size in
+                  let size = total_size_to_pull in
+                  Prout.minor @@ fun () ->
+                  sf "Pulling... (%d / %d) (%d%%) (file %d / %d) %s"
+                    bytes size (bytes * 100 / size)
+                    !file_index file_count (Device.show_file_path file.path)
+              )
+          in
+          if verbose then
+            Prout.echo "Pulled: %s" (Device.show_file_path file.path);
+          ok (pulled_size + file.size)
+        in
+        Prout.echo "Pulled %d files (%s)." file_count (show_size total_size_pulled);
+        unit
 
 let remove_file setup (state: state) (path: Device.file_path): (state, _) r =
   match state with

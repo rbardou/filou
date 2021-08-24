@@ -561,9 +561,11 @@ let main () =
   in
   let parse_local_path_with_kind (setup: Setup.t) string =
     match setup.workdir with
-      | Local (_, root) ->
+      | None ->
+          failed [ "cannot do that with no work directory" ]
+      | Some (Local (_, root)) ->
           Device.parse_local_path root string
-      | SSH_filou _ ->
+      | Some (SSH_filou _) ->
           failed [ "cannot operate on the work directory of remote clone repositories" ]
   in
   let parse_local_path setup string =

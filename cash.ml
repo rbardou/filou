@@ -159,46 +159,54 @@ let set_cache setup ((dir_path, filename): Device.file_path) (value: dir_entry o
   maybe_save setup
 
 let get ~on_progress (setup: Setup.t) ((dir_path, filename) as file_path: Device.file_path) =
-  match Device.stat setup.workdir (Device.path_of_file_path file_path) with
-    | ERROR { code = `failed; _ } as x ->
-        x
-    | ERROR { code = `no_such_file; _ } ->
+  match setup.workdir with
+    | None ->
         ok Does_not_exist
-    | OK Dir ->
-        set_cache setup file_path None;
-        ok Dir
-    | OK (File { size; mtime }) ->
-        let dir = read_cache_for_dir setup dir_path in
-        let from_cache =
-          match Filename_map.find_opt filename dir with
-            | Some dir_entry ->
-                if dir_entry.size = size && dir_entry.mtime = mtime then
-                  Some dir_entry
-                else
-                  None
-            | None ->
-                None
-        in
-        match from_cache with
-          | Some dir_entry ->
-              ok (File dir_entry.hash)
-          | None ->
-              (* TODO: progress *)
-              match
-                Device.hash ~on_progress setup.workdir file_path
-              with
-                | ERROR { code = `failed; _ } as x ->
-                    x
-                | ERROR { code = `no_such_file; _ } ->
-                    ok Does_not_exist
-                | OK (hash, _) ->
-                    let dir_entry = { hash; size; mtime } in
-                    set_cache setup file_path (Some dir_entry);
-                    ok (File hash)
+    | Some workdir ->
+        match Device.stat workdir (Device.path_of_file_path file_path) with
+          | ERROR { code = `failed; _ } as x ->
+              x
+          | ERROR { code = `no_such_file; _ } ->
+              ok Does_not_exist
+          | OK Dir ->
+              set_cache setup file_path None;
+              ok Dir
+          | OK (File { size; mtime }) ->
+              let dir = read_cache_for_dir setup dir_path in
+              let from_cache =
+                match Filename_map.find_opt filename dir with
+                  | Some dir_entry ->
+                      if dir_entry.size = size && dir_entry.mtime = mtime then
+                        Some dir_entry
+                      else
+                        None
+                  | None ->
+                      None
+              in
+              match from_cache with
+                | Some dir_entry ->
+                    ok (File dir_entry.hash)
+                | None ->
+                    (* TODO: progress *)
+                    match
+                      Device.hash ~on_progress workdir file_path
+                    with
+                      | ERROR { code = `failed; _ } as x ->
+                          x
+                      | ERROR { code = `no_such_file; _ } ->
+                          ok Does_not_exist
+                      | OK (hash, _) ->
+                          let dir_entry = { hash; size; mtime } in
+                          set_cache setup file_path (Some dir_entry);
+                          ok (File hash)
 
 let set (setup: Setup.t) file_path hash =
-  match Device.stat setup.workdir (Device.path_of_file_path file_path) with
-    | ERROR { code = (`failed | `no_such_file); _ } | OK Dir ->
+  match setup.workdir with
+    | None ->
         ()
-    | OK (File { size; mtime }) ->
-        set_cache setup file_path (Some { hash; size; mtime })
+    | Some workdir ->
+        match Device.stat workdir (Device.path_of_file_path file_path) with
+          | ERROR { code = (`failed | `no_such_file); _ } | OK Dir ->
+              ()
+          | OK (File { size; mtime }) ->
+              set_cache setup file_path (Some { hash; size; mtime })
