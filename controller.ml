@@ -70,21 +70,22 @@ let fetch_raw_or_fail (setup: Setup.t) concrete_hash =
               in
               Repo.fetch_raw setup.clone_dot_filou concrete_hash
 
+let write_config location config =
+  let encoded = W.to_string (fun buffer -> Config.write buffer config) in
+  Device.write_file location dot_filou_config encoded
+
+let read_config location =
+  trace "failed to read configuration file" @@
+  let* encoded = Device.read_file location dot_filou_config in
+  decode_rawbin_string Config.read encoded
+
 let init (location: Device.location) =
+  let* () = write_config location Main in
   Repo.write_root [ Device.sublocation location dot_filou ] @@ Repo.hash {
     redo = [];
     head = { command = "init"; state = Empty };
     undo = [];
   }
-
-let write_clone_config ~clone_location config =
-  let encoded = W.to_string (fun buffer -> Config.write_clone buffer config) in
-  Device.write_file clone_location dot_filou_config encoded
-
-let read_clone_config ~clone_location =
-  trace "failed to read configuration file" @@
-  let* encoded = Device.read_file clone_location dot_filou_config in
-  decode_rawbin_string Config.read_clone encoded
 
 let read_root_hash (setup: Setup.t) =
   let* root_hash_option, read_from_main =
@@ -148,24 +149,32 @@ let print_journal ?(only_redo = false) { redo; head; undo } =
   )
 
 let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
-  Prout.echo "Cloning %s into: %s" (Device.show_location main_location)
-    (Device.show_location clone_location);
-  (* Check that the remote repository is readable. *)
-  let* root_hash_option = Repo.read_root (Device.sublocation main_location dot_filou) in
-  match root_hash_option with
-    | None ->
-        failed [ sf "%s is not a main Filou repository" (Device.show_location main_location) ]
-    | Some root ->
-        (* Initialize the clone. *)
-        let* () = write_clone_config ~clone_location { main_location } in
-        Repo.write_root [ Device.sublocation clone_location dot_filou ] root
+  Prout.major "Checking %s..." (Device.show_location main_location);
+  let* main_config = read_config main_location in
+  match main_config with
+    | Clone _ ->
+        failed [ "cannot clone %s"; "%s is itself a clone repository" ]
+    | Main ->
+        let* root_hash_option = Repo.read_root (Device.sublocation main_location dot_filou) in
+        match root_hash_option with
+          | None ->
+              failed [ sf "%s has no root" (Device.show_location main_location) ]
+          | Some root ->
+              Prout.major "Creating %s..." (Device.show_location clone_location);
+              let* () = write_config clone_location (Clone { main_location }) in
+              let* () =
+                Repo.write_root [ Device.sublocation clone_location dot_filou ] root
+              in
+              Prout.echo "Cloned %s into: %s" (Device.show_location main_location)
+                (Device.show_location clone_location);
+              unit
 
-let find_local_clone_config mode =
+let find_local_config mode =
   let rec find current =
-    let clone_location = Device.Local (mode, current) in
-    match read_clone_config ~clone_location with
+    let location = Device.Local (mode, current) in
+    match read_config location with
       | OK config ->
-          ok (clone_location, config)
+          ok (location, config)
       | ERROR { code = (`no_such_file | `failed); _ } ->
           match Path.parent current with
             | None -> failed [ "not in a clone repository" ]
@@ -174,21 +183,28 @@ let find_local_clone_config mode =
   find (Path.get_cwd ())
 
 let find_local_clone ~clone_only mode =
-  let* clone_location, config = find_local_clone_config mode in
-  let main_dot_filou =
-    if clone_only then
-      None
-    else
-      Some (Device.sublocation config.main_location dot_filou)
-  in
-  let setup: Setup.t =
-    {
-      main_dot_filou;
-      clone_dot_filou = Device.sublocation clone_location dot_filou;
-      workdir = clone_location;
-    }
-  in
-  ok setup
+  let* clone_location, config = find_local_config mode in
+  match config with
+    | Main ->
+        failed [
+          sf "%s is a main repository, not a clone repository"
+            (Device.show_location clone_location)
+        ]
+    | Clone config ->
+        let main_dot_filou =
+          if clone_only then
+            None
+          else
+            Some (Device.sublocation config.main_location dot_filou)
+        in
+        let setup: Setup.t =
+          {
+            main_dot_filou;
+            clone_dot_filou = Device.sublocation clone_location dot_filou;
+            workdir = clone_location;
+          }
+        in
+        ok setup
 
 module Check_redo:
 sig
@@ -2204,12 +2220,26 @@ let show setup obj =
               in
               show_hash hash
 
+let show_config location: Config.t -> _ = function
+  | Main ->
+      Prout.echo "main repository: %s" (Device.show_location location)
+  | Clone { main_location } ->
+      Prout.echo "clone repository: %s" (Device.show_location location);
+      Prout.echo "main repository: %s" (Device.show_location main_location)
+
 let config ~mode ~main_location =
-  let* clone_location, config = find_local_clone_config mode in
+  let* location, config = find_local_config mode in
   match main_location with
     | None ->
-        Prout.echo "clone repository: %s" (Device.show_location clone_location);
-        Prout.echo "main repository: %s" (Device.show_location config.main_location);
+        show_config location config;
         unit
     | Some main_location ->
-        write_clone_config ~clone_location { main_location }
+        match config with
+          | Main ->
+              failed [
+                "cannot set main location";
+                sf "%s is a main repository, not a clone repository"
+                  (Device.show_location location)
+              ]
+          | Clone _ ->
+              write_config location (Clone { main_location })

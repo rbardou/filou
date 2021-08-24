@@ -1,11 +1,16 @@
 # Initialize a main repository and a clone.
 $ main.exe --no-color init /tmp/filou-test/main
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
-Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone/
+Checking /tmp/filou-test/main/...
+Creating /tmp/filou-test/clone/...
+Cloned /tmp/filou-test/main/ into: /tmp/filou-test/clone/
+$ hexdump -C /tmp/filou-test/main/.filou/config
+00000000  00                                                |.|
+00000001
 $ hexdump -C /tmp/filou-test/clone/.filou/config
-00000000  15 00 2f 74 6d 70 2f 66  69 6c 6f 75 2d 74 65 73  |../tmp/filou-tes|
-00000010  74 2f 6d 61 69 6e 2f                              |t/main/|
-00000017
+00000000  01 15 00 2f 74 6d 70 2f  66 69 6c 6f 75 2d 74 65  |.../tmp/filou-te|
+00000010  73 74 2f 6d 61 69 6e 2f                           |st/main/|
+00000018
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Repository is empty.
@@ -15,7 +20,14 @@ $ main.exe --no-color tree
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
 -->  0 init
+# Try to do something in the main repository directly.
+$ cd /tmp/filou-test/main
+$ main.exe --no-color tree
+Error:
+  /tmp/filou-test/main/ is a main repository, not a clone repository
+Exit code: 1
 # Play with the configuration.
+$ cd /tmp/filou-test/clone
 $ main.exe --no-color config
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
@@ -1428,7 +1440,9 @@ Transferred 0 objects.
 Clone is up-to-date.
 $ rm -r -f /tmp/filou-test/clone/.filou
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
-Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone/
+Checking /tmp/filou-test/main/...
+Creating /tmp/filou-test/clone/...
+Cloned /tmp/filou-test/main/ into: /tmp/filou-test/clone/
 $ cd /tmp/filou-test/clone
 $ tree -a -s -F
 .
@@ -1438,7 +1452,7 @@ $ tree -a -s -F
 │   └── [       4096]  blo/
 │       └── [          4]  plouf
 ├── [       4096]  .filou/
-│   ├── [         23]  config
+│   ├── [         24]  config
 │   └── [         64]  root
 ├── [          4]  plif
 ├── [          6]  titi
@@ -1463,7 +1477,7 @@ $ tree -a -s -F
 │   └── [       4096]  blo/
 │       └── [          4]  plouf
 ├── [       4096]  .filou/
-│   ├── [         23]  config
+│   ├── [         24]  config
 │   ├── [       4096]  meta/
 │   │   ├── [       4096]  02/
 │   │   │   └── [       1422]  026a6708d5d46ca16d9b348dd3a1734023823e60f182e7257eca2b8c8f44868d
@@ -1895,7 +1909,9 @@ $ main.exe --no-color log
 # Check that needed objects are copied in the clone cache when fetching.
 $ rm -r -f /tmp/filou-test/clone/.filou
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
-Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone/
+Checking /tmp/filou-test/main/...
+Creating /tmp/filou-test/clone/...
+Cloned /tmp/filou-test/main/ into: /tmp/filou-test/clone/
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree bla/bli
 └── bla/bli/
@@ -1913,7 +1929,7 @@ $ tree -a -s -F
 │   │   └── [       4096]  bla-/
 │   │       └── [       4096]  bli-/
 │   │           └── [         67]  self
-│   ├── [         23]  config
+│   ├── [         24]  config
 │   ├── [       4096]  meta/
 │   │   ├── [       4096]  44/
 │   │   │   └── [         60]  4442a3508bca0bae85653d231eead0498b4ada604774587e860727532d0f1fbf
@@ -3854,7 +3870,9 @@ $ rm -r -f /tmp/filou-test/main
 $ rm -r -f /tmp/filou-test/clone
 $ main.exe --no-color init /tmp/filou-test/main
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone
-Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone/
+Checking /tmp/filou-test/main/...
+Creating /tmp/filou-test/clone/...
+Cloned /tmp/filou-test/main/ into: /tmp/filou-test/clone/
 $ cd /tmp/filou-test/clone
 $ echo 'contents of bla first version' > bla
 $ cd /tmp/filou-test/clone
@@ -3865,7 +3883,9 @@ Pushing files...
 Pushed: bla
 Pushed 1 files (29 B).
 $ main.exe --no-color clone /tmp/filou-test/main /tmp/filou-test/clone2
-Cloning /tmp/filou-test/main/ into: /tmp/filou-test/clone2/
+Checking /tmp/filou-test/main/...
+Creating /tmp/filou-test/clone2/...
+Cloned /tmp/filou-test/main/ into: /tmp/filou-test/clone2/
 $ cd /tmp/filou-test/clone2
 $ cd /tmp/filou-test/clone2
 $ main.exe --no-color rm --yes bla

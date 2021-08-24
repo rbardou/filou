@@ -354,12 +354,17 @@ let small_repo () =
   comment "Initialize a main repository and a clone.";
   Filou.init ~main ();
   Filou.clone ~main ~clone ();
+  hexdump (main // ".filou/config");
   hexdump (clone // ".filou/config");
   Clone.check ();
   Clone.tree ();
   Clone.log ();
 
+  comment "Try to do something in the main repository directly.";
+  Main.tree ();
+
   comment "Play with the configuration.";
+  cd clone;
   Filou.config ();
   Filou.config ~main: "/tmp" ();
   Filou.config ();
