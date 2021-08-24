@@ -6,6 +6,73 @@ let error message =
 
 let main () =
   Clap.description "FILe Organizer Ultimate";
+(*   Clap.section "REPOSITORY KINDS" *)
+(*     "There are two kinds of Filou repositories: main repositories, and \ *)
+(*      clones.\n\ *)
+(*      \n\ *)
+(*      Main repositories contain all metadata and all data (the files \ *)
+(*      you store). They are the source of truth for the current state of \ *)
+(*      the directory tree. All metadata and all data is stored in a \ *)
+(*      .filou subdirectory, as files whose name is their hash.\n\ *)
+(*      \n\ *)
+(*      Clone repositories contain a cache of the metadata in their own \ *)
+(*      .filou subdirectory. They also contain the location of the main \ *)
+(*      repository in their configuration: clones are cloned from main \ *)
+(*      repositories. The cache is useful to view the current state of \ *)
+(*      the directory tree when the main repository is not \ *)
+(*      available. Clone repositories do not contain data in their .filou \ *)
+(*      subdirectory, however.\n\ *)
+(*      \n\ *)
+(*      Work directories contain data that have been pulled \ *)
+(*      (i.e. fetched) from main repositories, or data that can be pushed \ *)
+(*      (i.e. sent) to main repositories. All clone repositories also act \ *)
+(*      as work directories. So a clone repository is a work directory, \ *)
+(*      with a partial copy of the directory tree, and with a .filou \ *)
+(*      subdirectory that contains only metadata.\n\ *)
+(*      \n\ *)
+(*      By default, Filou finds the first parent directory that contains \ *)
+(*      a .filou subdirectory. If it is a clone, Filou operates on this \ *)
+(*      clone and on the main repository that is configured in the \ *)
+(*      clone. If it is a main repository, Filou operates on this main \ *)
+(*      repository."; *)
+  let repository =
+    Clap.optional_string
+      ~description:
+        "Location of the repository to operate on. By default, Filou \
+         uses the first parent directory that contains a .filou \
+         subdirectory."
+      ~long: "repository"
+      ~short: 'R'
+      ()
+  in
+  let no_main =
+    Clap.flag
+      ~description:
+        "Only operate on the clone, not on the main repository. Only \
+         operations that do not change the state of the repository can \
+         be performed in this mode. This flag is useful to ensure that \
+         you do not modify the state of the repository, or if the main \
+         repository is not available. If the cache is not up-to-date, \
+         output may not be up-to-date. If the cache is incomplete, \
+         some operations may fail. If --repository is a main \
+         repository, fail."
+      ~set_long: "no-main"
+      ~set_short: 'C'
+      false
+  in
+  let no_cache =
+    Clap.flag
+      ~description:
+        "Do not read or store metadata in the clone cache, always read \
+         directly from the main repository. This flag is useful if \
+         both the main repository and the clone are on a local device \
+         and if you do not need to store cache metadata for later in \
+         case the main repository becomes unavailable. Ignored if \
+         --repository is a main repository."
+      ~set_long: "no-cache"
+      ~set_short: 'M'
+      false
+  in
   let verbose =
     Clap.flag
       ~description: "Log more information."
@@ -91,15 +158,6 @@ let main () =
              the path of those copies."
           false
       in
-      let cache =
-        Clap.flag
-          ~set_long: "cache"
-          ~set_short: 'C'
-          ~description:
-            "Only read from the clone repository cache, not the main \
-             repository. Output may not be up-to-date."
-          false
-      in
       let full_dir_paths =
         Clap.flag
           ~set_long: "full-dir-paths"
@@ -117,7 +175,7 @@ let main () =
       in
       (
         paths, max_depth, only_main, only_dirs, print_size, print_file_count,
-        print_duplicates, cache, full_dir_paths
+        print_duplicates, full_dir_paths
       )
     in
     Clap.subcommand [
@@ -303,18 +361,6 @@ let main () =
           ~description: "Check for potential corruptions."
           "check"
         @@ fun () ->
-        let cache =
-          Clap.flag
-            ~set_long: "cache"
-            ~set_short: 'C'
-            ~description:
-              "Only read from the clone repository cache, not the main \
-               repository. If some objects are not available in the \
-               cache, this will result in an error, but it does not \
-               mean that the repository is corrupted, only that the \
-               cache is partial. File sizes will not be checked."
-            false
-        in
         let hash_all =
           Clap.flag
             ~set_long: "hash"
@@ -331,7 +377,7 @@ let main () =
             ~description: "Check hashes of metadata objects (but not file objects)."
             false
         in
-        `check (cache, hash_all, hash_metadata)
+        `check (hash_all, hash_metadata)
       );
       (
         Clap.case
@@ -490,33 +536,13 @@ let main () =
              Disk usage assumes a block size of 4096."
           "stats"
         @@ fun () ->
-        let cache =
-          Clap.flag
-            ~set_long: "cache"
-            ~set_short: 'C'
-            ~description:
-              "Only read from the clone repository cache, not the main \
-               repository. If you do not specify this flag, \
-               unavailable objects will be fetched from the main \
-               repository and added to the cache."
-            false
-        in
-        `stats cache
+        `stats
       );
       (
         Clap.case
           ~description: "Show an object. Mostly useful for debugging."
           "show"
         @@ fun () ->
-        let cache =
-          Clap.flag
-            ~set_long: "cache"
-            ~set_short: 'C'
-            ~description:
-              "Only read from the clone repository cache, not the main \
-               repository."
-            false
-        in
         let obj =
           Clap.default_string
             ~description:
@@ -525,7 +551,7 @@ let main () =
             ~placeholder: "OBJECT"
             "journal"
         in
-        `show (obj, cache)
+        `show obj
       );
       (
         Clap.case
@@ -536,7 +562,7 @@ let main () =
         @@ fun () ->
         let main =
           Clap.optional_string
-            ~long: "main"
+            ~long: "set-main"
             ~description: "Set the location of the main repository. See 'clone --help'."
             ()
         in
@@ -553,8 +579,8 @@ let main () =
   );
   let device_mode = if dry_run then Device.RO else RW in
   let parse_location = Device.parse_location device_mode in
-  let with_local_clone ~clone_only f =
-    let* setup = Controller.find_local_clone ~clone_only device_mode in
+  let with_setup f =
+    let* setup = Controller.find_setup ~repository ~no_main ~no_cache device_mode in
     let result = f setup in
     Cash.save setup;
     result
@@ -588,9 +614,9 @@ let main () =
           Controller.clone ~main_location ~clone_location
       | `tree (
           paths, max_depth, only_main, only_dirs, print_size, print_file_count,
-          print_duplicates, cache, full_dir_paths
+          print_duplicates, full_dir_paths
         ) ->
-          with_local_clone ~clone_only: cache @@ fun setup ->
+          with_setup @@ fun setup ->
           let paths =
             match paths with
               | [] -> [ "." ]
@@ -600,7 +626,7 @@ let main () =
           Controller.tree ~color ~max_depth ~only_main ~only_dirs ~print_size
             ~print_file_count ~print_duplicates ~full_dir_paths setup paths
       | `push paths ->
-          with_local_clone ~clone_only: false @@ fun setup ->
+          with_setup @@ fun setup ->
           let paths =
             match paths with
               | [] -> [ "." ]
@@ -609,7 +635,7 @@ let main () =
           let* paths = list_map_e paths (parse_local_path setup) in
           Controller.push ~verbose ~yes setup paths
       | `pull paths ->
-          with_local_clone ~clone_only: false @@ fun setup ->
+          with_setup @@ fun setup ->
           let paths =
             match paths with
               | [] -> [ "." ]
@@ -618,8 +644,7 @@ let main () =
           let* paths = list_map_e paths (parse_local_path setup) in
           Controller.pull ~verbose setup paths
       | `rm (paths, recursive) ->
-          (* TODO: show progress "Deleted X files." *)
-          with_local_clone ~clone_only: false @@ fun setup ->
+          with_setup @@ fun setup ->
           let* paths = list_map_e paths (parse_local_path setup) in
           Controller.remove ~recursive ~yes setup paths
       | `mv paths | `cp paths as command ->
@@ -632,7 +657,7 @@ let main () =
               | head :: tail ->
                   ok (List.rev tail, head)
           in
-          with_local_clone ~clone_only: false @@ fun setup ->
+          with_setup @@ fun setup ->
           let* source_paths = list_map_e source_paths (parse_local_path setup) in
           let* target_path = parse_local_path_with_kind setup target_path in
           let action =
@@ -641,41 +666,41 @@ let main () =
               | `cp _ -> Controller.Copy
           in
           Controller.copy_or_move_files action ~verbose ~yes setup source_paths target_path
-      | `check (cache, hash_all, hash_metadata) ->
-          with_local_clone ~clone_only: cache @@ fun setup ->
+      | `check (hash_all, hash_metadata) ->
+          with_setup @@ fun setup ->
           let hash =
             if hash_all then `all else
             if hash_metadata then `metadata else
               `no
           in
-          Controller.check ~clone_only: cache ~hash setup
+          Controller.check ~hash setup
       | `update ->
-          with_local_clone ~clone_only: false @@ fun setup ->
+          with_setup @@ fun setup ->
           Controller.update setup
       | `prune (yes, keep_undo, keep_redo, keep) ->
           let keep_undo = max keep_undo keep in
           let keep_redo = max keep_redo keep in
-          with_local_clone ~clone_only: false @@ fun setup ->
+          with_setup @@ fun setup ->
           Controller.prune ~yes ~keep_undo ~keep_redo setup
       | `log ->
-          with_local_clone ~clone_only: false @@ fun setup ->
+          with_setup @@ fun setup ->
           Controller.log setup
       | `undo count ->
-          with_local_clone ~clone_only: false @@ fun setup ->
+          with_setup @@ fun setup ->
           Controller.undo setup ~count
       | `redo count ->
-          with_local_clone ~clone_only: false @@ fun setup ->
+          with_setup @@ fun setup ->
           Controller.undo setup ~count: (- count)
       | `diff (before, after) ->
-          with_local_clone ~clone_only: false @@ fun setup ->
+          with_setup @@ fun setup ->
           Controller.diff ~color setup ~before ~after
       | `listen ->
           Listen.run ()
-      | `stats cache ->
-          with_local_clone ~clone_only: cache @@ fun setup ->
+      | `stats ->
+          with_setup @@ fun setup ->
           Controller.stats setup
-      | `show (obj, cache) ->
-          with_local_clone ~clone_only: cache @@ fun setup ->
+      | `show obj ->
+          with_setup @@ fun setup ->
           Controller.show setup obj
       | `config main ->
           let* main_location = opt_map_e main parse_location in

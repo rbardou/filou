@@ -25,18 +25,18 @@ $ main.exe --no-color log
 $ cd /tmp/filou-test/main
 $ main.exe --no-color tree
 Error:
-  /tmp/filou-test/main/ is a main repository, not a clone repository
+  cannot do that with no work directory
 Exit code: 1
 # Play with the configuration.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color config
 clone repository: /tmp/filou-test/clone/
 main repository: filou+ssh://localhost//tmp/filou-test/main/
-$ main.exe --no-color config --main 'filou+ssh://localhost//tmp'
+$ main.exe --no-color config --set-main 'filou+ssh://localhost//tmp'
 $ main.exe --no-color config
 clone repository: /tmp/filou-test/clone/
 main repository: filou+ssh://localhost//tmp/
-$ main.exe --no-color config --main 'filou+ssh://localhost//tmp/filou-test/main'
+$ main.exe --no-color config --set-main 'filou+ssh://localhost//tmp/filou-test/main'
 $ main.exe --no-color config
 clone repository: /tmp/filou-test/clone/
 main repository: filou+ssh://localhost//tmp/filou-test/main/
@@ -155,7 +155,7 @@ Already exists: bla/blo/plouf
 Pushing files...
 Pushed 0 files (0 B).
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color check --cache
+$ main.exe --no-color --no-main check
 Directory structure looks ok (total size: 26, file count: 5).
 All files are available.
 Hash index is consistent with the directory structure.
@@ -1582,12 +1582,12 @@ $ tree -a -s -F
 
 51 directories, 56 files
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color check --cache
+$ main.exe --no-color --no-main check
 Directory structure looks ok (total size: 30, file count: 6).
 All files are available.
 Hash index is consistent with the directory structure.
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color tree --cache
+$ main.exe --no-color --no-main tree
 ./
 ├── bla/
 │   ├── bli/
@@ -1892,7 +1892,7 @@ Error:
   no root
 Exit code: 1
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color tree --cache
+$ main.exe --no-color --no-main tree
 ./
 ├── bla/
 │   ├── bli/

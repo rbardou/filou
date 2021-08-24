@@ -193,12 +193,13 @@ let no_color = true
 
 module Make_filou (P: sig val path: string option end) =
 struct
-  let run ?(v = false) ?(dry_run = false) ?(color = false) args =
+  let run ?(v = false) ?(dry_run = false) ?(color = false) ?(no_main = false) args =
     Option.iter cd P.path;
     let flags =
       flag v "-v" @
       flag dry_run "--dry-run" @
-      flag (not color) "--no-color"
+      flag (not color) "--no-color" @
+      flag no_main "--no-main"
     in
     cmd filou_exe (flags @ args)
 
@@ -241,12 +242,13 @@ struct
   let cp ?(v = true) ?dry_run ?color paths =
     run ~v ?dry_run ?color ("cp" :: "--yes" :: paths)
 
-  let check ?v ?dry_run ?color ?path ?(cache = false) () =
-    run ?v ?dry_run ?color ("check" :: flag cache "--cache" @ list_of_option path)
+  let check ?v ?dry_run ?color ?path ?no_main () =
+    run ?v ?dry_run ?color ?no_main ("check" :: list_of_option path)
 
-  let tree ?v ?dry_run ?color ?depth ?(only_dirs = false) ?(size = false) ?(count = false)
-      ?(duplicates = false) ?(cache = false) ?path () =
-    run ?v ?dry_run ?color (
+  let tree ?v ?dry_run ?color ?no_main
+      ?depth ?(only_dirs = false) ?(size = false) ?(count = false)
+      ?(duplicates = false) ?path () =
+    run ?v ?dry_run ?color ?no_main (
       "tree"
       :: list_of_option ~name: "--depth" (Option.map string_of_int depth)
       @ list_of_option path
@@ -254,7 +256,6 @@ struct
       @ flag size "--size"
       @ flag count "--count"
       @ flag duplicates "--duplicates"
-      @ flag cache "--cache"
     )
 
   let prune ?v ?dry_run ?color () =
@@ -283,14 +284,14 @@ struct
   let stats ?v ?dry_run ?color () =
     run ?v ?dry_run ?color [ "stats" ]
 
-  let config ?v ?dry_run ?color ?main () =
-    let main =
+  let config ?v ?dry_run ?color ?set_main () =
+    let set_main =
       if use_ssh then
-        Option.map (fun main -> "filou+ssh://localhost/" ^ main) main
+        Option.map (fun set_main -> "filou+ssh://localhost/" ^ set_main) set_main
       else
-        main
+        set_main
     in
-    run ?v ?dry_run ?color ("config" :: list_of_option ~name: "--main" main)
+    run ?v ?dry_run ?color ("config" :: list_of_option ~name: "--set-main" set_main)
 
   let show ?v ?dry_run ?color ?what ?r () =
     run ?v ?dry_run ?color (
@@ -366,9 +367,9 @@ let small_repo () =
   comment "Play with the configuration.";
   cd clone;
   Filou.config ();
-  Filou.config ~main: "/tmp" ();
+  Filou.config ~set_main: "/tmp" ();
   Filou.config ();
-  Filou.config ~main ();
+  Filou.config ~set_main: main ();
   Filou.config ();
 
   comment "Add a file.";
@@ -407,7 +408,7 @@ let small_repo () =
   Clone.push ~dry_run: true [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
   Clone.push [ "bla/bli/plouf"; "bla/blo/plouf" ];
-  Clone.check ~cache: true ();
+  Clone.check ~no_main: true ();
   Clone.log ();
   Clone.diff ~before: 3 ();
 
@@ -599,8 +600,8 @@ let small_repo () =
   clone_tree ();
   Clone.update ();
   clone_tree ();
-  Clone.check ~cache: true ();
-  Clone.tree ~cache: true ();
+  Clone.check ~no_main: true ();
+  Clone.tree ~no_main: true ();
   Clone.log ();
 
   comment "Play with undo / redo.";
@@ -633,7 +634,7 @@ let small_repo () =
   comment "Check that the main repository is not read with --cache.";
   mv main (main ^ ".backup");
   Clone.tree ();
-  Clone.tree ~cache: true ();
+  Clone.tree ~no_main: true ();
   mv (main ^ ".backup") main;
   Clone.log ();
 

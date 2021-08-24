@@ -216,26 +216,47 @@ let find_local_config mode =
     let dot_filou = Device.sublocation location dot_filou in
     match read_config ~dot_filou with
       | OK config ->
-          ok (location, config)
+          ok (location, dot_filou, config)
       | ERROR { code = (`no_such_file | `failed); _ } ->
           match Path.parent current with
-            | None -> failed [ "not in a clone repository" ]
+            | None -> failed [ "not in a repository" ]
             | Some parent -> find parent
   in
   find (Path.get_cwd ())
 
-let find_local_clone ~clone_only mode =
-  let* clone_location, config = find_local_config mode in
+let find_setup ~repository ~no_main ~no_cache mode =
+  let* location, location_dot_filou, config =
+    match repository with
+      | None ->
+          find_local_config mode
+      | Some repository ->
+          let* location = Device.parse_location mode repository in
+          let dot_filou = Device.sublocation location dot_filou in
+          match read_config ~dot_filou with
+            | OK config ->
+                ok (location, dot_filou, config)
+            | ERROR { code = (`no_such_file | `failed); msg } ->
+                failed ("not a repository" :: msg)
+  in
   match config with
     | Main ->
-        (* TODO: accept this (but not if clone_only - need to review CLI options) *)
-        failed [
-          sf "%s is a main repository, not a clone repository"
-            (Device.show_location clone_location)
-        ]
+        if no_main then
+          failed [
+            sf "%s is a main repository but --no-main was specified"
+              (Device.show_location location)
+          ]
+        else
+          let setup: Setup.t =
+            {
+              main_dot_filou = Some location_dot_filou;
+              clone_dot_filou = None;
+              workdir = None; (* TODO: could actually use main's *)
+            }
+          in
+          ok setup
     | Clone config ->
         let main_dot_filou =
-          if clone_only then
+          if no_main then
             None
           else
             Some (Device.sublocation config.main_location dot_filou)
@@ -243,8 +264,8 @@ let find_local_clone ~clone_only mode =
         let setup: Setup.t =
           {
             main_dot_filou;
-            clone_dot_filou = Some (Device.sublocation clone_location dot_filou);
-            workdir = Some clone_location;
+            clone_dot_filou = (if no_cache then None else Some location_dot_filou);
+            workdir = Some location;
           }
         in
         ok setup
@@ -779,7 +800,7 @@ struct
 end
 
 (* Recursively check sizes, file counts, and whether reachable files are available. *)
-let rec check_dir ~clone_only expected_hash_index setup
+let rec check_dir expected_hash_index setup
     (path: Device.path) (dir: dir hash) =
   let* dir = fetch_or_fail setup Dir dir in
   if Filename_map.is_empty dir then
@@ -793,7 +814,7 @@ let rec check_dir ~clone_only expected_hash_index setup
     match dir_entry with
       | Dir { hash; total_size = expected_size; total_file_count = expected_file_count } ->
           let* size, file_count =
-            check_dir ~clone_only expected_hash_index setup entry_path hash
+            check_dir expected_hash_index setup entry_path hash
           in
           if size <> expected_size then
             failed [
@@ -814,7 +835,7 @@ let rec check_dir ~clone_only expected_hash_index setup
           )
       | File { hash; size = expected_size } ->
           match
-            if clone_only then
+            if setup.main_dot_filou = None then
               (* Cannot get file sizes in clone-only mode. *)
               ok expected_size
             else
@@ -853,7 +874,7 @@ let rec check_dir ~clone_only expected_hash_index setup
   in
   ok (!path_size, !path_file_count)
 
-let check ~clone_only ~hash (setup: Setup.t) =
+let check ~hash (setup: Setup.t) =
   let* () =
     let check_hashes description iter_hashes check_hash =
       Prout.major "Listing %ss..." description;
@@ -929,7 +950,7 @@ let check ~clone_only ~hash (setup: Setup.t) =
         unit
     | Non_empty root ->
         let expected_hash_index = ref File_hash_map.empty in
-        let* size, count = check_dir ~clone_only expected_hash_index setup [] root.root_dir in
+        let* size, count = check_dir expected_hash_index setup [] root.root_dir in
         let expected_hash_index = !expected_hash_index in
         Prout.echo "Directory structure looks ok (total size: %d, file count: %d)."
           size count;
@@ -2314,7 +2335,7 @@ let show_config location: Config.t -> _ = function
       Prout.echo "main repository: %s" (Device.show_location main_location)
 
 let config ~mode ~main_location =
-  let* location, config = find_local_config mode in
+  let* location, location_dot_filou, config = find_local_config mode in
   match main_location with
     | None ->
         show_config location config;
@@ -2328,5 +2349,4 @@ let config ~mode ~main_location =
                   (Device.show_location location)
               ]
           | Clone _ ->
-              let dot_filou = Device.sublocation location dot_filou in
-              write_config ~dot_filou (Clone { main_location })
+              write_config ~dot_filou: location_dot_filou (Clone { main_location })
