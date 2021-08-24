@@ -77,30 +77,14 @@ let init (location: Device.location) =
     undo = [];
   }
 
-type clone_config =
-  {
-    main_location: Device.location;
-  }
-
-let write_clone_config ~clone_location { main_location } =
-  let encoded =
-    W.to_string @@ fun buffer ->
-    W.(string int_u16) buffer (Device.show_location main_location)
-  in
+let write_clone_config ~clone_location config =
+  let encoded = W.to_string (fun buffer -> Config.write_clone buffer config) in
   Device.write_file clone_location dot_filou_config encoded
 
 let read_clone_config ~clone_location =
   trace "failed to read configuration file" @@
   let* encoded = Device.read_file clone_location dot_filou_config in
-  let read_clone_config buffer =
-    let main_location = R.(string int_u16) buffer in
-    match Device.parse_location RW main_location with
-      | ERROR { code = `failed; msg } ->
-          raise (Failed msg)
-      | OK main_location ->
-          { main_location }
-  in
-  decode_rawbin_string read_clone_config encoded
+  decode_rawbin_string Config.read_clone encoded
 
 let read_root_hash (setup: Setup.t) =
   let* root_hash_option, read_from_main =
