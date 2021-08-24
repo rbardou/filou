@@ -22,17 +22,17 @@ let prompt_for_confirmation prompt =
 
 let empty_dir: dir = Filename_map.empty
 
-let fetch_or_fail setup typ hash =
-  match Repo.fetch (Setup.clone_dot_filou setup) typ hash with
+let fetch_or_fail (setup: Setup.t) typ hash =
+  match Repo.fetch setup.clone_dot_filou typ hash with
     | OK _ as x ->
         x
     | ERROR { code = `failed; _ } as x ->
         x
     | ERROR { code = `not_available; msg } ->
-        match Setup.main setup with
+        match setup.main_dot_filou with
           | None ->
               failed msg
-          | Some main ->
+          | Some main_dot_filou ->
               (* If [R.fetch] failed, the object is stored, so [concrete_hash_or_fail]
                  will not fail. *)
               let* concrete_hash = Repository.concrete_hash_or_fail hash in
@@ -43,35 +43,35 @@ let fetch_or_fail setup typ hash =
                     (show_size bytes)
                 in
                 (* TODO: do we really want [transfer_object] to manipulate concrete hashes? *)
-                Repo.transfer_object ~source: main ~target: (Setup.clone_dot_filou setup)
+                Repo.transfer_object ~source: main_dot_filou ~target: setup.clone_dot_filou
                   concrete_hash ~on_progress
               in
-              Repo.fetch (Setup.clone_dot_filou setup) typ hash
+              Repo.fetch setup.clone_dot_filou typ hash
 
-let fetch_raw_or_fail setup concrete_hash =
-  match Repo.fetch_raw (Setup.clone_dot_filou setup) concrete_hash with
+let fetch_raw_or_fail (setup: Setup.t) concrete_hash =
+  match Repo.fetch_raw setup.clone_dot_filou concrete_hash with
     | OK _ as x ->
         x
     | ERROR { code = `failed; _ } as x ->
         x
     | ERROR { code = `not_available; msg } ->
-        match Setup.main setup with
+        match setup.main_dot_filou with
           | None ->
               failed msg
-          | Some main ->
+          | Some main_dot_filou ->
               let* () =
                 let on_progress ~bytes =
                   Prout.minor @@ fun () ->
                   sf "Transferring object: %s (%s)" (Hash.to_hex concrete_hash)
                     (show_size bytes)
                 in
-                Repo.transfer_object ~source: main ~target: (Setup.clone_dot_filou setup)
+                Repo.transfer_object ~source: main_dot_filou ~target: setup.clone_dot_filou
                   concrete_hash ~on_progress
               in
-              Repo.fetch_raw (Setup.clone_dot_filou setup) concrete_hash
+              Repo.fetch_raw setup.clone_dot_filou concrete_hash
 
 let init (location: Device.location) =
-  Repo.write_root [ location ] @@ Repo.hash {
+  Repo.write_root [ Device.sublocation location dot_filou ] @@ Repo.hash {
     redo = [];
     head = { command = "init"; state = Empty };
     undo = [];
@@ -102,14 +102,14 @@ let read_clone_config ~clone_location =
   in
   decode_rawbin_string read_clone_config encoded
 
-let read_root_hash setup =
+let read_root_hash (setup: Setup.t) =
   let* root_hash_option, read_from_main =
-    match Setup.main setup with
+    match setup.main_dot_filou with
       | None ->
-          let* root = Repo.read_root (Setup.clone_dot_filou setup) in
+          let* root = Repo.read_root setup.clone_dot_filou in
           ok (root, false)
-      | Some main ->
-          let* root = Repo.read_root main in
+      | Some main_dot_filou ->
+          let* root = Repo.read_root main_dot_filou in
           ok (root, true)
   in
   match root_hash_option with
@@ -118,38 +118,38 @@ let read_root_hash setup =
     | Some root_hash ->
         let* () =
           if read_from_main then
-            Repo.write_root [ Setup.clone_dot_filou setup ] root_hash
+            Repo.write_root [ setup.clone_dot_filou ] root_hash
           else
             unit
         in
         ok root_hash
 
-let store_journal setup journal =
+let store_journal (setup: Setup.t) journal =
   let journal_hash = Repo.hash journal in
-  match Setup.main setup with
+  match setup.main_dot_filou with
     | None ->
         unit
-    | Some main ->
-        Repo.write_root [ main; Setup.clone_dot_filou setup ] journal_hash
+    | Some main_dot_filou ->
+        Repo.write_root [ main_dot_filou; setup.clone_dot_filou ] journal_hash
 
-let get_object_size setup (hash: Hash.t) =
-  match Repo.get_object_size (Setup.clone_dot_filou setup) hash with
+let get_object_size (setup: Setup.t) (hash: Hash.t) =
+  match Repo.get_object_size setup.clone_dot_filou hash with
     | ERROR { code = `failed; _ } | OK _ as x ->
         x
     | ERROR { code = `not_available; _ } as x ->
-        match Setup.main setup with
+        match setup.main_dot_filou with
           | None ->
               x
-          | Some main ->
-              Repo.get_object_size main hash
+          | Some main_dot_filou ->
+              Repo.get_object_size main_dot_filou hash
 
-let get_file_size setup (hash: Repository.file_hash) =
-  match Setup.main setup with
+let get_file_size (setup: Setup.t) (hash: Repository.file_hash) =
+  match setup.main_dot_filou with
     | None ->
         failed [ "cannot get file sizes in clone-only mode" ]
-    | Some main ->
+    | Some main_dot_filou ->
         (* Files are not stored in clones, at least not with their hash. *)
-        Repo.get_file_size main hash
+        Repo.get_file_size main_dot_filou hash
 
 let print_journal ?(only_redo = false) { redo; head; undo } =
   let redo = List.mapi (fun i x -> - i - 1, x) redo in
@@ -167,15 +167,14 @@ let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
   Prout.echo "Cloning %s into: %s" (Device.show_location main_location)
     (Device.show_location clone_location);
   (* Check that the remote repository is readable. *)
-  let* root_hash_option = Repo.read_root main_location in
+  let* root_hash_option = Repo.read_root (Device.sublocation main_location dot_filou) in
   match root_hash_option with
     | None ->
         failed [ sf "%s is not a main Filou repository" (Device.show_location main_location) ]
     | Some root ->
         (* Initialize the clone. *)
         let* () = write_clone_config ~clone_location { main_location } in
-        let setup = Setup.make ~main: (Some main_location) ~workdir: clone_location () in
-        Repo.write_root [ Setup.clone_dot_filou setup ] root
+        Repo.write_root [ Device.sublocation clone_location dot_filou ] root
 
 let find_local_clone_config mode =
   let rec find current =
@@ -192,13 +191,20 @@ let find_local_clone_config mode =
 
 let find_local_clone ~clone_only mode =
   let* clone_location, config = find_local_clone_config mode in
-  let main =
+  let main_dot_filou =
     if clone_only then
       None
     else
-      Some config.main_location
+      Some (Device.sublocation config.main_location dot_filou)
   in
-  ok (Setup.make ~main ~workdir: clone_location ())
+  let setup: Setup.t =
+    {
+      main_dot_filou;
+      clone_dot_filou = Device.sublocation clone_location dot_filou;
+      workdir = clone_location;
+    }
+  in
+  ok setup
 
 module Check_redo:
 sig
@@ -804,7 +810,7 @@ let rec check_dir ~clone_only expected_hash_index setup
   in
   ok (!path_size, !path_file_count)
 
-let check ~clone_only ~hash setup =
+let check ~clone_only ~hash (setup: Setup.t) =
   let* () =
     let check_hashes description iter_hashes check_hash =
       Prout.major "Listing %ss..." description;
@@ -842,22 +848,23 @@ let check ~clone_only ~hash setup =
     in
     let check_objects () =
       let* () =
-        match Setup.main setup with
+        match setup.main_dot_filou with
           | None ->
               unit
-          | Some main ->
-              check_hashes "main object" (Repo.iter_objects main)
-                (Repo.check_object_hash main)
+          | Some main_dot_filou ->
+              check_hashes "main object" (Repo.iter_objects main_dot_filou)
+                (Repo.check_object_hash main_dot_filou)
       in
-      let clone = Setup.clone_dot_filou setup in
+      let clone = setup.clone_dot_filou in
       check_hashes "clone object" (Repo.iter_objects clone) (Repo.check_object_hash clone)
     in
     let check_files () =
-      match Setup.main setup with
+      match setup.main_dot_filou with
         | None ->
             unit
-        | Some main ->
-            check_hashes "file" (Repo.iter_files main) (Repo.check_file_hash main)
+        | Some main_dot_filou ->
+            check_hashes "file" (Repo.iter_files main_dot_filou)
+              (Repo.check_file_hash main_dot_filou)
     in
     match hash with
       | `no ->
@@ -928,8 +935,8 @@ type tree_entry_name =
 
 let tree ~color ~max_depth ~only_main ~only_dirs
     ~print_size ~print_file_count ~print_duplicates ~full_dir_paths
-    setup (paths: Device.path list) =
-  let workdir = Setup.workdir setup in
+    (setup: Setup.t) (paths: Device.path list) =
+  let workdir = setup.workdir in
   let* state = fetch_state setup in
   let* root_dir = fetch_root_dir setup state in
   let find_path path =
@@ -1317,7 +1324,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
         print_merged_entry ~last: true head
 
 let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
-    setup (state: state) (path: Device.file_path):
+    (setup: Setup.t) (state: state) (path: Device.file_path):
   (state, [> `failed ]) r =
   trace ("failed to push file: " ^ Device.show_file_path path) @@
   let* root_dir = fetch_root_dir setup state in
@@ -1334,11 +1341,11 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
     let get_hash_and_size () =
       let* hash, size =
         let* main =
-          match Setup.main setup with
+          match setup.main_dot_filou with
             | None ->
                 failed [ "cannot store files in clone-only mode" ]
-            | Some main ->
-                ok main
+            | Some main_dot_filou ->
+                ok main_dot_filou
         in
         Repo.store_file
           ~on_hash_progress
@@ -1351,7 +1358,7 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
                 (show_size bytes) (show_size size) (bytes * 100 / size)
                 file_index file_count (Device.show_file_path path)
           )
-          ~source: (Setup.workdir setup)
+          ~source: setup.workdir
           ~source_path: path
           ~target: main
       in
@@ -1404,10 +1411,10 @@ let push ~verbose ~yes setup (paths: Device.path list) =
     if Device.same_paths path [ dot_filou ] then
       unit
     else
-      let* stat = Device.stat (Setup.workdir setup) path in
+      let* stat = Device.stat setup.workdir path in
       match stat with
         | Dir ->
-            Device.iter_read_dir (Setup.workdir setup) path @@ fun filename ->
+            Device.iter_read_dir setup.workdir path @@ fun filename ->
             add_path (path @ [ filename ])
         | File { size; _ } ->
             match Device.file_path_of_path path with
@@ -1545,16 +1552,16 @@ let pull ~verbose setup (paths: Device.path list) =
     list_fold_e 0 files_to_pull @@ fun pulled_size file ->
     incr file_index;
     let* () =
-      let* main =
-        match Setup.main setup with
+      let* main_dot_filou =
+        match setup.main_dot_filou with
           | None ->
               failed [ "cannot store files in clone-only mode" ]
-          | Some main ->
-              ok main
+          | Some main_dot_filou ->
+              ok main_dot_filou
       in
       Repo.fetch_file file.hash
-        ~source: main
-        ~target: (Setup.workdir setup)
+        ~source: main_dot_filou
+        ~target: setup.workdir
         ~target_path: file.path
         ~on_progress: (
           fun ~bytes ~size: _ ->
@@ -1789,26 +1796,26 @@ let copy_or_move_files (action: copy_or_move) ~verbose ~yes setup
   );
   unit
 
-let update setup =
-  match Setup.main setup with
+let update (setup: Setup.t) =
+  match setup.main_dot_filou with
     | None ->
         failed [ "cannot update in clone-only mode" ]
-    | Some main ->
+    | Some main_dot_filou ->
         Prout.major_s "Transferring root...";
-        let* root_hash = Repo.read_root main in
+        let* root_hash = Repo.read_root main_dot_filou in
         let* () =
           match root_hash with
             | None ->
                 failed [ "main repository is not initialized" ]
             | Some root_hash ->
-                Repo.write_root [ Setup.clone_dot_filou setup ] root_hash
+                Repo.write_root [ setup.clone_dot_filou ] root_hash
         in
         Prout.major_s "Listing objects...";
         let count = ref 0 in
         let* object_hashes =
           let result = ref [] in
           let* () =
-            Repo.iter_objects main @@ fun hash ->
+            Repo.iter_objects main_dot_filou @@ fun hash ->
             Prout.minor (fun () -> sf "Listing objects... (%d)" !count);
             result := hash :: !result;
             unit
@@ -1820,7 +1827,7 @@ let update setup =
         let* object_hashes_to_transfer =
           let index = ref 0 in
           list_filter_e object_hashes @@ fun hash ->
-          let* available = Repo.object_is_available (Setup.clone_dot_filou setup) hash in
+          let* available = Repo.object_is_available setup.clone_dot_filou hash in
           incr index;
           (
             Prout.minor @@ fun () ->
@@ -1841,7 +1848,9 @@ let update setup =
               (Hash.to_hex hash) (show_size bytes)
           in
           let* () =
-            Repo.transfer_object ~source: main ~target: (Setup.clone_dot_filou setup)
+            Repo.transfer_object
+              ~source: main_dot_filou
+              ~target: setup.clone_dot_filou
               hash ~on_progress
           in
           incr index;
@@ -1851,12 +1860,12 @@ let update setup =
         Prout.echo_s "Clone is up-to-date.";
         unit
 
-let prune ~yes ~keep_undo ~keep_redo setup =
-  match Setup.main setup with
+let prune ~yes ~keep_undo ~keep_redo (setup: Setup.t) =
+  match setup.main_dot_filou with
     | None ->
         (* TODO: we could garbage-collect the clone, without changing the journal? *)
         failed [ "cannot prune in clone-only mode" ]
-    | Some main ->
+    | Some main_dot_filou ->
         let* journal = fetch_journal setup in
         let new_journal =
           {
@@ -1876,11 +1885,8 @@ let prune ~yes ~keep_undo ~keep_redo setup =
             Prout.echo_s "";
             Prout.echo_s "Repositories:";
             Prout.echo_s "";
-            (
-              Option.iter' (Setup.main setup) @@ fun location ->
-              Prout.echo "  Main repository: %s" (Device.show_location location);
-            );
-            Prout.echo "            Clone: %s" (Device.show_location (Setup.workdir setup));
+            Prout.echo "  Main repository: %s" (Device.show_location main_dot_filou);
+            Prout.echo "            Clone: %s" (Device.show_location setup.clone_dot_filou);
             Prout.echo "";
             prompt_for_confirmation "Prune main repository and its clone?"
           )
@@ -1896,7 +1902,7 @@ let prune ~yes ~keep_undo ~keep_redo setup =
               sf "Computing reachable set (%d objects, %d files)..."
                 object_count file_count
             in
-            Repo.get_reachable_hashes ~on_progress main
+            Repo.get_reachable_hashes ~on_progress main_dot_filou
           in
           let reachable_hashes =
             Hash_set.union reachable_objects_hashes reachable_file_hashes
@@ -1916,15 +1922,15 @@ let prune ~yes ~keep_undo ~keep_redo setup =
           in
           let* unreachable_clone_object_hashes =
             list_unreachable_hashes "clone object"
-              (Repo.iter_objects (Setup.clone_dot_filou setup))
+              (Repo.iter_objects setup.clone_dot_filou)
           in
           let* unreachable_main_object_hashes =
             list_unreachable_hashes "main object"
-              (Repo.iter_objects main)
+              (Repo.iter_objects main_dot_filou)
           in
           let* unreachable_file_hashes =
             list_unreachable_hashes "file"
-              (Repo.iter_files main)
+              (Repo.iter_files main_dot_filou)
           in
           let remove_list description from get_size remove_hash hashes =
             Prout.major "Removing unreachable %s from %s..." description from;
@@ -1955,20 +1961,21 @@ let prune ~yes ~keep_undo ~keep_redo setup =
           in
           let* () =
             remove_list "object" "clone"
-              (Repo.get_object_size (Setup.clone_dot_filou setup))
-              (Repo.remove_object (Setup.clone_dot_filou setup))
+              (Repo.get_object_size setup.clone_dot_filou)
+              (Repo.remove_object setup.clone_dot_filou)
               unreachable_clone_object_hashes
           in
           let* () =
             remove_list "object" "main"
-              (Repo.get_object_size main)
-              (Repo.remove_object main)
+              (Repo.get_object_size main_dot_filou)
+              (Repo.remove_object main_dot_filou)
               unreachable_main_object_hashes
           in
           let* () =
             remove_list "file" "main"
-              (fun hash -> Repo.get_file_size main (Repository.stored_file_hash hash))
-              (Repo.remove_file main)
+              (fun hash ->
+                 Repo.get_file_size main_dot_filou (Repository.stored_file_hash hash))
+              (Repo.remove_file main_dot_filou)
               unreachable_file_hashes
           in
           unit
@@ -2127,16 +2134,16 @@ let diff ~color setup ~before ~after =
 let disk_usage size =
   max 4096 (size / 4096 * 4096 + (if size mod 4096 = 0 then 0 else 4096))
 
-let stats setup =
+let stats (setup: Setup.t) =
   let* reachable_count, total_bytes, total_disk_usage =
     Prout.major_s "Computing reachable set...";
     let* reachable_object_hashes, _ =
       let location =
-        match Setup.main setup with
+        match setup.main_dot_filou with
           | None ->
-              Setup.clone_dot_filou setup
-          | Some main ->
-              main
+              setup.clone_dot_filou
+          | Some main_dot_filou ->
+              main_dot_filou
       in
       let on_progress ~object_count ~file_count =
         Prout.minor @@ fun () ->

@@ -648,7 +648,7 @@ let small_repo () =
   Clone.prune ();
   let clone_files_2 = find_files clone in
   let main_files_2 = find_files main in
-  cat (main // "root");
+  cat (main // ".filou/root");
   comment "Clone:";
   comment "- some meta files should have been removed";
   comment "- none should have been added, except the new journal (see above cat)";
@@ -682,10 +682,11 @@ let small_repo () =
   create_file
     ".filou/meta/01/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859"
     "dummy object";
-  mkdir (main // "data/01");
-  mkdir (main // "data/01/23");
+  mkdir (main // ".filou/data/01");
+  mkdir (main // ".filou/data/01/23");
   create_file
-    (main // "data/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b85a")
+    (main //
+     ".filou/data/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b85a")
     "dummy object";
   let clone_files_1 = find_files clone in
   let main_files_1 = find_files main in

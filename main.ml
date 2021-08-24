@@ -559,8 +559,8 @@ let main () =
     Cash.save setup;
     result
   in
-  let parse_local_path_with_kind setup string =
-    match Setup.workdir setup with
+  let parse_local_path_with_kind (setup: Setup.t) string =
+    match setup.workdir with
       | Local (_, root) ->
           Device.parse_local_path root string
       | SSH_filou _ ->

@@ -51,9 +51,10 @@ $ main.exe --no-color push --yes
 Listing files...
 Listing files to push...
 Pushing files...
-Pushing... (405 kB / 631 kB) (64%) (file 6528 / 10000) dir1/dir11/dir23/dir25/dir200/dir423/file8907
+Pushing... (322 kB / 631 kB) (51%) (file 5062 / 10000) - hashing (58 B / 58 B) (100%)
+Pushing... (570 kB / 631 kB) (90%) (file 8971 / 10000) - hashing (66 B / 66 B) (100%)
 Pushed 10000 files (631 kB).
-time(push) = 2.15165s
+time(push) = 2.54406s
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 631199, file count: 10000).

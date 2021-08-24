@@ -1963,7 +1963,7 @@ Removing unreachable object from main...
 Removed 7 objects from main totalling 972 B.
 Removing unreachable file from main...
 Removed 0 files from main totalling 0 B.
-$ cat /tmp/filou-test/main/root
+$ cat /tmp/filou-test/main/.filou/root
 2b48df188f9d6eb0dd598346957d601e2f32453ec0e83b120c66b4b3b542e9ca%
 # Clone:
 # - some meta files should have been removed
@@ -1978,14 +1978,14 @@ $ cat /tmp/filou-test/main/root
 - /tmp/filou-test/clone/.filou/meta/ae/aed863956a61fbc9cc04a917eaa6f6798a5be59f22b08e802f3ba635bc34818e
 + /tmp/filou-test/clone/.filou/meta/2b/2b48df188f9d6eb0dd598346957d601e2f32453ec0e83b120c66b4b3b542e9ca
 # Main: should be the same diff:
-- /tmp/filou-test/main/meta/2f/2f2bfbf7510abe706cbc6a3a7b336b3309a2a9c6dd7d1bab4c7c44747cfa463d
-- /tmp/filou-test/main/meta/44/4442a3508bca0bae85653d231eead0498b4ada604774587e860727532d0f1fbf
-- /tmp/filou-test/main/meta/67/67bff1482ebc930eba6658a67c9357716c8062cacaf838ef71f3e0684f700211
-- /tmp/filou-test/main/meta/7b/7b3defa6a7bb68ecf8eea854ee070d3932c5e73b95f4b1bd377a9a177f71f4b4
-- /tmp/filou-test/main/meta/80/80a19258bf56e3a503c5302a9eccd5751fd24949cbaafab81468a4d986d582ae
-- /tmp/filou-test/main/meta/a1/a1a6e0b57c362a340319686fadb420779809b9c92e69ff333a60a9391374d309
-- /tmp/filou-test/main/meta/ae/aed863956a61fbc9cc04a917eaa6f6798a5be59f22b08e802f3ba635bc34818e
-+ /tmp/filou-test/main/meta/2b/2b48df188f9d6eb0dd598346957d601e2f32453ec0e83b120c66b4b3b542e9ca
+- /tmp/filou-test/main/.filou/meta/2f/2f2bfbf7510abe706cbc6a3a7b336b3309a2a9c6dd7d1bab4c7c44747cfa463d
+- /tmp/filou-test/main/.filou/meta/44/4442a3508bca0bae85653d231eead0498b4ada604774587e860727532d0f1fbf
+- /tmp/filou-test/main/.filou/meta/67/67bff1482ebc930eba6658a67c9357716c8062cacaf838ef71f3e0684f700211
+- /tmp/filou-test/main/.filou/meta/7b/7b3defa6a7bb68ecf8eea854ee070d3932c5e73b95f4b1bd377a9a177f71f4b4
+- /tmp/filou-test/main/.filou/meta/80/80a19258bf56e3a503c5302a9eccd5751fd24949cbaafab81468a4d986d582ae
+- /tmp/filou-test/main/.filou/meta/a1/a1a6e0b57c362a340319686fadb420779809b9c92e69ff333a60a9391374d309
+- /tmp/filou-test/main/.filou/meta/ae/aed863956a61fbc9cc04a917eaa6f6798a5be59f22b08e802f3ba635bc34818e
++ /tmp/filou-test/main/.filou/meta/2b/2b48df188f9d6eb0dd598346957d601e2f32453ec0e83b120c66b4b3b542e9ca
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 44, file count: 7).
@@ -2048,9 +2048,9 @@ Clone is up-to-date.
 $ cd /tmp/filou-test/clone
 $ mkdir .filou/meta/01
 $ echo 'dummy object' > .filou/meta/01/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
-$ mkdir /tmp/filou-test/main/data/01
-$ mkdir /tmp/filou-test/main/data/01/23
-$ echo 'dummy object' > /tmp/filou-test/main/data/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b85a
+$ mkdir /tmp/filou-test/main/.filou/data/01
+$ mkdir /tmp/filou-test/main/.filou/data/01/23
+$ echo 'dummy object' > /tmp/filou-test/main/.filou/data/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b85a
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color prune --yes
 Computing reachable set...
@@ -2066,7 +2066,7 @@ Removed 1 files from main totalling 12 B.
 # Clone: diff should show one removed meta file:
 - /tmp/filou-test/clone/.filou/meta/01/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b859
 # Main: diff should show one removed data file:
-- /tmp/filou-test/main/data/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b85a
+- /tmp/filou-test/main/.filou/data/01/23/01234567fb95b9dd5d20056bc24150b79354852e0f0a28ce578af2b3d2f4b85a
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
 -->  0 push bla/bli

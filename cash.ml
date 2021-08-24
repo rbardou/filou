@@ -70,15 +70,15 @@ let self_filename = Path.Filename.parse_exn "self"
 let self (dir_path: Device.path): Device.file_path =
   cash_filename :: List.map add_dash dir_path, self_filename
 
-let save setup =
-  match Device.mode (Setup.clone_dot_filou setup) with
+let save (setup: Setup.t) =
+  match Device.mode setup.clone_dot_filou with
     | RO ->
         ()
     | RW ->
         (
           Path_map.iter' !modified @@ fun dir_path dir ->
           if Filename_map.is_empty dir then
-            match Device.remove_file (Setup.clone_dot_filou setup) (self dir_path) with
+            match Device.remove_file setup.clone_dot_filou (self dir_path) with
               | ERROR { code = `failed; msg } ->
                   warn_msg msg "failed to remove hash cash"
               | ERROR { code = `no_such_file; _ } | OK () ->
@@ -89,7 +89,7 @@ let save setup =
               write_dir buffer dir
             in
             match
-              Device.write_file (Setup.clone_dot_filou setup) (self dir_path) contents
+              Device.write_file setup.clone_dot_filou (self dir_path) contents
             with
               | ERROR { code = `failed; msg } ->
                   warn_msg msg "failed to write hash cash"
@@ -111,7 +111,7 @@ let maybe_save setup =
         if now >= next_save then
           save setup
 
-let read_cache_for_dir setup (dir_path: Device.path) =
+let read_cache_for_dir (setup: Setup.t) (dir_path: Device.path) =
   match Path_map.find_opt dir_path !modified with
     | Some dir ->
         dir
@@ -120,7 +120,7 @@ let read_cache_for_dir setup (dir_path: Device.path) =
           | Some dir ->
               dir
           | None ->
-              match Device.read_file (Setup.clone_dot_filou setup) (self dir_path) with
+              match Device.read_file setup.clone_dot_filou (self dir_path) with
                 | ERROR { code = `failed; msg } ->
                     warn_msg msg "failed to read hash cash";
                     Filename_map.empty
@@ -150,8 +150,8 @@ let set_cache setup ((dir_path, filename): Device.file_path) (value: dir_entry o
   modified := Path_map.add dir_path new_dir !modified;
   maybe_save setup
 
-let get ~on_progress setup ((dir_path, filename) as file_path: Device.file_path) =
-  match Device.stat (Setup.workdir setup) (Device.path_of_file_path file_path) with
+let get ~on_progress (setup: Setup.t) ((dir_path, filename) as file_path: Device.file_path) =
+  match Device.stat setup.workdir (Device.path_of_file_path file_path) with
     | ERROR { code = `failed; _ } as x ->
         x
     | ERROR { code = `no_such_file; _ } ->
@@ -177,7 +177,7 @@ let get ~on_progress setup ((dir_path, filename) as file_path: Device.file_path)
           | None ->
               (* TODO: progress *)
               match
-                Device.hash ~on_progress (Setup.workdir setup) file_path
+                Device.hash ~on_progress setup.workdir file_path
               with
                 | ERROR { code = `failed; _ } as x ->
                     x
@@ -188,8 +188,8 @@ let get ~on_progress setup ((dir_path, filename) as file_path: Device.file_path)
                     set_cache setup file_path (Some dir_entry);
                     ok (File hash)
 
-let set setup file_path hash =
-  match Device.stat (Setup.workdir setup) (Device.path_of_file_path file_path) with
+let set (setup: Setup.t) file_path hash =
+  match Device.stat setup.workdir (Device.path_of_file_path file_path) with
     | ERROR { code = (`failed | `no_such_file); _ } | OK Dir ->
         ()
     | OK (File { size; mtime }) ->
