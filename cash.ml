@@ -71,36 +71,40 @@ let self (dir_path: Device.path): Device.file_path =
   cash_filename :: List.map add_dash dir_path, self_filename
 
 let save (setup: Setup.t) =
-  match Device.mode setup.clone_dot_filou with
-    | RO ->
+  match setup.clone_dot_filou with
+    | None ->
         ()
-    | RW ->
-        (
-          Path_map.iter' !modified @@ fun dir_path dir ->
-          if Filename_map.is_empty dir then
-            match Device.remove_file setup.clone_dot_filou (self dir_path) with
-              | ERROR { code = `failed; msg } ->
-                  warn_msg msg "failed to remove hash cash"
-              | ERROR { code = `no_such_file; _ } | OK () ->
-                  ()
-          else
-            let contents =
-              W.to_string @@ fun buffer ->
-              write_dir buffer dir
-            in
-            match
-              Device.write_file setup.clone_dot_filou (self dir_path) contents
-            with
-              | ERROR { code = `failed; msg } ->
-                  warn_msg msg "failed to write hash cash"
-              | OK () ->
-                  ()
-        );
-        up_to_date := (
-          Path_map.merge' !up_to_date !modified @@ fun _ up_to_date modified ->
-          match up_to_date, modified with x, None | _, (Some _ as x) -> x
-        );
-        modified := Path_map.empty
+    | Some clone_dot_filou ->
+        match Device.mode clone_dot_filou with
+          | RO ->
+              ()
+          | RW ->
+              (
+                Path_map.iter' !modified @@ fun dir_path dir ->
+                if Filename_map.is_empty dir then
+                  match Device.remove_file clone_dot_filou (self dir_path) with
+                    | ERROR { code = `failed; msg } ->
+                        warn_msg msg "failed to remove hash cash"
+                    | ERROR { code = `no_such_file; _ } | OK () ->
+                        ()
+                else
+                  let contents =
+                    W.to_string @@ fun buffer ->
+                    write_dir buffer dir
+                  in
+                  match
+                    Device.write_file clone_dot_filou (self dir_path) contents
+                  with
+                    | ERROR { code = `failed; msg } ->
+                        warn_msg msg "failed to write hash cash"
+                    | OK () ->
+                        ()
+              );
+              up_to_date := (
+                Path_map.merge' !up_to_date !modified @@ fun _ up_to_date modified ->
+                match up_to_date, modified with x, None | _, (Some _ as x) -> x
+              );
+              modified := Path_map.empty
 
 let maybe_save setup =
   let now = Unix.gettimeofday () in
@@ -120,20 +124,24 @@ let read_cache_for_dir (setup: Setup.t) (dir_path: Device.path) =
           | Some dir ->
               dir
           | None ->
-              match Device.read_file setup.clone_dot_filou (self dir_path) with
-                | ERROR { code = `failed; msg } ->
-                    warn_msg msg "failed to read hash cash";
+              match setup.clone_dot_filou with
+                | None ->
                     Filename_map.empty
-                | ERROR { code = `no_such_file; _ } ->
-                    Filename_map.empty
-                | OK contents ->
-                    match decode_rawbin_string read_dir contents with
+                | Some clone_dot_filou ->
+                    match Device.read_file clone_dot_filou (self dir_path) with
                       | ERROR { code = `failed; msg } ->
-                          warn_msg msg "failed to decode hash cash";
+                          warn_msg msg "failed to read hash cash";
                           Filename_map.empty
-                      | OK dir ->
-                          up_to_date := Path_map.add dir_path dir !up_to_date;
-                          dir
+                      | ERROR { code = `no_such_file; _ } ->
+                          Filename_map.empty
+                      | OK contents ->
+                          match decode_rawbin_string read_dir contents with
+                            | ERROR { code = `failed; msg } ->
+                                warn_msg msg "failed to decode hash cash";
+                                Filename_map.empty
+                            | OK dir ->
+                                up_to_date := Path_map.add dir_path dir !up_to_date;
+                                dir
 
 let set_cache setup ((dir_path, filename): Device.file_path) (value: dir_entry option) =
   let old_dir = read_cache_for_dir setup dir_path in
