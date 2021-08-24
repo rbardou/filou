@@ -76,7 +76,7 @@ let trace error_message = function
   | ERROR { code; msg } -> ERROR { code; msg = error_message :: msg }
 
 let dot_filou = Path.Filename.parse_exn ".filou"
-let dot_filou_config = [ dot_filou ], Path.Filename.parse_exn "config"
+let config_path_in_dot_filou = [], Path.Filename.parse_exn "config"
 
 exception Failed of string list
 

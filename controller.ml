@@ -102,18 +102,19 @@ let fetch_raw_or_fail (setup: Setup.t) hash =
                     in
                     Repo.fetch_raw clone_dot_filou hash
 
-let write_config location config =
+let write_config ~dot_filou config =
   let encoded = W.to_string (fun buffer -> Config.write buffer config) in
-  Device.write_file location dot_filou_config encoded
+  Device.write_file dot_filou config_path_in_dot_filou encoded
 
-let read_config location =
+let read_config ~dot_filou =
   trace "failed to read configuration file" @@
-  let* encoded = Device.read_file location dot_filou_config in
+  let* encoded = Device.read_file dot_filou config_path_in_dot_filou in
   decode_rawbin_string Config.read encoded
 
 let init (location: Device.location) =
-  let* () = write_config location Main in
-  Repo.write_root [ Device.sublocation location dot_filou ] @@ Repo.hash {
+  let dot_filou = Device.sublocation location dot_filou in
+  let* () = write_config ~dot_filou Main in
+  Repo.write_root [ dot_filou ] @@ Repo.hash {
     redo = [];
     head = { command = "init"; state = Empty };
     undo = [];
@@ -190,21 +191,21 @@ let print_journal ?(only_redo = false) { redo; head; undo } =
 
 let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
   Prout.major "Checking %s..." (Device.show_location main_location);
-  let* main_config = read_config main_location in
+  let main_dot_filou = Device.sublocation main_location dot_filou in
+  let* main_config = read_config ~dot_filou: main_dot_filou in
   match main_config with
     | Clone _ ->
         failed [ "cannot clone %s"; "%s is itself a clone repository" ]
     | Main ->
-        let* root_hash_option = Repo.read_root (Device.sublocation main_location dot_filou) in
+        let* root_hash_option = Repo.read_root main_dot_filou in
         match root_hash_option with
           | None ->
-              failed [ sf "%s has no root" (Device.show_location main_location) ]
+              failed [ sf "%s has no root" (Device.show_location main_dot_filou) ]
           | Some root ->
               Prout.major "Creating %s..." (Device.show_location clone_location);
-              let* () = write_config clone_location (Clone { main_location }) in
-              let* () =
-                Repo.write_root [ Device.sublocation clone_location dot_filou ] root
-              in
+              let clone_dot_filou = Device.sublocation clone_location dot_filou in
+              let* () = write_config ~dot_filou: clone_dot_filou (Clone { main_location }) in
+              let* () = Repo.write_root [ clone_dot_filou ] root in
               Prout.echo "Cloned %s into: %s" (Device.show_location main_location)
                 (Device.show_location clone_location);
               unit
@@ -212,7 +213,8 @@ let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
 let find_local_config mode =
   let rec find current =
     let location = Device.Local (mode, current) in
-    match read_config location with
+    let dot_filou = Device.sublocation location dot_filou in
+    match read_config ~dot_filou with
       | OK config ->
           ok (location, config)
       | ERROR { code = (`no_such_file | `failed); _ } ->
@@ -2326,4 +2328,5 @@ let config ~mode ~main_location =
                   (Device.show_location location)
               ]
           | Clone _ ->
-              write_config location (Clone { main_location })
+              let dot_filou = Device.sublocation location dot_filou in
+              write_config ~dot_filou (Clone { main_location })

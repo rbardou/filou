@@ -30,10 +30,16 @@ let make_location ?username ~hostname ?port ~path () =
   { username; hostname; port; path; connection = { status = None } }
 
 let sublocation (location: location) (filename: Path.Filename.t) =
-  {
-    location with
-      path = Path.Any_relativity.concat location.path (Path.Dir (filename, Current));
-  }
+  match location.connection.status with
+    | Some _ ->
+        (* We would need to resend Q_hello basically, possibly breaking stuff. *)
+        (* TODO: improve this *)
+        invalid_arg "cannot use Device_ssh_filou.sublocation on an active connection"
+    | None ->
+        {
+          location with
+            path = Path.Any_relativity.concat location.path (Path.Dir (filename, Current));
+        }
 
 let send connection (query: Protocol.query) =
   match connection.status with
