@@ -253,7 +253,7 @@ let find_setup ~repository ~no_main ~no_cache mode =
             {
               main_dot_filou = Some location_dot_filou;
               clone_dot_filou = None;
-              workdir = None; (* TODO: could actually use main's *)
+              workdir = Some location;
             }
           in
           ok setup

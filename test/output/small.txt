@@ -24,9 +24,7 @@ $ main.exe --no-color log
 # Try to do something in the main repository directly.
 $ cd /tmp/filou-test/main
 $ main.exe --no-color tree
-Error:
-  cannot do that with no work directory
-Exit code: 1
+./
 # Play with the configuration.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color config
