@@ -50,11 +50,12 @@ $ main.exe --no-color tree
 # Push.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color push --yes
+Locking main repository...
 Listing files...
 Listing files to push...
 Pushing files...
 Pushed 10000 files (631 kB).
-time(push) = 0.751256s
+time(push) = 0.709504s
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 631199, file count: 10000).

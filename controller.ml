@@ -1,12 +1,6 @@
 open Misc
 open State
 
-(* TODO: use [Device.with_lock] for read-write operations?
-   Note that the damage that can be done if we don't is not terrible:
-   it just means that if there are multiple concurrent accesses, the last
-   one wins, but the repository is not corrupted: it only contains some
-   unreachable objects. *)
-
 let prompt_for_confirmation prompt =
   Prout.print "%s [y/N] " prompt;
   flush stdout;
@@ -331,6 +325,23 @@ let fetch_root_dir setup (state: state) =
         ok Filename_map.empty
     | Non_empty state ->
         fetch_or_fail setup Dir state.root_dir
+
+let lock_path = [], Path.Filename.parse_exn "lock"
+
+let with_lock (setup: Setup.t) f =
+  (* We don't really need to lock clones: read-write operations must be performed
+     with a main anyway so a single lock is enough.
+     Note that the damage that can be done if we don't lock is not horrible:
+     when updating concurrently it just means that the last update wins.
+     But still, if the user wants to, say, have a cron job that regularly
+     pushes, while still being able to write safely for manual commands,
+     we should lock. *)
+  match setup.main_dot_filou with
+    | None ->
+        f ()
+    | Some main_dot_filou ->
+        Prout.major_s "Locking main repository...";
+        Device.with_lock main_dot_filou lock_path f
 
 module Hash_index =
 struct
@@ -1493,6 +1504,7 @@ let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
     | None ->
         operation_not_available [ "cannot push with no work directory" ]
     | Some workdir ->
+        with_lock setup @@ fun () ->
         let* journal = fetch_journal setup in
         let* checked_redo = Check_redo.check ~yes journal in
         Prout.major_s "Listing files...";
@@ -1702,6 +1714,7 @@ let remove_file setup (state: state) (path: Device.file_path): (state, _) r =
               ok (Non_empty new_root)
 
 let remove ~recursive ~yes setup (paths: Device.path list) =
+  with_lock setup @@ fun () ->
   let* journal = fetch_journal setup in
   let* checked_redo = Check_redo.check ~yes journal in
   let state = journal.head.state in
@@ -1731,6 +1744,7 @@ let remove ~recursive ~yes setup (paths: Device.path list) =
 
 type copy_or_move = Copy | Move
 
+(* Not locking because this is a helper for [copy_or_move_files]. *)
 let copy_or_move_file (action: copy_or_move) ~verbose setup root
     (source: Dir.found_file) (target_path: Device.file_path) =
   let* root =
@@ -1769,6 +1783,7 @@ let copy_or_move_file (action: copy_or_move) ~verbose setup root
 
 let copy_or_move_files (action: copy_or_move) ~verbose ~yes setup
     (source_paths: Device.path list) (target: Device.path_with_kind) =
+  with_lock setup @@ fun () ->
   let* journal = fetch_journal setup in
   let* checked_redo = Check_redo.check ~yes journal in
   let state = journal.head.state in
@@ -1964,6 +1979,7 @@ let prune ~yes ~keep_undo ~keep_redo (setup: Setup.t) =
         (* TODO: we could garbage-collect the clone, without changing the journal? *)
         operation_not_available [ "main repository is not configured" ]
     | Some main_dot_filou ->
+        with_lock setup @@ fun () ->
         let* journal = fetch_journal setup in
         let new_journal =
           {
@@ -2100,6 +2116,7 @@ let log setup =
   unit
 
 let undo setup ~count =
+  with_lock setup @@ fun () ->
   let undo count =
     let* journal = fetch_journal setup in
     if List.compare_length_with journal.undo count < 0 then
