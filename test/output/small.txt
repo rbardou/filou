@@ -10,7 +10,8 @@ $ hexdump -C /tmp/filou-test/main/.filou/config
 $ hexdump -C /tmp/filou-test/clone/.filou/config
 00000000  46 63 6f 6e 66 69 67 31  01 15 00 2f 74 6d 70 2f  |Fconfig1.../tmp/|
 00000010  66 69 6c 6f 75 2d 74 65  73 74 2f 6d 61 69 6e 2f  |filou-test/main/|
-00000020
+00000020  00                                                |.|
+00000021
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Repository is empty.
@@ -31,14 +32,45 @@ $ cd /tmp/filou-test/clone
 $ main.exe --no-color config
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
+no cache: false
 $ main.exe --no-color config --set-main /tmp
 $ main.exe --no-color config
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/
+no cache: false
 $ main.exe --no-color config --set-main /tmp/filou-test/main
 $ main.exe --no-color config
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
+no cache: false
+$ main.exe --no-color config --set-no-cache
+$ main.exe --no-color config
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
+no cache: true
+$ main.exe --no-color config --set-no-cache --unset-no-cache
+Error:
+  cannot both set and unset the same flag
+Exit code: 1
+$ main.exe --no-color config
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
+no cache: true
+$ main.exe --no-color config --unset-no-cache
+$ main.exe --no-color config
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
+no cache: false
+$ main.exe --no-color config --set-main /tmp --set-no-cache
+$ main.exe --no-color config
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/
+no cache: true
+$ main.exe --no-color config --set-main /tmp/filou-test/main --unset-no-cache
+$ main.exe --no-color config
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
+no cache: false
 # Add a file.
 $ cd /tmp/filou-test/clone
 $ echo blablabla > toto
@@ -1452,7 +1484,7 @@ $ tree -a -s -F
 │   └── [       4096]  blo/
 │       └── [          4]  plouf
 ├── [       4096]  .filou/
-│   ├── [         32]  config
+│   ├── [         33]  config
 │   └── [         64]  root
 ├── [          4]  plif
 ├── [          6]  titi
@@ -1477,7 +1509,7 @@ $ tree -a -s -F
 │   └── [       4096]  blo/
 │       └── [          4]  plouf
 ├── [       4096]  .filou/
-│   ├── [         32]  config
+│   ├── [         33]  config
 │   ├── [       4096]  meta/
 │   │   ├── [       4096]  02/
 │   │   │   └── [       1422]  026a6708d5d46ca16d9b348dd3a1734023823e60f182e7257eca2b8c8f44868d
@@ -1929,7 +1961,7 @@ $ tree -a -s -F
 │   │   └── [       4096]  bla-/
 │   │       └── [       4096]  bli-/
 │   │           └── [         67]  self
-│   ├── [         32]  config
+│   ├── [         33]  config
 │   ├── [       4096]  meta/
 │   │   ├── [       4096]  44/
 │   │   │   └── [         60]  4442a3508bca0bae85653d231eead0498b4ada604774587e860727532d0f1fbf
@@ -3952,3 +3984,72 @@ $ main.exe --no-color show root_dir
     hash = 20580e3e285f773043630dc3218e4d40339c4e353093c680d54136b5fffcddfa;
     size = 30;
   } }
+# No-cache: check that cloning with --no-cache stores in config.
+$ rm -r -f /tmp/filou-test/main
+$ rm -r -f /tmp/filou-test/clone
+$ main.exe --no-color init /tmp/filou-test/main
+$ main.exe --no-color --no-cache clone /tmp/filou-test/main /tmp/filou-test/clone
+Checking /tmp/filou-test/main/...
+Creating /tmp/filou-test/clone/...
+Cloned /tmp/filou-test/main/ into: /tmp/filou-test/clone/
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color config
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
+no cache: true
+$ cd /tmp/filou-test/clone
+$ echo 'contents of bla' > bla
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color push --yes
+Listing files...
+Listing files to push...
+Pushing files...
+Pushed: bla
+Pushed 1 files (15 B).
+$ cd /tmp/filou-test/clone
+$ tree -a -s -F
+.
+├── [         15]  bla
+└── [       4096]  .filou/
+    ├── [         33]  config
+    └── [         64]  root
+
+1 directory, 3 files
+$ cd /tmp/filou-test/main
+$ tree -a -s -F
+.
+└── [       4096]  .filou/
+    ├── [          9]  config
+    ├── [       4096]  data/
+    │   └── [       4096]  8d/
+    │       └── [       4096]  aa/
+    │           └── [         15]  8daa67250ffe562766271adc69523687c3d61d1f0f37bb9cd54145d8fad42799
+    ├── [       4096]  meta/
+    │   ├── [       4096]  3b/
+    │   │   └── [         41]  3b54cedbae889d85887eacf9a3b25338131f7d01eff904e0cecaafa5d2393881
+    │   ├── [       4096]  8a/
+    │   │   └── [         23]  8abebbeb21b4af7d134691b3235c68ad986c4aec5d7d1b8a7d7020c5cf38f92d
+    │   ├── [       4096]  9c/
+    │   │   └── [         53]  9ca1f728d5ab6488dcfb3c24de65abd8b747fd8c21ee69c27b8c998690748060
+    │   ├── [       4096]  ae/
+    │   │   └── [         58]  ae6b16749601810436782fe8f70f504b8d587895aaa3684ea2cae09eac9c7a00
+    │   └── [       4096]  c2/
+    │       └── [         96]  c22796296b53b226f8247071988edbd514bb8da3bbe4adbad51bb543fd1a8ffb
+    └── [         64]  root
+
+10 directories, 8 files
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 15, file count: 1).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ tree -a -s -F
+.
+├── [         15]  bla
+└── [       4096]  .filou/
+    ├── [         33]  config
+    └── [         64]  root
+
+1 directory, 3 files
+# --- End of small tests. ---

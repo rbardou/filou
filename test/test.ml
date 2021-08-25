@@ -193,36 +193,38 @@ let no_color = true
 
 module Make_filou (P: sig val path: string option end) =
 struct
-  let run ?(v = false) ?(dry_run = false) ?(color = false) ?(no_main = false) args =
+  let run ?(v = false) ?(dry_run = false) ?(color = false)
+      ?(no_main = false) ?(no_cache = false) args =
     Option.iter cd P.path;
     let flags =
-      flag v "-v" @
-      flag dry_run "--dry-run" @
-      flag (not color) "--no-color" @
-      flag no_main "--no-main"
+      flag v "-v"
+      @ flag dry_run "--dry-run"
+      @ flag (not color) "--no-color"
+      @ flag no_main "--no-main"
+      @ flag no_cache "--no-cache"
     in
     cmd filou_exe (flags @ args)
 
   let run_and_read ?(v = false) ?(dry_run = false) ?(color = false) args =
     Option.iter cd P.path;
     let flags =
-      flag v "-v" @
-      flag dry_run "--dry-run" @
-      flag (not color) "--no-color"
+      flag v "-v"
+      @ flag dry_run "--dry-run"
+      @ flag (not color) "--no-color"
     in
     cmd_and_read filou_exe (flags @ args)
 
   let init ?v ?dry_run ?color ?main () =
     run ?v ?dry_run ?color ("init" :: list_of_option main)
 
-  let clone ?v ?dry_run ?color ?main ?clone () =
+  let clone ?v ?dry_run ?color ?no_cache ?main ?clone () =
     let main =
       if use_ssh then
         Option.map (fun main -> "filou+ssh://localhost/" ^ main) main
       else
         main
     in
-    run ?v ?dry_run ?color ("clone" :: list_of_option main @ list_of_option clone)
+    run ?v ?dry_run ?color ?no_cache ("clone" :: list_of_option main @ list_of_option clone)
 
   let push ?(v = true) ?dry_run ?color paths =
     run ~v ?dry_run ?color ("push" :: "--yes" :: paths)
@@ -284,14 +286,20 @@ struct
   let stats ?v ?dry_run ?color () =
     run ?v ?dry_run ?color [ "stats" ]
 
-  let config ?v ?dry_run ?color ?set_main () =
+  let config ?v ?dry_run ?color ?set_main
+      ?(set_no_cache = false) ?(unset_no_cache = false) () =
     let set_main =
       if use_ssh then
         Option.map (fun set_main -> "filou+ssh://localhost/" ^ set_main) set_main
       else
         set_main
     in
-    run ?v ?dry_run ?color ("config" :: list_of_option ~name: "--set-main" set_main)
+    run ?v ?dry_run ?color (
+      "config"
+      :: list_of_option ~name: "--set-main" set_main
+      @ flag set_no_cache "--set-no-cache"
+      @ flag unset_no_cache "--unset-no-cache"
+    )
 
   let show ?v ?dry_run ?color ?what ?r () =
     run ?v ?dry_run ?color (
@@ -370,6 +378,16 @@ let small_repo () =
   Filou.config ~set_main: "/tmp" ();
   Filou.config ();
   Filou.config ~set_main: main ();
+  Filou.config ();
+  Filou.config ~set_no_cache: true ();
+  Filou.config ();
+  Filou.config ~set_no_cache: true ~unset_no_cache: true ();
+  Filou.config ();
+  Filou.config ~unset_no_cache: true ();
+  Filou.config ();
+  Filou.config ~set_main: "/tmp" ~set_no_cache: true ();
+  Filou.config ();
+  Filou.config ~set_main: main ~unset_no_cache: true ();
   Filou.config ();
 
   comment "Add a file.";
@@ -937,7 +955,25 @@ let small_repo () =
   let hash, _ = Clone.show_and_read ~what: "hash_index" () in
   Clone.show ~what: (String.trim hash) ();
   Clone.show ~what: "root_dir" ();
-  ()
+
+  comment "No-cache: check that cloning with --no-cache stores in config.";
+  rm_rf main;
+  rm_rf clone;
+  Filou.init ~main ();
+  Filou.clone ~main ~clone ~no_cache: true ();
+  Clone.config ();
+  cd clone;
+  create_file "bla" "contents of bla";
+  Clone.push [];
+  cd clone;
+  tree ();
+  cd main;
+  tree ();
+  Clone.check ();
+  cd clone;
+  tree ();
+
+  comment "--- End of small tests. ---"
 
 let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
   (* Create a random hierarchy of directories. *)

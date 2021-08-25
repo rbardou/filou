@@ -189,7 +189,7 @@ let print_journal ?(only_redo = false) { redo; head; undo } =
     Prout.echo "    %2d %s" (i + 1) command
   )
 
-let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
+let clone ~no_cache ~(main_location: Device.location) ~(clone_location: Device.location) =
   Prout.major "Checking %s..." (Device.show_location main_location);
   let main_dot_filou = Device.sublocation main_location dot_filou in
   let* main_config = read_config ~dot_filou: main_dot_filou in
@@ -204,7 +204,10 @@ let clone ~(main_location: Device.location) ~(clone_location: Device.location) =
           | Some root ->
               Prout.major "Creating %s..." (Device.show_location clone_location);
               let clone_dot_filou = Device.sublocation clone_location dot_filou in
-              let* () = write_config ~dot_filou: clone_dot_filou (Clone { main_location }) in
+              let* () =
+                write_config ~dot_filou: clone_dot_filou
+                  (Clone { main_location; no_cache })
+              in
               let* () = Repo.write_root [ clone_dot_filou ] root in
               Prout.echo "Cloned %s into: %s" (Device.show_location main_location)
                 (Device.show_location clone_location);
@@ -264,7 +267,12 @@ let find_setup ~repository ~no_main ~no_cache mode =
         let setup: Setup.t =
           {
             main_dot_filou;
-            clone_dot_filou = (if no_cache then None else Some location_dot_filou);
+            clone_dot_filou = (
+              if no_cache || config.no_cache then
+                None
+              else
+                Some location_dot_filou
+            );
             workdir = Some location;
           }
         in
@@ -2330,17 +2338,18 @@ let show setup obj =
 let show_config location: Config.t -> _ = function
   | Main ->
       Prout.echo "main repository: %s" (Device.show_location location)
-  | Clone { main_location } ->
+  | Clone { main_location; no_cache } ->
       Prout.echo "clone repository: %s" (Device.show_location location);
-      Prout.echo "main repository: %s" (Device.show_location main_location)
+      Prout.echo "main repository: %s" (Device.show_location main_location);
+      Prout.echo "no cache: %b" no_cache
 
-let config ~mode ~main_location =
+let config ~mode ~set_main ~set_no_cache =
   let* location, location_dot_filou, config = find_local_config mode in
-  match main_location with
-    | None ->
+  match set_main, set_no_cache with
+    | None, None ->
         show_config location config;
         unit
-    | Some main_location ->
+    | _ ->
         match config with
           | Main ->
               failed [
@@ -2348,5 +2357,15 @@ let config ~mode ~main_location =
                 sf "%s is a main repository, not a clone repository"
                   (Device.show_location location)
               ]
-          | Clone _ ->
-              write_config ~dot_filou: location_dot_filou (Clone { main_location })
+          | Clone clone_config ->
+              let clone_config =
+                match set_main with
+                  | None -> clone_config
+                  | Some main_location -> { clone_config with main_location }
+              in
+              let clone_config =
+                match set_no_cache with
+                  | None -> clone_config
+                  | Some no_cache -> { clone_config with no_cache }
+              in
+              write_config ~dot_filou: location_dot_filou (Clone clone_config)

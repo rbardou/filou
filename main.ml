@@ -68,7 +68,11 @@ let main () =
          both the main repository and the clone are on a local device \
          and if you do not need to store cache metadata for later in \
          case the main repository becomes unavailable. Ignored if \
-         --repository is a main repository."
+         --repository is a main repository.\n\
+         \n\
+         When used with command 'clone', this parameter is saved in \
+         the configuration file and all operations on the clone will \
+         be performed as if --no-cache was specified."
       ~set_long: "no-cache"
       ~set_short: 'M'
       false
@@ -566,7 +570,19 @@ let main () =
             ~description: "Set the location of the main repository. See 'clone --help'."
             ()
         in
-        `config main
+        let set_no_cache =
+          Clap.flag
+            ~set_long: "set-no-cache"
+            ~description: "Set no-cache mode (see --no-cache)."
+            false
+        in
+        let unset_no_cache =
+          Clap.flag
+            ~set_long: "unset-no-cache"
+            ~description: "Unset no-cache mode (see --no-cache)."
+            false
+        in
+        `config (main, set_no_cache, unset_no_cache)
       );
     ]
   in
@@ -611,7 +627,7 @@ let main () =
       | `clone (main_location, clone_location) ->
           let* main_location = parse_location main_location in
           let* clone_location = parse_location clone_location in
-          Controller.clone ~main_location ~clone_location
+          Controller.clone ~no_cache ~main_location ~clone_location
       | `tree (
           paths, max_depth, only_main, only_dirs, print_size, print_file_count,
           print_duplicates, full_dir_paths
@@ -702,9 +718,20 @@ let main () =
       | `show obj ->
           with_setup @@ fun setup ->
           Controller.show setup obj
-      | `config main ->
-          let* main_location = opt_map_e main parse_location in
-          Controller.config ~mode: device_mode ~main_location
+      | `config (set_main, set_no_cache, unset_no_cache) ->
+          let* set_main = opt_map_e set_main parse_location in
+          let set_flag set unset =
+            if set && unset then
+              failed [ "cannot both set and unset the same flag" ]
+            else if set then
+              ok (Some true)
+            else if unset then
+              ok (Some false)
+            else
+              ok None
+          in
+          let* set_no_cache = set_flag set_no_cache unset_no_cache in
+          Controller.config ~mode: device_mode ~set_main ~set_no_cache
   with
     | OK () ->
         Prout.clear_progress ()
