@@ -19,6 +19,16 @@ let print_newline () = if not !quiet then print_newline ()
 let print_endline s = if not !quiet then print_endline s
 let echo x = Printf.ksprintf print_endline x
 
+(* let rec take ?(acc = []) n l = *)
+(*   if n <= 0 then *)
+(*     List.rev acc *)
+(*   else *)
+(*     match l with *)
+(*       | [] -> *)
+(*           List.rev acc *)
+(*       | head :: tail -> *)
+(*           take ~acc: (head :: acc) (n - 1) tail *)
+
 let () =
   Clap.description "Run Filou tests"
 
@@ -133,7 +143,12 @@ let cmd_and_read executable args =
   stdout, stderr
 
 let create_file path contents =
-  echo "$ echo %s > %s" (Filename.quote_if_needed contents) (Filename.quote_if_needed path);
+  if String.length contents > 256 then
+    echo "$ echo %s... > %s"
+      (Filename.quote_if_needed (String.sub contents 0 256))
+      (Filename.quote_if_needed path)
+  else
+    echo "$ echo %s > %s" (Filename.quote_if_needed contents) (Filename.quote_if_needed path);
   let ch = open_out path in
   output_string ch contents;
   close_out ch
@@ -244,8 +259,10 @@ struct
   let cp ?(v = true) ?dry_run ?color paths =
     run ~v ?dry_run ?color ("cp" :: "--yes" :: paths)
 
-  let check ?v ?dry_run ?color ?path ?no_main () =
-    run ?v ?dry_run ?color ?no_main ("check" :: list_of_option path)
+  let check ?v ?dry_run ?color ?path ?no_main ?(h = false) () =
+    run ?v ?dry_run ?color ?no_main (
+      "check" :: list_of_option path @ flag h "-h"
+    )
 
   let tree ?v ?dry_run ?color ?no_main
       ?depth ?(only_dirs = false) ?(size = false) ?(count = false)
@@ -1018,6 +1035,32 @@ let large_repo ?(seed = 0) ~files: file_count ~dirs: dir_count () =
   (time "push" @@ fun () -> Clone.push ~v: false []);
   Clone.check ();
   Clone.stats ~v ();
+
+  comment "Remove some files.";
+  let to_remove = ref [] in
+  for i = 0 to file_count / 20 - 1 do
+    to_remove := files.(i) :: !to_remove;
+  done;
+  Clone.rm !to_remove;
+  Clone.check ();
+
+  comment "Push again.";
+  Clone.push ~v: false [];
+  Clone.check ();
+
+  comment "Remove some from the workdir and pull.";
+  for i = file_count / 2 to file_count / 2 + file_count / 20 - 1 do
+    rm files.(i);
+  done;
+  Clone.pull ~v: false [];
+  cat "dir1/dir12/dir78/file5499";
+
+  comment "Create a rather large file.";
+  create_file "large-file" (String.init 100_000_000 @@ fun i -> Char.chr (i mod 256));
+  Clone.push [ "large-file" ];
+  Clone.check ~h: true ();
+  rm "large-file";
+  Clone.pull [ "large-file" ];
   ()
 
 let () =

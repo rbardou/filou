@@ -55,7 +55,7 @@ Listing files...
 Listing files to push...
 Pushing files...
 Pushed 10000 files (631 kB).
-time(push) = 0.709504s
+time(push) = 0.771603s
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Directory structure looks ok (total size: 631199, file count: 10000).
@@ -68,3 +68,571 @@ Reachable object count: 534
 Total size of reachable objects: 1.40 MB
 Disk usage of reachable objects: 2.98 MB
 Efficiency (total size / disk usage): 46%
+# Remove some files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color rm --yes dir7/dir37/dir157/file499 dir1/dir6/dir66/file498 dir4/dir256/file497 dir2/dir5/dir14/dir15/dir153/file496 dir1/dir12/dir17/dir21/dir99/dir222/file495 dir2/dir5/dir13/dir71/dir98/dir372/dir475/file494 dir7/dir18/dir33/dir96/file493 dir1/dir12/dir42/dir46/dir64/dir108/dir180/dir238/file492 dir2/dir5/dir14/dir51/dir94/dir488/file491 dir1/dir12/dir42/dir46/dir64/dir108/dir180/file490 dir2/dir5/dir38/dir121/dir164/dir433/dir441/file489 dir2/dir8/dir56/dir205/file488 dir1/dir12/dir42/dir106/file487 dir2/dir8/dir9/dir141/file486 dir1/dir11/dir23/dir47/dir82/dir105/dir115/file485 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir146/dir343/dir392/file484 dir1/dir11/dir23/dir25/dir200/dir323/dir455/file483 dir1/dir12/dir19/file482 dir2/dir5/dir14/dir68/dir73/file481 dir1/dir12/dir42/dir46/dir64/dir108/dir268/dir443/file480 dir2/dir8/dir26/dir34/dir55/dir172/dir250/file479 dir1/dir12/dir17/dir24/dir44/dir62/dir116/dir358/file478 dir2/dir5/dir13/dir71/dir263/dir425/file477 dir7/dir18/dir52/dir79/file476 dir7/dir18/dir33/dir86/dir125/dir251/file475 dir2/dir8/dir26/dir34/dir55/dir172/dir220/dir260/file474 dir7/dir18/dir33/dir86/dir125/dir127/dir217/dir246/file473 dir7/dir10/dir29/dir370/file472 dir1/dir12/dir78/dir166/dir187/file471 dir1/dir12/dir78/dir388/dir450/file470 dir2/dir5/dir14/dir51/file469 dir1/dir12/dir42/dir46/dir67/dir110/file468 dir7/dir18/dir52/file467 dir1/dir12/dir17/dir21/dir50/dir176/dir466/file466 dir1/dir12/dir42/dir46/file465 dir7/dir18/dir33/dir86/dir339/dir389/file464 dir1/dir12/dir17/dir24/dir120/dir393/file463 dir1/dir12/dir41/dir118/dir151/dir311/file462 dir1/dir11/dir23/dir25/dir59/dir449/file461 dir2/dir5/dir13/dir254/dir413/dir499/file460 dir2/dir5/dir14/dir68/file459 dir2/dir8/dir9/dir28/dir89/dir112/dir133/file458 dir1/dir11/dir23/dir47/dir82/dir105/dir213/dir456/file457 dir2/dir3/dir81/dir267/file456 dir2/dir5/dir13/dir71/dir145/file455 dir1/dir12/dir42/dir46/dir64/dir108/dir180/file454 dir1/dir11/dir23/dir57/dir431/file453 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir146/dir343/dir468/file452 dir1/dir12/dir78/dir166/file451 dir7/dir18/dir33/dir86/dir386/dir462/file450 dir7/file449 dir7/dir10/dir29/dir129/file448 dir2/dir5/dir13/dir71/dir98/file447 dir1/dir12/dir42/file446 dir1/dir12/dir41/dir118/dir174/dir243/file445 dir1/dir12/dir42/dir46/dir67/dir214/dir265/dir356/file444 dir2/dir5/dir14/file443 dir1/dir12/dir17/dir21/dir297/file442 dir2/dir5/dir14/dir51/dir94/file441 dir7/dir37/dir139/file440 dir2/dir8/dir26/dir34/dir55/file439 dir1/dir12/dir17/dir24/dir44/dir77/dir143/dir194/dir264/file438 dir2/dir5/dir38/dir107/file437 dir1/dir12/dir41/dir310/file436 dir2/dir8/dir9/dir28/dir89/dir112/dir223/dir419/dir429/file435 dir7/dir18/dir52/dir79/dir322/file434 dir1/dir6/dir66/file433 dir2/dir8/dir26/dir34/dir55/dir154/file432 dir1/dir12/dir42/dir46/dir61/dir88/dir486/file431 dir1/dir12/dir42/dir46/dir61/dir88/dir156/dir434/file430 dir1/dir12/dir42/dir46/dir64/dir108/dir209/dir453/file429 dir7/file428 dir1/dir12/dir17/dir24/dir44/dir62/dir116/dir332/file427 dir7/dir18/dir33/dir96/dir101/file426 dir2/dir8/dir26/dir34/dir55/dir172/dir220/dir260/dir446/file425 dir1/dir12/dir42/dir46/dir67/dir214/dir437/file424 dir2/dir3/dir81/dir267/file423 dir1/dir11/dir23/dir25/dir200/file422 dir1/dir12/dir17/dir24/dir44/dir62/dir116/dir332/file421 dir1/dir12/dir17/dir21/dir199/file420 dir1/dir12/dir17/dir24/dir44/dir77/dir143/dir194/dir264/file419 dir1/dir12/dir78/dir388/dir448/file418 dir2/dir5/dir14/dir51/dir94/file417 dir2/dir8/dir26/dir34/dir55/dir172/dir220/dir390/file416 dir2/dir5/dir38/dir60/dir216/file415 dir2/dir8/dir56/dir197/dir286/file414 dir1/dir6/dir31/dir32/dir301/dir306/file413 dir1/dir11/dir23/dir47/dir82/dir105/dir213/dir226/file412 dir2/dir5/dir13/dir71/dir98/dir372/file411 dir2/dir5/dir38/dir70/file410 dir1/dir12/dir41/dir118/dir137/file409 dir2/dir8/dir56/file408 dir7/dir10/dir29/dir129/file407 dir2/dir5/dir14/dir15/dir27/file406 dir2/dir8/dir26/file405 dir1/dir12/dir17/dir24/dir44/dir77/dir143/dir194/dir232/dir366/file404 dir1/dir12/dir42/dir46/dir64/dir108/file403 dir1/dir12/dir19/dir45/dir266/dir351/file402 dir2/dir8/dir26/dir34/dir55/dir172/file401 dir1/dir12/dir41/file400 dir7/dir18/dir52/dir79/dir411/file399 dir1/dir12/dir17/dir21/dir99/dir123/dir235/file398 dir1/dir12/dir41/dir118/dir137/file397 dir1/dir11/dir23/dir47/dir284/file396 dir2/dir8/dir9/dir28/file395 dir1/dir12/dir17/dir24/dir44/dir150/dir212/dir376/file394 dir2/dir8/dir134/dir175/dir374/file393 dir1/dir11/dir23/dir47/dir82/dir105/dir213/file392 dir1/dir12/dir17/dir24/dir44/dir62/dir116/dir313/file391 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir396/dir444/file390 dir7/dir18/dir33/dir86/dir125/dir251/dir348/file389 dir2/dir8/dir9/dir28/dir128/file388 dir2/dir8/dir26/dir34/dir55/dir172/dir220/file387 dir1/dir12/dir42/dir46/dir61/dir88/dir258/dir362/file386 dir2/dir8/dir9/dir28/dir128/dir490/file385 dir1/dir12/dir42/dir46/dir61/dir88/dir486/file384 dir1/dir135/file383 dir1/dir12/dir17/dir24/dir191/dir271/dir344/dir363/dir368/dir426/file382 dir2/dir5/dir14/dir51/dir94/file381 dir1/dir12/dir42/dir46/dir64/dir108/dir268/dir409/file380 dir1/dir12/dir19/file379 dir2/dir5/dir38/dir60/dir225/file378 dir1/dir12/dir17/dir21/dir297/file377 dir1/dir318/dir457/file376 dir1/dir6/dir321/file375 dir1/dir12/dir17/dir21/dir99/dir222/file374 dir7/dir18/dir33/dir86/dir125/dir190/dir352/file373 dir1/dir12/dir19/dir45/file372 dir1/dir12/dir78/file371 dir2/dir5/dir14/dir16/dir162/dir188/dir384/file370 dir1/dir12/dir42/dir46/dir64/file369 dir7/dir18/dir52/file368 dir1/dir12/dir17/dir24/dir191/dir227/file367 dir2/dir5/dir202/file366 dir7/dir18/dir33/dir96/dir149/file365 dir2/dir8/dir9/dir141/file364 dir1/dir11/dir23/dir47/dir48/file363 dir2/dir5/dir14/dir15/dir27/dir117/dir228/file362 dir2/dir8/dir56/dir205/file361 dir2/dir5/dir14/dir51/file360 dir1/dir12/dir41/dir118/dir151/file359 dir7/dir18/dir33/dir86/dir386/file358 dir1/dir12/dir42/dir485/file357 dir1/dir12/dir42/dir46/dir64/dir108/dir268/file356 dir1/dir11/dir23/dir47/dir82/dir105/dir382/file355 dir1/dir12/dir42/dir46/dir64/dir108/dir209/dir248/file354 dir2/dir8/dir9/dir28/dir87/file353 dir7/dir37/dir157/dir171/file352 dir7/file351 dir7/dir10/dir29/dir173/dir288/file350 dir2/file349 dir7/dir18/dir52/file348 dir1/dir12/dir17/dir24/dir44/dir62/dir116/file347 dir2/dir5/dir14/dir51/dir94/dir111/dir307/file346 dir2/dir8/dir26/dir34/dir55/dir172/dir181/dir185/dir479/file345 dir1/dir12/dir17/dir24/dir191/dir271/dir344/dir363/file344 dir1/dir12/dir17/dir24/dir191/dir271/dir344/file343 dir1/dir12/dir42/dir46/dir64/dir108/dir209/dir248/file342 dir1/dir11/dir23/dir47/dir231/dir438/file341 dir2/dir8/dir26/dir34/dir55/dir172/dir220/dir390/file340 dir1/dir11/dir23/dir25/dir200/dir323/file339 dir2/dir5/dir14/dir51/dir142/file338 dir7/dir18/dir33/dir86/dir339/file337 dir7/dir18/dir33/dir100/dir244/dir255/file336 dir7/dir10/dir29/dir173/dir288/file335 dir1/dir6/dir31/dir445/file334 dir1/dir11/dir23/dir25/dir59/dir449/file333 dir2/dir8/dir9/dir28/dir261/dir461/file332 dir1/dir12/dir42/dir46/dir64/dir108/dir324/file331 dir2/dir5/dir13/dir71/dir242/file330 dir2/dir8/dir26/dir34/dir55/dir172/dir220/dir390/file329 dir1/dir12/dir42/dir46/dir67/dir214/dir265/file328 dir1/dir12/dir17/dir21/dir99/dir222/file327 dir2/dir5/dir14/dir51/dir94/dir111/dir307/file326 dir1/dir12/dir17/dir24/dir191/dir227/dir410/file325 dir1/dir12/dir420/dir482/file324 dir2/dir8/dir26/dir109/file323 dir1/dir12/dir420/dir482/file322 dir7/dir10/dir29/dir173/dir484/file321 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir396/dir444/file320 dir2/dir8/dir56/dir205/file319 dir1/dir6/dir31/dir32/dir39/dir103/file318 dir2/dir8/dir26/dir34/dir92/dir130/dir138/dir447/file317 dir1/dir12/dir42/dir106/dir198/file316 dir1/dir11/dir23/dir57/dir391/file315 dir2/dir53/dir252/file314 dir2/dir5/dir14/dir16/dir63/file313 dir1/dir12/dir42/dir46/dir61/dir88/dir156/dir364/dir470/file312 dir1/dir11/dir23/dir25/dir200/dir423/file311 dir7/dir37/dir157/dir210/file310 dir2/file309 dir7/dir18/dir33/dir86/dir125/dir190/dir417/file308 dir1/dir12/dir17/dir21/dir99/dir123/dir235/file307 dir1/dir12/dir17/dir21/dir50/dir176/dir466/file306 dir2/dir5/dir14/dir16/dir162/file305 dir1/dir11/dir23/dir47/dir82/dir105/dir213/file304 dir2/dir3/dir259/dir418/dir481/file303 dir2/dir5/dir14/dir15/dir153/file302 dir7/dir18/dir33/dir86/dir125/dir190/dir352/file301 dir2/dir8/dir26/dir34/dir408/file300 dir1/dir12/dir17/dir24/dir120/file299 dir1/dir12/dir42/dir106/file298 dir1/dir12/dir22/file297 dir1/dir12/dir42/dir46/dir61/file296 dir2/dir83/file295 dir2/dir5/dir14/dir51/dir94/dir104/dir394/file294 dir2/dir3/dir81/dir267/dir303/dir454/file293 dir1/dir12/dir42/dir46/dir64/dir108/dir268/dir409/file292 dir1/dir12/dir420/file291 dir1/dir12/dir17/dir24/dir44/file290 dir2/dir5/dir14/dir15/dir27/dir117/file289 dir1/dir12/dir17/dir24/dir191/dir271/dir344/dir363/file288 dir1/dir12/dir42/dir46/dir64/dir108/dir324/file287 dir1/dir12/dir17/dir21/dir99/dir123/dir235/file286 dir1/dir135/dir230/file285 dir2/dir8/dir9/dir28/dir128/dir407/file284 dir1/dir12/dir42/dir46/dir64/dir108/dir268/dir402/file283 dir2/dir5/dir14/dir16/dir162/dir188/file282 dir7/dir18/dir33/dir96/file281 dir2/dir8/dir26/dir69/file280 dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/dir474/file279 dir1/dir12/dir17/dir24/dir44/dir77/dir143/file278 dir1/dir12/dir42/dir46/dir67/dir110/file277 dir7/dir18/dir33/dir86/dir125/dir127/dir217/dir404/file276 dir1/dir12/dir42/dir46/dir61/dir88/dir156/dir434/file275 dir2/dir3/dir81/dir282/file274 dir1/dir12/dir17/dir24/dir44/dir62/dir72/file273 dir2/dir8/dir26/dir34/dir55/dir154/file272 dir2/dir5/dir38/dir60/dir225/file271 dir1/dir12/dir17/dir24/file270 dir7/dir18/dir52/dir334/file269 dir2/dir5/dir13/file268 dir1/dir6/dir66/file267 dir7/dir18/dir33/dir96/dir149/dir295/dir440/dir442/file266 dir1/dir11/dir23/dir47/dir48/dir148/dir331/file265 dir7/dir18/dir33/dir96/dir149/dir340/file264 dir2/dir3/dir81/dir282/file263 dir1/dir11/dir23/dir47/dir82/dir105/dir213/file262 dir2/dir8/dir134/dir283/file261 dir7/dir18/dir52/dir79/dir274/dir496/file260 dir7/dir18/dir33/dir86/dir339/file259 dir1/dir12/dir17/dir84/dir359/file258 dir2/dir8/dir26/dir34/dir92/dir130/dir349/dir375/file257 dir2/dir8/dir26/dir34/dir35/dir74/dir353/file256 dir2/dir5/dir14/dir15/dir27/dir40/file255 dir2/dir5/dir14/dir16/dir162/dir188/file254 dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/file253 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir136/file252 dir1/dir12/dir17/file251 dir1/dir12/dir42/dir46/dir64/dir108/dir209/file250 dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/dir474/file249 dir2/dir5/dir14/dir15/dir153/file248 dir2/dir3/dir81/dir267/dir303/dir454/file247 dir2/dir8/dir9/dir28/dir89/dir112/dir133/file246 dir1/dir12/dir42/dir46/dir64/dir108/dir209/dir383/file245 dir1/dir318/dir457/file244 dir1/dir12/dir17/dir24/dir191/dir271/dir344/dir363/file243 dir1/dir12/dir42/dir46/dir61/dir91/file242 dir1/dir11/dir23/dir25/dir75/file241 dir2/dir53/file240 dir1/dir12/dir42/dir46/dir64/dir108/dir268/dir443/file239 dir2/dir3/dir81/dir267/file238 dir2/dir5/dir38/dir121/dir164/dir433/file237 dir1/dir12/dir19/dir239/file236 dir1/dir11/dir23/dir47/file235 dir2/dir8/dir26/dir34/dir55/dir58/file234 dir1/dir12/dir41/dir310/dir492/file233 dir1/dir12/dir41/dir118/dir151/dir161/dir281/file232 dir7/dir18/dir33/file231 dir1/dir12/dir17/dir24/dir44/dir150/dir212/dir376/file230 dir2/dir8/dir9/dir28/dir89/dir112/dir223/dir419/dir429/file229 dir1/dir11/dir23/dir25/dir75/file228 dir1/dir12/dir19/file227 dir1/dir12/dir17/dir24/dir44/dir150/dir212/file226 dir1/dir12/dir17/dir24/dir120/dir393/file225 dir2/dir8/dir9/dir28/dir89/dir112/dir133/file224 dir7/dir18/dir33/file223 dir1/dir12/dir17/dir24/dir44/dir150/dir160/dir296/file222 dir1/dir11/dir23/file221 dir2/dir5/dir304/file220 dir1/dir11/dir23/dir47/dir82/dir245/file219 dir2/dir3/dir259/dir418/dir481/file218 dir1/dir11/dir23/dir47/dir82/file217 dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/dir474/dir498/file216 dir2/dir5/dir13/dir254/dir413/file215 dir2/dir5/dir13/dir71/dir242/dir403/file214 dir2/dir3/dir81/file213 dir2/dir5/dir14/dir15/dir27/dir155/file212 dir1/dir12/dir17/dir21/dir99/dir123/dir235/file211 dir2/dir8/dir26/dir109/file210 dir2/dir8/dir26/dir34/dir55/dir154/file209 dir1/dir11/dir23/dir25/dir200/dir323/file208 dir7/dir18/file207 dir2/dir8/dir9/dir28/dir128/dir407/file206 dir1/dir6/dir66/file205 dir2/dir3/dir81/dir267/file204 dir2/dir5/dir14/dir51/dir94/dir111/dir179/file203 dir1/dir11/dir23/dir47/dir82/dir105/dir213/dir226/dir494/file202 dir2/dir5/dir13/dir71/dir98/dir276/file201 dir2/dir8/dir9/dir28/dir128/dir407/file200 dir1/dir6/dir321/dir464/file199 dir2/dir3/dir259/dir418/dir481/file198 dir2/dir5/dir14/dir68/dir73/dir97/file197 dir1/dir12/dir42/dir46/dir67/dir214/file196 dir2/dir8/dir26/dir34/dir92/dir130/dir138/dir447/file195 dir1/dir12/dir42/dir46/dir61/dir88/dir486/file194 dir2/dir5/dir14/dir16/dir63/file193 dir2/dir83/dir330/dir439/file192 dir1/dir12/dir42/dir46/dir64/dir108/dir209/file191 dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/file190 dir7/dir18/dir20/dir397/file189 dir1/dir12/dir17/dir24/dir191/dir227/file188 dir1/dir12/dir42/dir46/dir61/dir88/dir258/dir350/file187 dir7/dir18/dir52/dir467/file186 dir1/dir11/dir23/dir57/dir391/file185 dir2/dir8/dir9/dir28/dir89/dir112/file184 dir1/dir12/dir42/dir46/dir61/dir88/dir258/file183 dir2/dir8/dir9/file182 dir7/dir18/dir33/dir86/dir125/dir127/dir163/file181 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir136/dir270/file180 dir2/dir5/dir14/dir15/dir27/dir117/dir379/file179 dir2/dir5/dir304/file178 dir2/dir5/dir14/dir16/file177 dir1/dir12/dir42/dir46/dir64/dir108/file176 dir1/dir12/dir17/dir24/dir191/dir227/file175 dir7/dir18/dir33/dir86/dir125/dir251/file174 dir2/dir5/dir13/dir71/dir98/dir372/dir475/dir478/file173 dir2/dir8/dir26/dir325/file172 dir2/dir5/dir14/dir68/dir73/file171 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir146/dir343/dir392/file170 dir2/dir8/dir26/dir34/dir55/dir85/file169 dir7/dir90/file168 dir2/dir5/dir14/dir51/dir94/dir104/dir394/dir427/file167 dir1/dir12/dir17/dir21/dir50/file166 dir2/dir5/dir38/dir60/dir216/file165 dir2/dir5/dir14/dir16/dir162/dir188/dir211/dir357/file164 dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/dir474/file163 dir2/dir5/dir14/dir51/dir94/dir111/file162 dir1/dir12/dir42/dir46/dir64/dir108/dir209/dir453/file161 dir2/dir8/dir9/dir141/file160 dir7/dir10/dir29/dir129/file159 dir7/dir18/dir33/dir86/dir386/file158 dir2/dir8/dir26/dir34/dir55/dir154/dir298/file157 dir7/dir18/dir52/dir467/file156 dir1/dir11/dir23/dir47/dir82/dir245/file155 dir2/dir8/dir26/dir34/dir92/dir130/dir349/file154 dir2/dir5/dir14/dir16/dir114/file153 dir2/dir5/dir13/dir254/file152 dir1/dir12/dir42/dir46/dir61/dir88/dir258/dir362/dir497/file151 dir2/dir8/dir9/dir141/file150 dir1/dir12/dir78/dir166/dir290/file149 dir2/dir8/dir26/dir34/dir35/dir74/dir353/file148 dir2/dir8/dir9/dir28/dir89/dir112/dir223/dir419/dir429/file147 dir2/dir5/dir14/dir51/dir94/dir111/dir179/dir233/file146 dir1/dir12/dir17/dir24/dir44/dir150/file145 dir7/dir18/dir33/dir86/dir125/dir251/dir348/file144 dir2/dir5/dir14/dir16/dir162/dir188/dir211/dir357/file143 dir2/dir5/dir14/dir51/file142 dir1/dir12/dir41/dir310/file141 dir2/dir8/dir9/dir28/dir89/file140 dir2/dir8/dir26/dir325/file139 dir1/dir11/dir23/dir47/dir82/dir105/dir213/dir456/file138 dir2/dir3/dir81/dir282/dir315/file137 dir1/dir12/dir17/dir24/dir44/dir62/dir72/file136 dir2/dir5/dir14/dir51/dir142/dir169/file135 dir1/dir12/file134 dir1/dir12/dir17/dir76/dir257/file133 dir1/dir11/dir23/dir57/dir391/file132 dir2/dir5/dir14/dir15/dir27/dir40/file131 dir1/dir11/dir23/dir47/file130 dir2/dir3/dir259/dir418/dir493/file129 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir146/dir343/file128 dir2/dir5/file127 dir1/dir12/dir17/file126 dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/dir474/file125 dir7/dir371/file124 dir2/dir83/dir330/dir365/file123 dir1/dir6/dir31/dir32/dir39/dir103/file122 dir1/dir11/dir23/dir25/dir200/dir323/dir455/file121 dir1/dir135/dir230/file120 dir1/dir12/dir42/dir46/dir67/dir93/dir193/file119 dir2/dir5/dir13/dir71/dir263/file118 dir2/dir5/dir14/dir15/file117 dir2/dir5/dir14/dir51/dir94/dir488/file116 dir1/dir11/dir23/dir47/dir82/dir105/dir382/file115 dir2/dir5/dir38/dir60/dir126/file114 dir1/dir12/dir42/dir46/dir67/dir93/file113 dir2/dir5/dir13/dir71/dir98/dir278/dir360/file112 dir7/dir18/dir33/dir86/dir386/file111 dir2/dir8/dir9/dir28/dir89/dir112/dir204/file110 dir1/dir11/dir23/dir47/dir231/dir438/file109 dir2/dir5/dir14/dir51/dir94/file108 dir1/dir11/dir23/dir47/dir231/dir406/file107 dir2/dir3/dir259/dir418/file106 dir1/dir12/dir42/dir46/dir61/dir88/dir156/file105 dir2/dir8/dir56/dir197/dir286/file104 dir2/dir53/dir377/file103 dir1/dir12/dir42/dir46/dir61/dir88/dir258/dir279/file102 dir1/dir6/dir31/dir32/dir301/dir306/file101 dir1/dir12/dir78/dir166/dir187/file100 dir1/dir12/dir17/dir24/dir44/dir62/dir116/dir332/file99 dir7/dir18/dir52/dir79/dir322/file98 dir1/dir12/dir22/dir49/dir277/file97 dir1/dir6/dir31/dir32/dir39/dir103/file96 dir2/dir3/dir81/dir282/file95 dir2/dir5/dir14/dir51/dir94/dir111/dir179/dir345/file94 dir1/dir12/dir41/dir118/dir336/file93 dir1/dir12/dir78/dir166/dir290/file92 dir1/dir12/dir19/dir45/dir266/dir351/file91 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir136/dir369/file90 dir1/dir12/dir41/dir118/dir151/dir152/dir236/file89 dir2/dir5/dir14/file88 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir146/dir343/dir468/file87 dir2/dir5/dir38/dir121/file86 dir1/dir12/dir17/dir24/dir44/dir150/dir471/file85 dir2/dir8/dir9/dir28/dir89/dir112/dir223/file84 dir1/dir12/dir17/dir24/dir191/dir271/dir344/dir363/dir368/file83 dir1/dir12/dir42/dir46/dir61/dir88/dir258/dir405/file82 dir1/dir12/dir42/dir46/dir64/dir108/dir268/file81 dir2/dir8/dir378/file80 dir2/dir5/dir14/dir124/file79 dir1/dir11/dir23/dir47/dir82/dir105/dir213/dir456/file78 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir146/dir343/dir392/file77 dir1/dir11/dir23/dir25/dir200/file76 dir2/dir8/dir26/dir34/dir35/file75 dir2/dir5/dir13/dir71/dir98/dir372/dir475/dir477/file74 dir1/dir12/dir41/dir118/dir174/dir243/dir415/file73 dir2/dir8/dir26/dir34/dir35/dir74/dir215/file72 dir1/dir12/dir42/dir46/dir64/dir108/dir180/dir238/file71 dir2/dir8/dir26/dir34/dir92/dir130/file70 dir2/dir8/file69 dir2/dir5/dir14/dir15/dir153/dir401/file68 dir1/dir11/dir23/dir47/dir231/file67 dir2/dir3/dir259/dir418/file66 dir2/dir3/dir81/dir422/dir487/file65 dir1/dir12/dir42/dir46/dir64/dir108/dir180/file64 dir2/dir8/dir9/dir28/dir89/dir112/file63 dir1/dir11/dir23/dir47/dir231/file62 dir7/dir10/dir29/dir370/file61 dir1/dir12/dir41/dir118/dir174/file60 dir1/dir12/dir42/dir46/dir61/dir88/dir258/file59 dir2/dir8/dir26/file58 dir1/dir11/dir23/dir57/dir431/file57 dir7/dir10/file56 dir2/dir5/dir14/dir16/dir162/dir188/dir384/file55 dir1/dir12/dir420/dir482/file54 dir1/dir12/dir22/file53 dir7/dir18/file52 dir2/dir8/dir26/dir34/dir92/dir130/dir349/dir375/file51 dir2/dir3/dir259/dir418/dir481/dir489/file50 dir2/dir8/dir9/dir28/dir89/dir112/dir122/dir189/file49 dir2/dir5/dir38/dir107/dir480/file48 dir2/dir5/dir14/dir15/dir27/dir40/file47 dir7/dir18/dir33/dir86/dir125/dir127/dir163/file46 dir7/dir10/file45 dir1/dir12/dir42/dir46/dir67/dir214/dir437/file44 dir2/dir8/dir26/dir34/dir55/dir172/dir220/dir390/file43 dir2/dir5/dir13/dir71/dir98/dir102/dir346/file42 dir1/dir12/dir41/dir118/file41 dir7/dir18/dir33/dir96/dir101/file40 dir1/dir12/dir41/dir54/file39 dir2/dir8/dir26/dir34/dir408/file38 dir2/dir8/dir9/dir28/dir89/dir112/dir223/file37 dir2/dir5/dir14/dir15/file36 dir1/dir6/dir31/dir32/dir131/file35 dir2/dir8/dir26/dir34/dir55/file34 dir2/dir8/dir9/dir28/dir87/file33 dir2/dir8/dir26/dir34/dir92/dir130/dir432/file32 dir1/dir12/dir17/dir21/dir50/file31 dir2/dir5/dir13/dir71/dir98/dir372/dir475/dir477/file30 dir7/dir18/file29 dir2/dir5/dir14/dir16/dir162/dir188/file28 dir7/dir18/dir20/dir30/file27 dir7/dir18/dir52/dir79/dir274/file26 dir2/dir5/dir14/dir15/dir27/file25 dir2/dir5/dir14/dir16/dir140/file24 dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir396/file23 dir1/dir12/dir42/dir46/dir64/file22 dir1/dir11/dir23/dir25/file21 dir1/dir12/dir17/dir21/dir99/file20 dir1/dir12/dir19/dir45/dir266/dir435/file19 dir1/dir12/dir17/dir24/dir44/dir62/file18 dir7/dir90/file17 dir7/dir37/dir139/file16 dir1/dir12/dir78/dir388/file15 dir2/dir5/dir13/dir71/dir98/file14 dir2/dir5/dir14/dir16/file13 dir1/dir12/dir17/dir24/dir44/dir150/dir212/file12 dir7/dir18/dir33/dir100/file11 dir7/dir18/dir33/dir100/dir244/file10 dir2/dir5/dir14/dir51/dir94/file9 dir7/dir37/dir157/dir171/dir184/file8 dir1/dir11/file7 dir2/dir8/dir378/file6 dir1/dir12/dir41/dir118/dir151/dir161/file5 dir1/dir11/dir23/dir57/dir391/file4 dir1/dir11/dir23/dir25/file3 dir1/dir11/dir23/dir47/dir48/dir148/file2 dir2/dir5/dir304/file1 dir1/dir12/dir41/dir118/dir174/dir243/file0
+Locking main repository...
+Listing files...
+Removing files...
+Storing root...
+Removed 500 files.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 600451, file count: 9500).
+All files are available.
+Hash index is consistent with the directory structure.
+# Push again.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color push --yes
+Locking main repository...
+Listing files...
+Listing files to push...
+Pushing files...
+Pushed 500 files (30.7 kB).
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check
+Directory structure looks ok (total size: 631199, file count: 10000).
+All files are available.
+Hash index is consistent with the directory structure.
+# Remove some from the workdir and pull.
+$ rm dir2/dir8/dir26/dir34/dir55/dir154/dir224/dir273/file5000
+$ rm dir2/dir5/dir13/dir71/dir263/file5001
+$ rm dir2/dir8/dir26/dir34/dir55/dir154/dir298/file5002
+$ rm dir2/dir8/dir26/dir34/dir35/file5003
+$ rm dir2/dir5/dir38/dir121/dir164/dir433/dir441/file5004
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir180/dir238/file5005
+$ rm dir7/dir37/dir157/dir171/dir184/dir192/file5006
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir122/dir189/file5007
+$ rm dir2/dir3/dir259/file5008
+$ rm dir2/dir5/dir13/dir71/dir145/file5009
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir486/file5010
+$ rm dir2/dir8/dir9/dir141/file5011
+$ rm dir2/dir8/dir9/dir28/dir261/file5012
+$ rm dir7/dir18/dir52/dir467/file5013
+$ rm dir7/dir90/file5014
+$ rm dir2/dir5/dir14/dir15/dir153/file5015
+$ rm dir2/dir8/dir134/dir175/dir374/file5016
+$ rm dir2/dir5/dir14/dir15/dir27/dir155/file5017
+$ rm dir2/dir8/dir9/dir28/dir128/dir407/file5018
+$ rm dir7/dir18/dir33/dir86/dir125/dir127/dir217/file5019
+$ rm dir1/dir12/dir42/file5020
+$ rm dir1/dir12/dir17/dir76/dir257/file5021
+$ rm dir2/dir5/dir14/dir15/dir27/dir40/file5022
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir209/dir453/file5023
+$ rm dir7/dir37/dir157/dir171/dir184/file5024
+$ rm dir1/dir12/dir17/dir24/dir44/dir150/dir160/file5025
+$ rm dir7/dir18/dir43/dir398/file5026
+$ rm dir2/dir3/dir259/dir418/dir481/file5027
+$ rm dir1/dir12/dir42/dir46/dir67/dir214/dir265/dir356/file5028
+$ rm dir1/dir6/dir66/file5029
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir258/dir405/file5030
+$ rm dir2/dir3/dir81/dir422/file5031
+$ rm dir1/dir12/dir17/dir24/dir44/file5032
+$ rm dir7/dir37/dir157/dir171/file5033
+$ rm dir2/dir3/dir81/dir422/dir487/file5034
+$ rm dir2/dir5/dir13/dir71/dir98/dir278/dir327/dir460/file5035
+$ rm dir2/dir83/dir330/dir365/file5036
+$ rm dir2/dir8/dir134/dir175/file5037
+$ rm dir2/dir5/dir38/dir107/dir480/file5038
+$ rm dir2/dir5/dir14/dir15/dir153/file5039
+$ rm dir1/dir6/dir31/dir32/dir39/file5040
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir136/dir270/file5041
+$ rm dir1/dir12/dir41/dir310/file5042
+$ rm dir2/dir5/dir13/dir71/dir263/file5043
+$ rm dir2/dir5/dir13/file5044
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir180/dir238/file5045
+$ rm dir1/dir12/dir17/file5046
+$ rm dir2/dir8/dir26/dir325/file5047
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir209/file5048
+$ rm dir1/dir11/dir23/dir25/dir75/dir203/file5049
+$ rm dir1/dir11/dir23/dir47/dir48/file5050
+$ rm dir1/dir12/dir19/dir45/dir266/dir351/file5051
+$ rm dir7/dir18/dir43/file5052
+$ rm dir1/dir12/dir420/dir482/file5053
+$ rm dir1/dir12/dir17/dir24/dir44/dir62/dir72/file5054
+$ rm dir2/dir5/dir14/dir15/dir27/dir155/file5055
+$ rm dir1/dir12/dir41/dir118/file5056
+$ rm dir2/dir8/dir56/dir197/file5057
+$ rm dir2/dir8/dir9/file5058
+$ rm dir2/dir3/dir81/dir282/dir315/file5059
+$ rm dir1/dir12/dir17/dir24/dir191/dir302/file5060
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/file5061
+$ rm dir1/dir12/dir42/dir46/dir67/dir110/file5062
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir156/dir364/dir470/file5063
+$ rm dir1/dir12/dir41/dir118/dir336/dir469/file5064
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir486/file5065
+$ rm dir2/dir8/dir9/dir28/dir87/file5066
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir122/file5067
+$ rm dir1/dir6/dir31/dir32/dir301/dir306/file5068
+$ rm dir2/dir8/dir26/dir34/dir35/dir74/file5069
+$ rm dir2/dir5/dir13/dir71/dir98/dir372/dir475/file5070
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/file5071
+$ rm dir2/dir8/dir26/dir109/file5072
+$ rm dir2/dir5/dir202/file5073
+$ rm dir2/dir5/dir14/dir16/dir162/file5074
+$ rm dir1/dir12/dir22/dir49/file5075
+$ rm dir2/dir8/dir9/file5076
+$ rm dir2/dir5/dir14/dir68/file5077
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir180/dir238/dir459/file5078
+$ rm dir2/dir5/dir14/dir51/dir94/dir104/dir394/file5079
+$ rm dir7/dir18/dir33/file5080
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir396/dir444/file5081
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir146/dir343/file5082
+$ rm dir2/dir8/dir26/dir34/dir408/file5083
+$ rm dir7/dir18/dir33/dir86/dir125/dir127/dir217/dir246/file5084
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/dir474/file5085
+$ rm dir2/dir8/dir26/dir34/dir35/dir74/file5086
+$ rm dir7/dir18/dir33/dir86/dir125/dir127/dir217/dir246/dir347/file5087
+$ rm dir1/dir12/dir17/dir84/dir359/file5088
+$ rm dir7/dir18/dir52/dir79/dir274/dir496/file5089
+$ rm dir4/dir65/dir452/dir458/file5090
+$ rm dir1/dir12/dir42/dir106/dir338/file5091
+$ rm dir7/dir18/dir33/dir86/dir339/dir389/dir472/file5092
+$ rm dir1/dir12/dir42/dir46/dir67/dir93/file5093
+$ rm dir1/dir12/dir17/dir21/dir99/file5094
+$ rm dir1/dir6/dir31/file5095
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir268/dir409/file5096
+$ rm dir2/dir8/dir9/dir28/dir89/file5097
+$ rm dir7/dir37/file5098
+$ rm dir1/dir318/file5099
+$ rm dir2/dir3/dir81/dir282/dir315/file5100
+$ rm dir2/dir3/dir259/dir418/dir481/dir489/file5101
+$ rm dir2/dir5/dir14/dir124/file5102
+$ rm dir1/dir12/dir42/dir46/dir67/dir214/dir265/dir319/file5103
+$ rm dir2/dir5/dir14/dir68/file5104
+$ rm dir2/dir5/dir14/dir51/dir94/dir111/dir179/dir233/file5105
+$ rm dir1/dir12/dir42/dir106/dir240/dir400/file5106
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir180/dir238/file5107
+$ rm dir2/dir8/dir26/dir34/dir55/dir172/dir220/file5108
+$ rm dir1/dir12/dir22/dir49/file5109
+$ rm dir1/dir12/dir22/dir49/file5110
+$ rm dir2/dir5/dir38/dir121/dir167/file5111
+$ rm dir2/dir5/dir13/dir71/dir145/file5112
+$ rm dir1/dir11/dir23/dir47/file5113
+$ rm dir2/dir5/dir13/dir71/dir98/dir276/dir387/file5114
+$ rm dir2/dir53/dir252/file5115
+$ rm dir1/dir12/dir22/dir49/dir277/file5116
+$ rm dir1/dir12/dir78/dir166/dir187/file5117
+$ rm dir2/dir3/dir81/dir282/dir315/file5118
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir324/file5119
+$ rm dir7/dir37/dir157/dir171/file5120
+$ rm dir1/dir12/dir19/file5121
+$ rm dir1/dir12/dir78/dir388/dir450/file5122
+$ rm dir1/dir12/dir22/dir49/dir277/file5123
+$ rm dir1/dir12/dir42/dir46/dir67/dir110/dir183/file5124
+$ rm dir1/dir12/dir41/dir262/file5125
+$ rm dir1/dir11/dir23/dir47/dir48/dir148/dir331/file5126
+$ rm dir7/dir18/dir33/file5127
+$ rm dir2/dir8/dir26/dir34/dir55/dir172/dir220/dir260/dir446/file5128
+$ rm dir1/dir12/dir17/dir24/dir44/dir77/dir143/dir194/file5129
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir209/dir383/file5130
+$ rm dir2/dir3/dir81/dir422/dir487/file5131
+$ rm dir1/dir12/dir17/dir24/dir44/dir62/dir219/file5132
+$ rm dir7/dir18/dir52/dir79/file5133
+$ rm dir7/dir18/dir33/dir86/dir125/dir127/dir217/file5134
+$ rm dir1/dir12/dir42/dir46/dir67/dir93/file5135
+$ rm dir1/dir12/dir17/dir24/dir191/dir271/dir344/dir363/file5136
+$ rm dir1/dir135/dir230/file5137
+$ rm dir1/dir11/dir23/dir57/dir186/dir314/file5138
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/dir474/file5139
+$ rm dir7/dir10/dir29/dir173/file5140
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/file5141
+$ rm dir2/dir8/dir56/dir197/file5142
+$ rm dir2/dir5/dir38/dir121/dir167/file5143
+$ rm dir2/dir8/dir56/file5144
+$ rm dir1/dir12/dir17/dir24/dir308/dir341/file5145
+$ rm dir1/dir12/dir42/dir46/dir61/dir91/file5146
+$ rm dir1/dir12/dir41/dir118/dir174/dir243/dir415/file5147
+$ rm dir2/dir8/dir26/dir34/dir55/dir154/dir224/dir273/file5148
+$ rm dir7/dir18/dir52/dir79/file5149
+$ rm dir1/dir11/dir23/dir57/file5150
+$ rm dir1/dir12/dir17/dir24/dir44/dir77/file5151
+$ rm dir1/dir12/dir22/dir49/dir277/file5152
+$ rm dir2/dir3/dir259/dir418/dir481/dir489/file5153
+$ rm dir7/dir18/dir33/dir100/file5154
+$ rm dir1/dir12/dir17/dir24/dir44/dir77/dir143/file5155
+$ rm dir4/dir65/dir452/file5156
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/file5157
+$ rm dir7/file5158
+$ rm dir2/dir3/file5159
+$ rm dir1/dir12/dir42/dir46/dir67/dir93/file5160
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir268/dir443/file5161
+$ rm dir2/dir8/dir26/dir34/dir408/file5162
+$ rm dir2/dir83/dir330/dir439/file5163
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/file5164
+$ rm dir2/dir8/dir9/dir28/dir261/file5165
+$ rm dir7/dir10/dir29/dir173/dir428/file5166
+$ rm dir2/dir8/dir26/dir34/dir55/dir172/dir206/file5167
+$ rm dir1/dir12/dir78/dir388/dir450/file5168
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir122/dir189/file5169
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir223/file5170
+$ rm dir2/dir8/dir9/dir141/file5171
+$ rm dir2/dir8/dir26/dir34/dir55/dir154/dir298/file5172
+$ rm file5173
+$ rm dir2/dir5/dir13/dir71/dir98/dir372/dir475/dir477/file5174
+$ rm dir2/dir8/dir26/dir34/dir55/dir154/dir224/file5175
+$ rm dir2/dir5/dir14/file5176
+$ rm dir1/dir12/dir19/dir45/file5177
+$ rm dir1/dir12/dir17/dir24/dir36/dir178/file5178
+$ rm dir1/dir11/dir23/dir47/dir82/dir105/file5179
+$ rm dir2/dir5/dir14/dir16/dir162/dir188/dir211/dir357/file5180
+$ rm dir1/dir12/dir19/dir45/file5181
+$ rm dir2/dir5/dir13/dir71/dir98/dir278/file5182
+$ rm dir1/dir12/dir42/dir46/dir67/dir214/file5183
+$ rm dir7/dir37/dir157/dir171/dir184/dir192/file5184
+$ rm dir1/dir12/dir41/dir118/dir137/file5185
+$ rm dir1/dir135/dir201/dir326/file5186
+$ rm dir7/dir18/dir165/file5187
+$ rm dir1/dir11/dir23/dir47/dir82/dir105/dir213/file5188
+$ rm dir1/dir11/dir23/dir57/dir391/file5189
+$ rm dir2/dir8/dir134/dir283/file5190
+$ rm dir2/dir5/dir14/dir15/dir27/dir155/file5191
+$ rm dir2/dir5/dir13/dir71/dir98/dir278/dir327/file5192
+$ rm dir1/dir12/dir42/dir46/dir61/dir91/dir221/file5193
+$ rm dir1/dir11/dir23/dir47/dir231/dir406/file5194
+$ rm dir2/dir8/dir9/dir28/dir128/file5195
+$ rm dir1/dir11/dir23/dir47/file5196
+$ rm dir7/dir18/dir33/dir86/dir125/dir127/file5197
+$ rm dir2/dir53/file5198
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/dir474/dir498/file5199
+$ rm dir1/dir12/dir42/dir46/dir67/dir214/file5200
+$ rm dir2/dir5/dir14/dir51/dir94/dir111/dir307/file5201
+$ rm dir2/dir8/dir56/file5202
+$ rm dir2/dir5/dir13/dir254/file5203
+$ rm dir2/dir8/dir9/dir28/dir87/file5204
+$ rm dir1/dir11/dir23/dir47/dir82/dir105/dir213/dir226/file5205
+$ rm dir2/dir3/dir81/dir422/dir487/file5206
+$ rm dir2/dir8/dir9/dir28/dir261/dir461/file5207
+$ rm dir2/dir5/dir14/dir124/dir208/file5208
+$ rm dir2/dir5/dir13/dir71/dir98/dir372/dir475/dir478/file5209
+$ rm dir7/dir18/dir20/dir397/file5210
+$ rm dir7/dir18/dir52/dir79/dir274/dir496/file5211
+$ rm dir7/dir37/dir157/file5212
+$ rm dir7/dir18/dir33/dir96/dir149/dir295/file5213
+$ rm dir2/dir5/dir14/dir15/dir153/dir401/file5214
+$ rm dir1/dir12/dir22/dir49/dir277/file5215
+$ rm dir2/dir8/dir26/dir34/dir35/dir74/file5216
+$ rm dir2/dir3/dir259/dir418/file5217
+$ rm dir2/dir3/dir81/dir282/file5218
+$ rm dir2/dir5/dir14/dir51/dir94/dir111/dir179/dir195/dir196/file5219
+$ rm dir1/dir12/dir42/dir46/dir61/dir91/dir221/dir317/file5220
+$ rm dir1/dir11/dir23/dir25/dir200/file5221
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir136/dir182/dir385/file5222
+$ rm dir2/dir5/dir13/dir71/dir98/dir278/file5223
+$ rm dir1/dir12/dir17/dir24/dir44/dir62/file5224
+$ rm dir2/dir8/dir26/dir34/dir55/dir154/dir298/file5225
+$ rm dir1/dir12/dir42/dir46/dir67/dir214/dir265/file5226
+$ rm dir1/dir12/dir42/dir46/file5227
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/file5228
+$ rm dir2/dir8/dir26/dir34/dir55/dir172/dir220/file5229
+$ rm dir7/dir18/dir33/dir86/dir386/file5230
+$ rm dir1/dir11/dir23/dir57/dir391/file5231
+$ rm dir1/dir12/dir19/dir45/file5232
+$ rm dir2/dir8/dir26/dir34/dir55/dir154/dir249/file5233
+$ rm dir1/dir12/dir22/file5234
+$ rm dir2/dir8/dir9/dir28/dir128/file5235
+$ rm dir1/dir6/dir31/dir272/file5236
+$ rm dir1/dir12/dir17/dir24/dir44/dir77/dir143/dir194/dir264/file5237
+$ rm dir2/dir5/dir14/dir51/dir94/dir111/dir179/dir195/dir196/file5238
+$ rm dir1/dir12/dir41/dir118/dir174/dir243/dir415/file5239
+$ rm dir2/dir5/dir38/dir121/file5240
+$ rm dir2/dir8/dir26/dir34/dir92/dir130/dir349/dir375/file5241
+$ rm dir7/dir37/dir157/dir171/dir184/file5242
+$ rm dir2/dir8/dir26/file5243
+$ rm dir1/dir12/dir17/dir24/dir36/dir178/file5244
+$ rm dir1/dir12/dir78/dir166/dir187/file5245
+$ rm dir1/dir12/dir42/dir106/file5246
+$ rm dir7/dir18/dir33/dir86/dir125/dir127/dir217/dir404/file5247
+$ rm dir1/dir135/file5248
+$ rm dir7/dir18/dir33/dir96/dir149/dir340/file5249
+$ rm dir2/dir8/dir26/dir325/file5250
+$ rm dir1/dir11/dir23/dir47/dir48/dir148/dir331/dir354/file5251
+$ rm dir2/dir5/dir14/dir51/dir94/dir488/file5252
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir156/dir434/file5253
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/dir474/file5254
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/file5255
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir122/file5256
+$ rm dir1/dir12/dir42/dir46/dir61/dir91/dir221/dir317/file5257
+$ rm dir2/dir8/dir134/dir283/file5258
+$ rm dir2/dir5/dir13/dir254/dir413/file5259
+$ rm dir1/dir12/dir78/dir388/dir448/file5260
+$ rm dir2/dir8/dir134/dir175/dir374/file5261
+$ rm dir1/dir11/dir23/dir47/dir48/dir148/dir331/dir354/file5262
+$ rm dir7/dir18/dir33/dir100/dir244/dir255/file5263
+$ rm dir2/dir5/dir14/dir51/dir94/dir104/dir394/file5264
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir268/dir402/file5265
+$ rm dir7/dir18/dir33/dir86/dir125/dir127/file5266
+$ rm dir7/dir18/dir33/dir86/dir125/dir127/dir217/dir246/dir347/dir436/file5267
+$ rm dir1/dir12/dir42/file5268
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir268/file5269
+$ rm dir2/dir5/dir14/dir51/dir94/dir104/dir381/file5270
+$ rm dir7/dir18/dir33/dir86/dir125/dir190/dir352/file5271
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/file5272
+$ rm dir2/dir8/dir134/file5273
+$ rm dir7/dir18/dir33/dir86/dir125/dir127/dir217/file5274
+$ rm dir1/dir12/dir17/dir21/dir50/dir176/file5275
+$ rm dir1/dir12/dir41/file5276
+$ rm dir1/dir12/dir17/file5277
+$ rm dir2/dir8/dir26/dir34/dir35/dir74/dir353/file5278
+$ rm dir1/dir135/dir201/file5279
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/file5280
+$ rm dir2/dir8/dir26/dir34/dir55/dir85/file5281
+$ rm dir2/dir5/dir14/dir51/dir94/dir111/dir179/dir345/dir399/file5282
+$ rm dir1/dir12/dir41/dir118/dir151/dir311/file5283
+$ rm dir1/dir12/dir17/dir24/dir44/dir62/dir116/dir332/file5284
+$ rm dir7/dir371/file5285
+$ rm dir1/dir12/dir17/dir24/dir191/file5286
+$ rm dir1/dir12/dir19/dir239/dir337/file5287
+$ rm dir2/dir5/dir13/dir71/dir263/file5288
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/dir474/file5289
+$ rm dir2/dir5/dir38/dir60/dir216/file5290
+$ rm dir1/dir11/dir23/dir47/dir82/dir105/dir382/file5291
+$ rm dir2/dir8/dir26/dir325/file5292
+$ rm dir7/dir18/dir33/dir86/dir125/dir127/dir217/file5293
+$ rm dir2/dir8/dir26/dir34/dir35/dir74/dir353/file5294
+$ rm dir1/dir6/file5295
+$ rm dir2/dir5/dir13/dir71/dir98/dir278/dir327/dir460/file5296
+$ rm dir7/dir10/dir29/dir173/dir288/dir476/file5297
+$ rm dir1/dir12/dir17/dir24/dir44/dir77/dir143/file5298
+$ rm dir7/dir18/dir33/dir86/dir339/dir389/file5299
+$ rm dir2/dir5/dir13/dir71/dir98/dir372/dir475/dir477/file5300
+$ rm dir2/dir5/dir14/dir51/dir94/dir488/file5301
+$ rm dir4/dir65/dir452/dir458/file5302
+$ rm dir2/dir8/dir26/dir34/dir92/dir130/dir432/file5303
+$ rm dir2/dir5/dir13/dir71/dir98/dir372/dir475/file5304
+$ rm dir7/dir18/dir20/dir30/file5305
+$ rm dir1/dir11/dir23/dir47/file5306
+$ rm dir1/dir12/dir17/dir21/dir199/file5307
+$ rm dir2/dir8/dir26/dir34/dir92/dir130/file5308
+$ rm dir2/dir5/dir14/dir51/dir94/dir111/dir179/dir195/dir196/dir328/file5309
+$ rm dir1/dir12/dir17/dir24/dir44/dir150/dir160/file5310
+$ rm dir2/dir5/dir38/dir121/dir164/dir433/dir441/file5311
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir268/dir409/file5312
+$ rm dir2/dir8/dir26/dir34/dir92/dir130/dir349/dir375/file5313
+$ rm dir1/dir11/dir23/dir25/dir75/dir203/file5314
+$ rm dir1/dir12/dir17/dir21/dir297/file5315
+$ rm dir2/dir8/dir26/dir34/dir92/dir130/dir138/dir447/file5316
+$ rm dir1/dir12/dir17/dir24/dir44/dir150/dir212/file5317
+$ rm dir7/dir18/dir33/dir96/file5318
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir156/file5319
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir258/dir350/file5320
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir324/file5321
+$ rm dir2/dir5/dir14/dir51/dir94/dir111/dir179/dir345/file5322
+$ rm dir1/dir11/dir23/file5323
+$ rm dir2/dir3/dir259/dir418/dir481/file5324
+$ rm dir1/dir12/dir17/dir76/dir257/file5325
+$ rm dir1/dir12/dir22/dir49/file5326
+$ rm dir7/dir18/dir33/dir100/dir244/file5327
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/file5328
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir146/dir343/file5329
+$ rm dir4/dir65/file5330
+$ rm dir2/dir8/dir56/dir205/file5331
+$ rm dir2/dir5/dir14/dir68/dir73/dir177/file5332
+$ rm dir1/dir12/dir17/dir24/dir44/dir62/dir116/dir313/file5333
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir324/file5334
+$ rm dir1/dir12/dir17/dir21/dir99/file5335
+$ rm dir1/dir6/dir31/dir32/dir301/dir306/file5336
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/file5337
+$ rm dir1/file5338
+$ rm dir1/dir6/dir321/dir464/file5339
+$ rm dir1/dir12/dir17/dir24/dir191/file5340
+$ rm dir7/dir18/dir20/file5341
+$ rm dir1/dir12/dir78/dir285/file5342
+$ rm dir7/dir37/dir157/dir171/file5343
+$ rm dir2/dir8/dir26/dir34/dir92/dir130/dir349/file5344
+$ rm dir2/dir8/dir26/dir34/dir92/file5345
+$ rm dir1/dir12/dir17/dir24/dir36/dir178/file5346
+$ rm dir2/dir83/dir330/dir439/file5347
+$ rm dir1/dir11/dir23/dir57/dir431/file5348
+$ rm dir1/dir11/dir23/dir25/dir200/dir323/dir455/file5349
+$ rm dir2/dir5/dir13/dir71/dir98/dir278/dir327/file5350
+$ rm dir1/dir12/dir17/dir24/dir44/dir62/dir116/dir313/file5351
+$ rm dir2/dir5/dir13/dir71/dir98/dir278/dir327/dir460/file5352
+$ rm dir2/dir3/dir81/dir422/dir487/file5353
+$ rm dir1/dir12/dir17/dir24/dir191/dir271/dir344/dir363/dir368/dir426/file5354
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/file5355
+$ rm dir1/dir12/dir17/dir21/dir99/dir123/dir235/dir416/file5356
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir258/dir362/dir497/file5357
+$ rm dir7/dir18/dir52/dir334/file5358
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/file5359
+$ rm dir1/dir12/dir19/file5360
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir136/dir270/file5361
+$ rm dir7/dir18/dir33/dir86/dir125/dir127/dir217/dir404/file5362
+$ rm dir1/dir6/file5363
+$ rm dir1/dir12/dir22/dir49/dir144/file5364
+$ rm dir2/dir5/dir14/dir16/dir162/dir188/dir329/dir483/file5365
+$ rm dir1/dir6/dir31/dir32/file5366
+$ rm dir2/dir5/dir14/dir16/dir162/dir188/dir384/file5367
+$ rm dir4/file5368
+$ rm dir7/dir18/dir20/dir397/file5369
+$ rm dir2/dir3/dir81/dir422/file5370
+$ rm dir1/dir11/dir23/dir25/dir200/dir323/file5371
+$ rm dir1/dir11/dir23/dir47/dir82/dir105/dir213/dir226/file5372
+$ rm dir1/dir6/dir31/dir32/dir39/file5373
+$ rm dir2/dir5/dir13/dir254/dir413/dir499/file5374
+$ rm dir7/dir18/dir20/dir397/file5375
+$ rm dir2/dir8/dir26/dir34/dir408/file5376
+$ rm dir2/dir8/dir56/dir205/file5377
+$ rm dir1/dir6/dir321/dir464/file5378
+$ rm dir1/dir12/dir17/dir24/dir191/dir227/dir410/file5379
+$ rm dir7/dir18/dir33/dir86/dir125/dir190/dir417/file5380
+$ rm dir1/dir12/dir17/dir24/dir308/dir380/file5381
+$ rm dir1/dir12/dir42/dir46/dir61/dir91/dir221/file5382
+$ rm dir1/dir12/dir17/dir24/dir191/dir271/file5383
+$ rm dir2/dir5/dir14/dir51/dir94/dir488/file5384
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir180/file5385
+$ rm dir2/dir8/dir26/dir325/file5386
+$ rm dir1/dir12/dir78/dir166/dir290/file5387
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/dir158/dir293/dir474/file5388
+$ rm dir1/dir12/dir17/dir24/dir44/dir150/file5389
+$ rm dir2/dir8/dir378/file5390
+$ rm dir1/dir12/dir42/dir485/file5391
+$ rm dir1/dir12/dir42/dir106/dir240/dir400/file5392
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir396/file5393
+$ rm dir2/dir8/dir9/dir28/dir128/file5394
+$ rm dir1/dir6/dir31/dir32/dir39/file5395
+$ rm dir7/dir10/file5396
+$ rm dir2/dir8/file5397
+$ rm dir1/dir11/dir23/dir47/dir82/dir105/dir213/dir226/file5398
+$ rm dir1/dir11/dir23/dir25/file5399
+$ rm dir2/dir3/dir259/dir418/dir493/file5400
+$ rm dir7/dir18/dir33/dir96/dir149/dir295/file5401
+$ rm dir2/dir8/dir9/dir28/dir261/file5402
+$ rm dir1/dir12/dir22/dir49/dir144/file5403
+$ rm dir2/dir8/dir26/dir34/dir55/dir172/dir181/file5404
+$ rm dir2/dir8/dir26/dir325/file5405
+$ rm dir2/dir5/dir13/dir254/dir413/file5406
+$ rm dir7/dir18/dir52/file5407
+$ rm dir2/dir5/dir14/dir51/dir94/dir111/dir179/dir345/file5408
+$ rm dir2/dir8/dir26/dir34/dir55/file5409
+$ rm dir1/dir11/dir23/file5410
+$ rm dir4/file5411
+$ rm dir7/dir18/dir43/file5412
+$ rm dir1/dir12/dir41/dir54/file5413
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir258/dir350/file5414
+$ rm dir1/dir12/dir78/dir166/file5415
+$ rm dir1/dir12/dir42/dir46/dir64/dir108/dir268/dir443/file5416
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir136/dir182/dir385/file5417
+$ rm dir1/dir11/dir23/dir25/dir200/dir323/dir455/file5418
+$ rm dir2/dir5/dir13/dir71/dir98/dir102/file5419
+$ rm dir2/dir5/dir14/dir15/dir27/dir117/file5420
+$ rm dir2/dir5/dir14/dir51/dir94/dir111/file5421
+$ rm dir2/dir5/dir14/dir16/dir162/dir188/dir211/dir357/file5422
+$ rm dir1/dir12/dir42/dir46/dir67/file5423
+$ rm dir7/dir10/dir29/dir173/dir288/dir476/file5424
+$ rm dir2/dir5/dir14/dir124/dir208/file5425
+$ rm dir2/dir8/dir26/file5426
+$ rm dir2/dir5/dir14/dir51/dir94/dir104/dir394/file5427
+$ rm dir1/dir6/dir31/dir32/dir39/file5428
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir223/file5429
+$ rm dir7/dir10/dir29/dir173/dir428/file5430
+$ rm dir2/dir5/dir14/dir68/dir73/dir97/file5431
+$ rm dir1/dir12/dir420/dir482/file5432
+$ rm dir1/dir12/dir17/dir24/dir44/dir77/dir143/dir194/dir232/file5433
+$ rm dir2/dir8/dir26/dir34/dir55/dir172/dir250/file5434
+$ rm dir1/dir12/dir78/dir285/file5435
+$ rm dir1/dir12/dir17/dir24/dir44/dir62/dir219/file5436
+$ rm dir1/dir12/dir22/dir49/dir144/file5437
+$ rm dir1/dir11/dir23/dir25/dir200/dir323/file5438
+$ rm dir2/dir5/dir14/dir15/dir27/file5439
+$ rm dir7/dir18/dir33/dir100/dir244/dir255/file5440
+$ rm dir7/dir18/file5441
+$ rm dir1/dir12/dir42/dir485/file5442
+$ rm dir2/dir5/dir14/dir15/file5443
+$ rm dir2/dir5/dir14/dir51/dir94/dir111/dir179/dir195/file5444
+$ rm dir1/dir12/dir420/file5445
+$ rm dir1/dir12/dir17/dir24/dir44/dir150/file5446
+$ rm dir1/dir12/dir17/dir24/dir36/file5447
+$ rm dir1/dir12/dir17/dir24/dir44/dir150/dir471/file5448
+$ rm dir7/dir18/dir33/dir96/dir101/file5449
+$ rm dir2/dir5/dir13/dir71/dir145/file5450
+$ rm dir7/dir18/dir52/dir79/dir322/file5451
+$ rm dir2/dir8/dir26/dir34/dir92/dir130/file5452
+$ rm dir1/dir12/dir17/dir76/file5453
+$ rm dir2/dir8/dir26/dir34/dir92/file5454
+$ rm dir2/dir5/dir14/dir16/dir162/dir188/dir329/dir483/file5455
+$ rm dir1/dir11/dir23/dir47/dir82/dir105/dir213/dir226/dir494/file5456
+$ rm dir1/dir12/dir19/dir45/dir266/file5457
+$ rm dir2/dir8/dir56/dir205/file5458
+$ rm dir2/dir8/dir26/dir34/dir35/dir74/dir215/file5459
+$ rm dir7/dir18/dir52/file5460
+$ rm dir1/dir12/dir19/dir239/dir337/file5461
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir133/dir146/file5462
+$ rm dir2/dir3/dir259/dir418/dir493/file5463
+$ rm dir7/dir18/dir52/dir467/file5464
+$ rm dir1/dir11/dir23/dir25/dir200/dir423/file5465
+$ rm dir1/dir12/dir41/dir118/dir151/dir161/dir281/file5466
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir258/file5467
+$ rm dir7/dir37/dir157/dir171/dir184/file5468
+$ rm dir2/dir5/dir13/dir71/dir98/dir278/dir360/file5469
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir122/dir189/file5470
+$ rm dir1/dir12/dir17/dir24/dir44/dir150/dir212/dir376/file5471
+$ rm dir1/dir12/dir42/dir46/dir67/dir93/file5472
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir156/dir434/file5473
+$ rm dir1/dir12/dir17/dir21/dir99/file5474
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir258/dir362/dir497/file5475
+$ rm dir2/dir5/dir38/file5476
+$ rm dir1/dir11/dir23/dir47/dir82/dir105/dir213/dir226/dir494/file5477
+$ rm dir2/dir5/dir13/dir71/dir98/file5478
+$ rm dir2/dir8/dir26/dir34/dir55/dir172/dir220/dir260/dir446/file5479
+$ rm dir1/dir12/dir17/dir24/dir44/dir62/dir116/dir313/file5480
+$ rm dir7/dir18/dir33/dir86/dir125/dir251/dir348/file5481
+$ rm dir2/dir5/dir38/dir60/dir225/file5482
+$ rm dir1/dir135/dir201/dir326/file5483
+$ rm dir2/dir5/dir38/dir107/dir480/file5484
+$ rm dir2/dir5/dir14/dir15/dir27/file5485
+$ rm dir2/dir8/dir26/dir34/dir55/dir154/dir249/file5486
+$ rm dir1/dir12/dir17/dir21/dir50/dir147/file5487
+$ rm dir2/dir5/dir14/dir51/dir94/dir111/dir179/file5488
+$ rm dir1/dir12/dir42/dir46/dir61/dir88/dir156/dir364/dir470/file5489
+$ rm dir1/file5490
+$ rm dir2/dir8/dir9/dir28/dir89/dir112/dir223/dir419/dir429/file5491
+$ rm dir2/dir5/dir38/dir107/dir480/file5492
+$ rm dir1/dir12/dir17/dir24/dir44/dir150/dir471/file5493
+$ rm dir1/dir11/file5494
+$ rm dir1/dir12/dir17/dir21/dir50/dir176/dir229/file5495
+$ rm dir1/dir12/dir41/dir118/dir137/file5496
+$ rm dir1/dir12/dir19/dir45/dir266/dir435/file5497
+$ rm dir1/dir12/dir19/dir45/dir266/file5498
+$ rm dir1/dir12/dir78/file5499
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color pull
+Listing files...
+Listing files to pull...
+Pulling files...
+Pulled 500 files (31.5 kB).
+$ cat dir1/dir12/dir78/file5499
+this is dir1/dir12/dir78/file5499, a test file%
+# Create a rather large file.
+$ echo ' 	
+ !"#$%&'\''()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ'... > large-file
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color push --yes large-file
+Locking main repository...
+Listing files...
+Listing files to push...
+Pushing files...
+Pushed: large-file
+Pushed 1 files (100 MB).
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check -h
+Listing main objects...
+Checking main object hashes...
+None of the 964 main objects are corrupted.
+Listing clone objects...
+Checking clone object hashes...
+None of the 964 clone objects are corrupted.
+Listing files...
+Checking file hashes...
+None of the 10001 files are corrupted.
+Directory structure looks ok (total size: 100631199, file count: 10001).
+All files are available.
+Hash index is consistent with the directory structure.
+$ rm large-file
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color pull large-file
+Listing files...
+Listing files to pull...
+Pulling files...
+Pulled: large-file
+Pulled 1 files (100 MB).
