@@ -253,7 +253,7 @@ struct
           x
       | OK Dir ->
           failed [ Device.show_file_path hash_path ^ " is a directory" ]
-      | OK (File { size; _ }) ->
+      | OK (File { size; _ } | Link_to_file { size; _ }) ->
           let* already_exists = Device.file_exists target target_path in
           if already_exists then
             error `already_exists [
@@ -280,7 +280,7 @@ struct
           error `not_available msg
       | ERROR { code = `failed; _ } as x ->
           x
-      | OK (File { size; _ }) ->
+      | OK (File { size; _ } | Link_to_file { size; _ }) ->
           ok size
       | OK Dir ->
           failed [
@@ -297,7 +297,7 @@ struct
           match Device.stat location (Device.path_of_file_path file_path) with
             | ERROR { code = `no_such_file | `failed; msg } ->
                 failed ("failed to get file size" :: msg)
-            | OK (File { size; _ }) ->
+            | OK (File { size; _ } | Link_to_file { size; _ }) ->
                 file_hash.size <- Some size;
                 ok size
             | OK Dir ->
@@ -355,7 +355,7 @@ struct
           x
       | OK Dir ->
           failed [ sf "%s is a directory" (Device.show_file_path path) ]
-      | OK (File _) ->
+      | OK (File _ | Link_to_file _) ->
           ok true
 
   let object_is_available location hash =
@@ -395,7 +395,7 @@ struct
                   x
               | OK Dir ->
                   unit
-              | OK (File _) ->
+              | OK (File _ | Link_to_file _) ->
                   match f hash with
                     | ERROR { code = `failed; _ } | OK () as x ->
                         x
@@ -423,7 +423,7 @@ struct
                     unit
                 | ERROR { code = `failed; _ } as x ->
                     x
-                | OK (File _) ->
+                | OK (File _ | Link_to_file _) ->
                     unit
                 | OK Dir ->
                     match f subdir_path with

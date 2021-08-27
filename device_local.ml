@@ -245,19 +245,58 @@ let stat (location: location) (path: path) =
         let file_path = List.rev tail, head in
         let full_path = local_file_path location file_path in
         let full_path_string = Path.show full_path in
-        match Unix.stat full_path_string with
+        match Unix.lstat full_path_string with
           | exception Unix.Unix_error (ENOENT, _, _) ->
-              ERROR {
-                code = `no_such_file;
-                msg = [ "no such file: " ^ full_path_string ];
-              }
+              error `no_such_file [ "no such file: " ^ full_path_string ]
           | exception Unix.Unix_error (error, _, _) ->
               failed_to_read_file full_path_string [ Unix.error_message error ]
           | { st_kind = S_DIR; _ } ->
               OK Dir
           | { st_kind = S_REG; st_size; st_mtime; _ } ->
               OK (File { size = st_size; mtime = st_mtime })
-          | { st_kind = (S_CHR | S_BLK | S_LNK | S_FIFO | S_SOCK); _ } ->
+          | { st_kind = S_LNK; _ } ->
+              (
+                match Unix.stat full_path_string with
+                  | exception Unix.Unix_error (ENOENT, _, _) ->
+                      error `no_such_file [
+                        "no such file: " ^ full_path_string;
+                        "symbolic link target does not exist"
+                      ]
+                  | exception Unix.Unix_error (error, _, _) ->
+                      failed_to_read_file full_path_string [ Unix.error_message error ]
+                  | { st_kind = S_DIR; _ } ->
+                      ok Dir
+                  | { st_kind = S_REG; st_size; st_mtime; _ } ->
+                      let* path =
+                        match Unix.readlink full_path_string with
+                          | exception Unix.Unix_error (error, _, _) ->
+                              failed [
+                                "failed to read symbolic link: " ^ full_path_string;
+                                Unix.error_message error;
+                              ]
+                          | path ->
+                              match Path.parse path with
+                                | None ->
+                                    failed [
+                                      "failed to read symbolic link: " ^ full_path_string;
+                                      "invalid target path: " ^ path;
+                                    ]
+                                | Some (AD _ | RD _) ->
+                                    failed [
+                                      "failed to read symbolic link: " ^ full_path_string;
+                                      "link targets a file but target \
+                                       path denotes a directory: " ^ path;
+                                    ]
+                                | Some (AF path) ->
+                                    ok (Path.A path)
+                                | Some (RF path) ->
+                                    ok (Path.R path)
+                      in
+                      OK (Link_to_file { path; size = st_size; mtime = st_mtime })
+                  | { st_kind = (S_CHR | S_BLK | S_LNK | S_FIFO | S_SOCK); _ } ->
+                      failed [ "not a regular file or a directory: " ^ full_path_string ]
+              )
+          | { st_kind = (S_CHR | S_BLK | S_FIFO | S_SOCK); _ } ->
               failed [ "not a regular file or a directory: " ^ full_path_string ]
 
 let remove_file (mode: mode) (location: location) ((dir_path, _) as file_path: file_path) =

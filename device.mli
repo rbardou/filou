@@ -133,6 +133,7 @@ val read_file_incrementally: location -> file_path ->
 type stat = Device_common.stat =
   | File of { size: int; mtime: float }
   | Dir
+  | Link_to_file of { path: Path.file Path.any_relativity; size: int; mtime: float }
 
 val stat: location -> path -> (stat, [> `no_such_file | `failed ]) r
 

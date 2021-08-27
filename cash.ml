@@ -171,7 +171,9 @@ let get ~on_progress (setup: Setup.t) ((dir_path, filename) as file_path: Device
           | OK Dir ->
               set_cache setup file_path None;
               ok Dir
-          | OK (File { size; mtime }) ->
+          | OK (File { size; mtime } | Link_to_file { size; mtime; _ }) ->
+              (* TODO: if link and if path leads to a .filou/data hash-named file,
+                 use this name *)
               let dir = read_cache_for_dir setup dir_path in
               let from_cache =
                 match Filename_map.find_opt filename dir with
@@ -208,5 +210,5 @@ let set (setup: Setup.t) file_path hash =
         match Device.stat workdir (Device.path_of_file_path file_path) with
           | ERROR { code = (`failed | `no_such_file); _ } | OK Dir ->
               ()
-          | OK (File { size; mtime }) ->
+          | OK (File { size; mtime } | Link_to_file { size; mtime; _ }) ->
               set_cache setup file_path (Some { hash; size; mtime })

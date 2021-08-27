@@ -75,6 +75,9 @@ let show_response = function
       "; mtime = " ^ string_of_float mtime ^ " })"
   | R_ok_stat Dir ->
       "R_ok_stat Dir"
+  | R_ok_stat (Link_to_file { path; size; mtime }) ->
+      sf "R_ok_stat (Link_to_file { path = %S; size = %d; mtime = %f })"
+        (Path.Any_relativity.show path) size mtime
   | R_ok_remove_file ->
       "R_ok_remove_file"
 
@@ -186,6 +189,11 @@ let write_stat buffer (stat: Device_common.stat) =
         W.float_64 buffer mtime
     | Dir ->
         W.int_u8 buffer 1
+    | Link_to_file { path; size; mtime } ->
+        W.int_u8 buffer 2;
+        W.(string int_u16) buffer (Path.Any_relativity.show path);
+        W.int_64 buffer size;
+        W.float_64 buffer mtime
 
 let read_stat buffer: Device_common.stat =
   match R.int_u8 buffer with
@@ -195,6 +203,27 @@ let read_stat buffer: Device_common.stat =
         File { size; mtime }
     | 1 ->
         Dir
+    | 2 ->
+        let path = R.(string int_u16) buffer in
+        let path: Path.file Path.any_relativity =
+          match Path.parse path with
+            | None ->
+                raise (Failed [ sf "invalid link-to-file target path: %s" path ])
+            | Some (AD _ | RD _) ->
+                raise (
+                  Failed [
+                    sf "invalid link-to-file target path: %s" path;
+                    "path denotes a directory";
+                  ]
+                )
+            | Some (AF path) ->
+                A path
+            | Some (RF path) ->
+                R path
+        in
+        let size = R.int_64 buffer in
+        let mtime = R.float_64 buffer in
+        Link_to_file { path; size; mtime }
     | tag ->
         raise (Failed [ sf "unknown stat tag: %d" tag ])
 

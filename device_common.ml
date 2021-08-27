@@ -91,6 +91,7 @@ type mode = RW | RO
 type stat =
   | File of { size: int; mtime: float }
   | Dir
+  | Link_to_file of { path: Path.file Path.any_relativity; size: int; mtime: float }
 
 let failed_to_read_directory path msg =
   failed (("failed to read directory: " ^ (Path.show path)) :: msg)

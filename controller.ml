@@ -1217,14 +1217,14 @@ let tree ~color ~max_depth ~only_main ~only_dirs
             print_newline ();
             print_duplicate_paths duplicates;
             unit
-        | MDE_clone (File { size; _ }) ->
+        | MDE_clone (File { size; _ } | Link_to_file { size; _ }) ->
             if only_main then unit else (
               print_prefix_and_filename `file_not_pushed;
               print_size size;
               print_newline ();
               unit
             )
-        | MDE_both (File { hash; size }, File _) ->
+        | MDE_both (File { hash; size }, (File _ | Link_to_file _)) ->
             let* status =
               let file_path =
                 match entry_name with
@@ -1307,7 +1307,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
             print_file_count total_file_count;
             print_newline ();
             recurse (Some hash)
-        | MDE_both (Dir _, File _)
+        | MDE_both (Dir _, (File _ | Link_to_file _))
         | MDE_both (File _, Dir) ->
             print_prefix_and_filename `inconsistent;
             print_newline ();
@@ -1375,7 +1375,8 @@ let tree ~color ~max_depth ~only_main ~only_dirs
           Filename_map.filter' merged_dir @@ fun _ -> function
             | MDE_main (Dir _) | MDE_clone Dir | MDE_both (Dir _, _) | MDE_both (_, Dir) ->
                 true
-            | MDE_main (File _) | MDE_clone (File _) | MDE_both (File _, File _) ->
+            | MDE_main (File _) | MDE_clone (File _ | Link_to_file _)
+            | MDE_both (File _, (File _ | Link_to_file _)) ->
                 false
         else
           merged_dir
@@ -1519,7 +1520,7 @@ let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
               | Dir ->
                   Device.iter_read_dir workdir path @@ fun filename ->
                   add_path (path @ [ filename ])
-              | File { size; _ } ->
+              | File { size; _ } | Link_to_file { size; _ } ->
                   match Device.file_path_of_path path with
                     | None ->
                         (* Should not happen, "." is a directory. *)
@@ -1561,6 +1562,8 @@ let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
                       (show_size size) (show_size bytes)
                       (size * 100 / bytes)
                   in
+                  (* TODO: if Cash.get actually computes the hash, this is inefficient:
+                     we will recompute the hash again when storing the file. *)
                   Cash.get ~on_progress setup path
                 in
                 match status with

@@ -156,7 +156,7 @@ let file_exists location (path: file_path) =
         x
     | OK Dir ->
         ok false
-    | OK (File _) ->
+    | OK (File _ | Link_to_file _) ->
         ok true
 
 let dir_exists location (path: path) =
@@ -167,7 +167,7 @@ let dir_exists location (path: path) =
         x
     | OK Dir ->
         ok true
-    | OK (File _) ->
+    | OK (File _ | Link_to_file _) ->
         ok false
 
 (* TODO: with ssh+filou, do this on the remote. *)
@@ -176,7 +176,7 @@ let hash ~on_progress location path =
   match stat with
     | Dir ->
         error `no_such_file [ "no such file: " ^ (show_file_path path) ]
-    | File { size; _ } ->
+    | File { size; _ } | Link_to_file { size; _ } ->
         read_file_incrementally location path @@ fun read ->
         let bytes = Bytes.create 4096 in
         let rec loop partial total_length =
