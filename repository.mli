@@ -18,6 +18,13 @@ type file_hash
 val concrete_file_hash: file_hash -> Hash.t
 val stored_file_hash: Hash.t -> file_hash
 
+val meta_filename: Path.Filename.t
+val data_filename: Path.Filename.t
+
+val hash_prefix_length: int
+
+val data_path: Hash.t -> Path.Filename.t * Path.Filename.t * Path.Filename.t
+
 module type OBJECT =
 sig
   type 'a t

@@ -163,6 +163,35 @@ let get ~on_progress (setup: Setup.t) ((dir_path, filename) as file_path: Device
     | None ->
         ok Does_not_exist
     | Some workdir ->
+        let get_for_file size mtime =
+          let dir = read_cache_for_dir setup dir_path in
+          let from_cache =
+            match Filename_map.find_opt filename dir with
+              | Some dir_entry ->
+                  if dir_entry.size = size && dir_entry.mtime = mtime then
+                    Some dir_entry
+                  else
+                    None
+              | None ->
+                  None
+          in
+          match from_cache with
+            | Some dir_entry ->
+                ok (File dir_entry.hash)
+            | None ->
+                (* TODO: progress *)
+                match
+                  Device.hash ~on_progress workdir file_path
+                with
+                  | ERROR { code = `failed; _ } as x ->
+                      x
+                  | ERROR { code = `no_such_file; _ } ->
+                      ok Does_not_exist
+                  | OK (hash, _) ->
+                      let dir_entry = { hash; size; mtime } in
+                      set_cache setup file_path (Some dir_entry);
+                      ok (File hash)
+        in
         match Device.stat workdir (Device.path_of_file_path file_path) with
           | ERROR { code = `failed; _ } as x ->
               x
@@ -171,36 +200,43 @@ let get ~on_progress (setup: Setup.t) ((dir_path, filename) as file_path: Device
           | OK Dir ->
               set_cache setup file_path None;
               ok Dir
-          | OK (File { size; mtime } | Link_to_file { size; mtime; _ }) ->
-              (* TODO: if link and if path leads to a .filou/data hash-named file,
-                 use this name *)
-              let dir = read_cache_for_dir setup dir_path in
-              let from_cache =
-                match Filename_map.find_opt filename dir with
-                  | Some dir_entry ->
-                      if dir_entry.size = size && dir_entry.mtime = mtime then
-                        Some dir_entry
-                      else
+          | OK (File { size; mtime }) ->
+              get_for_file size mtime
+          | OK (Link_to_file { path; size; mtime }) ->
+              let hash_from_path =
+                let hash_from_path (type r) (path: (r, Path.file) Path.t) =
+                  match path with
+                    | File (hash, Dir (prefix2, Dir (prefix1, Dir (data, Dir (filou, _))))) ->
+                        (
+                          match Hash.of_hex (Path.Filename.show hash) with
+                            | None ->
+                                None
+                            | Some hash ->
+                                let expected_prefix1, expected_prefix2, _ =
+                                  Repository.data_path hash
+                                in
+                                if
+                                  Path.Filename.compare filou dot_filou = 0
+                                  && Path.Filename.compare data Repository.data_filename = 0
+                                  && Path.Filename.compare prefix1 expected_prefix1 = 0
+                                  && Path.Filename.compare prefix2 expected_prefix2 = 0
+                                then
+                                  Some hash
+                                else
+                                  None
+                        )
+                    | _ ->
                         None
-                  | None ->
-                      None
+                in
+                match path with
+                  | A path -> hash_from_path path
+                  | R path -> hash_from_path path
               in
-              match from_cache with
-                | Some dir_entry ->
-                    ok (File dir_entry.hash)
+              match hash_from_path with
                 | None ->
-                    (* TODO: progress *)
-                    match
-                      Device.hash ~on_progress workdir file_path
-                    with
-                      | ERROR { code = `failed; _ } as x ->
-                          x
-                      | ERROR { code = `no_such_file; _ } ->
-                          ok Does_not_exist
-                      | OK (hash, _) ->
-                          let dir_entry = { hash; size; mtime } in
-                          set_cache setup file_path (Some dir_entry);
-                          ok (File hash)
+                    get_for_file size mtime
+                | Some hash ->
+                    ok (File hash)
 
 let set (setup: Setup.t) file_path hash =
   match setup.workdir with

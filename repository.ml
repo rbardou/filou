@@ -127,6 +127,19 @@ sig
   val remove_file: Device.location -> Hash.t -> (unit, [> `failed ]) r
 end
 
+let meta_filename = Path.Filename.parse_exn "meta"
+let data_filename = Path.Filename.parse_exn "data"
+
+let hash_prefix_length = 2
+
+let data_path hash =
+  let hash_string = Hash.to_hex hash in
+  let prefix1 = String.sub hash_string 0 hash_prefix_length in
+  let prefix2 = String.sub hash_string hash_prefix_length hash_prefix_length in
+  Path.Filename.parse_exn prefix1,
+  Path.Filename.parse_exn prefix2,
+  Path.Filename.parse_exn hash_string
+
 module Make (Object: OBJECT): S
   with type 'a object_type = 'a Object.t
    and type root = Object.root =
@@ -141,11 +154,6 @@ struct
 
   let is_read_only () = !read_only
 
-  let meta_filename = Path.Filename.parse_exn "meta"
-  let data_filename = Path.Filename.parse_exn "data"
-
-  let hash_prefix_length = 2
-
   let file_path_of_object_hash hash =
     let hash_string = Hash.to_hex hash in
     (* [Hash.to_hex] always returns a string of length >= 4,
@@ -156,11 +164,8 @@ struct
 
   (* Same as [file_path_of_object_hash] but with 2 levels. *)
   let file_path_of_file_hash hash =
-    let hash_string = Hash.to_hex hash in
-    let prefix1 = String.sub hash_string 0 hash_prefix_length in
-    let prefix2 = String.sub hash_string hash_prefix_length hash_prefix_length in
-    [ data_filename; Path.Filename.parse_exn prefix1; Path.Filename.parse_exn prefix2 ],
-    Path.Filename.parse_exn hash_string
+    let prefix1, prefix2, filename = data_path hash in
+    [ data_filename; prefix1; prefix2 ], filename
 
   let hash value =
     { status = Not_stored value }
