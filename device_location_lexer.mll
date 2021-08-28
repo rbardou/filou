@@ -48,6 +48,12 @@ and location_file first_char = parse
         let path = match first_char with None -> path | Some c -> String.make 1 c ^ path in
         with_path path @@ fun path -> `local path
       }
+  | eof
+      {
+        match first_char with
+          | None -> `invalid
+          | Some c -> with_path (String.make 1 c) @@ fun path -> `local path
+      }
 
 and location_ssh_filou = parse
   | ((username as user) '@')?
