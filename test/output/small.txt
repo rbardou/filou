@@ -5,13 +5,13 @@ Checking /tmp/filou-test/main/...
 Creating /tmp/filou-test/clone/...
 Cloned /tmp/filou-test/main/ into: /tmp/filou-test/clone/
 $ hexdump -C /tmp/filou-test/main/.filou/config
-00000000  46 63 6f 6e 66 69 67 31  00                       |Fconfig1.|
+00000000  46 63 6f 6e 66 69 67 32  00                       |Fconfig2.|
 00000009
 $ hexdump -C /tmp/filou-test/clone/.filou/config
-00000000  46 63 6f 6e 66 69 67 31  01 15 00 2f 74 6d 70 2f  |Fconfig1.../tmp/|
+00000000  46 63 6f 6e 66 69 67 32  01 15 00 2f 74 6d 70 2f  |Fconfig2.../tmp/|
 00000010  66 69 6c 6f 75 2d 74 65  73 74 2f 6d 61 69 6e 2f  |filou-test/main/|
-00000020  00                                                |.|
-00000021
+00000020  00 00 00 00 00                                    |.....|
+00000025
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color check
 Repository is empty.
@@ -31,26 +31,31 @@ $ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
 no cache: false
+ignore filters: empty
 $ main.exe --no-color config set main /tmp
 $ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/
 no cache: false
+ignore filters: empty
 $ main.exe --no-color config set main /tmp/filou-test/main
 $ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
 no cache: false
+ignore filters: empty
 $ main.exe --no-color config set no-cache true
 $ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
 no cache: true
+ignore filters: empty
 $ main.exe --no-color config set no-cache false
 $ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
 no cache: false
+ignore filters: empty
 # Add a file.
 $ cd /tmp/filou-test/clone
 $ echo blablabla > toto
@@ -1490,7 +1495,7 @@ $ tree -a -s -F
 │   └── [       4096]  blo/
 │       └── [          4]  plouf
 ├── [       4096]  .filou/
-│   ├── [         33]  config
+│   ├── [         37]  config
 │   └── [         64]  root
 ├── [          4]  plif
 ├── [          6]  titi
@@ -1515,7 +1520,7 @@ $ tree -a -s -F
 │   └── [       4096]  blo/
 │       └── [          4]  plouf
 ├── [       4096]  .filou/
-│   ├── [         33]  config
+│   ├── [         37]  config
 │   ├── [       4096]  meta/
 │   │   ├── [       4096]  02/
 │   │   │   └── [       1422]  026a6708d5d46ca16d9b348dd3a1734023823e60f182e7257eca2b8c8f44868d
@@ -1975,7 +1980,7 @@ $ tree -a -s -F
 │   │   └── [       4096]  bla-/
 │   │       └── [       4096]  bli-/
 │   │           └── [         67]  self
-│   ├── [         33]  config
+│   ├── [         37]  config
 │   ├── [       4096]  meta/
 │   │   ├── [       4096]  44/
 │   │   │   └── [         60]  4442a3508bca0bae85653d231eead0498b4ada604774587e860727532d0f1fbf
@@ -4096,6 +4101,7 @@ $ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
 no cache: true
+ignore filters: empty
 $ cd /tmp/filou-test/clone
 $ echo 'contents of bla' > bla
 $ cd /tmp/filou-test/clone
@@ -4111,7 +4117,7 @@ $ tree -a -s -F
 .
 ├── [         15]  bla
 └── [       4096]  .filou/
-    ├── [         33]  config
+    ├── [         37]  config
     └── [         64]  root
 
 1 directory, 3 files
@@ -4148,7 +4154,7 @@ $ tree -a -s -F
 .
 ├── [         15]  bla
 └── [       4096]  .filou/
-    ├── [         33]  config
+    ├── [         37]  config
     └── [         64]  root
 
 1 directory, 3 files

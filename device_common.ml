@@ -74,6 +74,14 @@ let show_path (path: path) =
     | [] -> "."
     | _ -> String.concat "/" (List.map Path.Filename.show path)
 
+let show_path_for_filter (path: path) ~is_dir =
+  match path with
+    | [] ->
+        "/"
+    | _ ->
+        let middle = String.concat "/" (List.map Path.Filename.show path) in
+        if is_dir then "/" ^ middle ^ "/" else "/" ^ middle
+
 let show_file_path path =
   show_path (path_of_file_path path)
 

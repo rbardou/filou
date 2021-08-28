@@ -593,6 +593,52 @@ let main () =
               in
               `set value_to_set
             );
+            (
+              Clap.case
+                ~description: "Add filters to the ignore list."
+                "ignore"
+              @@ fun () ->
+              let filters =
+                Clap.list_string
+                  ~description:
+                    "Filter to add to the ignore list. Its format \
+                     should be a Perl-compatible regular expression \
+                     (PCRE). If the path of a file or a directory in \
+                     the work directory matches a filter in the ignore \
+                     list, this file or directory is ignored by \
+                     'push'. For this purpose, paths always start with \
+                     a '\\' (denoting the root of the work \
+                     directory). Additionally, paths to directories \
+                     end with a '\\' while file paths do not.\n\
+                     \n\
+                     Examples (regular expressions are quoted using \
+                     shell syntax):\n\
+                     - '\\.log$': ignore all files ending with \
+                     .log;\n\
+                     - '/_build/$': ignore all directories named \
+                     '_build';\n\
+                     - '^/.git/$': ignore a Git directory at the \
+                     root;\n\
+                     - '/test/?$': ignore all files and directories \
+                     named 'test'."
+                  ~placeholder: "FILTER"
+                  ()
+              in
+              `set (`add_ignore filters)
+            );
+            (
+              Clap.case
+                ~description: "Remove filters to the ignore list."
+                "unignore"
+              @@ fun () ->
+              let filters =
+                Clap.list_string
+                  ~description: "Filter to remove from the ignore list."
+                  ~placeholder: "FILTER"
+                  ()
+              in
+              `set (`remove_ignore filters)
+            );
           ]
         in
         `config config_command

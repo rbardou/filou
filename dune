@@ -1,5 +1,5 @@
 (executable
  (name main)
- (libraries digestif.c mysc unix clap typath))
+ (libraries digestif.c mysc unix clap typath re))
 
 (ocamllex device_location_lexer)

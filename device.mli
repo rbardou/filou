@@ -55,6 +55,12 @@ val parse_local_path: (Path.absolute, Path.dir) Path.t -> string ->
 (** Convert a path to a string. *)
 val show_path: path -> string
 
+(** Convert a path to a string for filtering.
+
+    Paths always start with a [/].
+    Paths end with a [/] if [is_dir] is [true]. *)
+val show_path_for_filter: path -> is_dir: bool -> string
+
 (** Convert a path to a string. *)
 val show_file_path: file_path -> string
 

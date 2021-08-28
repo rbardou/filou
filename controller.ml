@@ -16,6 +16,10 @@ let prompt_for_confirmation prompt =
 
 let empty_dir: dir = Filename_map.empty
 
+let path_is_ignored (setup: Setup.t) (path: Device.path) ~is_dir =
+  let path_string = Device.show_path_for_filter path ~is_dir in
+  Re.execp setup.ignore_filters_rex path_string
+
 let operation_not_available msg =
   failed ("operation not available" :: msg)
 
@@ -199,8 +203,14 @@ let clone ~no_cache ~(main_location: Device.location) ~(clone_location: Device.l
               Prout.major "Creating %s..." (Device.show_location clone_location);
               let clone_dot_filou = Device.sublocation clone_location dot_filou in
               let* () =
-                write_config ~dot_filou: clone_dot_filou
-                  (Clone { main_location; no_cache })
+                write_config ~dot_filou: clone_dot_filou (
+                  Clone {
+                    main_location;
+                    no_cache;
+                    ignore_filters = [];
+                    ignore_filters_rex = Config.match_nothing;
+                  }
+                )
               in
               let* () = Repo.write_root [ clone_dot_filou ] root in
               Prout.echo "Cloned %s into: %s" (Device.show_location main_location)
@@ -248,6 +258,7 @@ let find_setup ~repository ~no_main ~no_cache mode =
               main_dot_filou = Some location_dot_filou;
               clone_dot_filou = None;
               workdir = Some location;
+              ignore_filters_rex = Config.match_nothing;
             }
           in
           ok setup
@@ -268,6 +279,7 @@ let find_setup ~repository ~no_main ~no_cache mode =
                 Some location_dot_filou
             );
             workdir = Some location;
+            ignore_filters_rex = config.ignore_filters_rex;
           }
         in
         ok setup
@@ -1518,18 +1530,30 @@ let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
             let* stat = Device.stat workdir path in
             match stat with
               | Dir ->
-                  Device.iter_read_dir workdir path @@ fun filename ->
-                  add_path (path @ [ filename ])
+                  if path_is_ignored setup path ~is_dir: true then
+                    (
+                      if verbose then Prout.echo "Ignoring: %s" (Device.show_path path);
+                      unit
+                    )
+                  else
+                    Device.iter_read_dir workdir path @@ fun filename ->
+                    add_path (path @ [ filename ])
               | File { size; _ } | Link_to_file { size; _ } ->
-                  match Device.file_path_of_path path with
-                    | None ->
-                        (* Should not happen, "." is a directory. *)
-                        unit
-                    | Some path ->
-                        files := (path, size) :: !files;
-                        incr file_count;
-                        Prout.minor (fun () -> sf "Listing files... (%d)" !file_count);
-                        unit
+                  if path_is_ignored setup path ~is_dir: false then
+                    (
+                      if verbose then Prout.echo "Ignoring: %s" (Device.show_path path);
+                      unit
+                    )
+                  else
+                    match Device.file_path_of_path path with
+                      | None ->
+                          (* Should not happen, "." is a directory. *)
+                          unit
+                      | Some path ->
+                          files := (path, size) :: !files;
+                          incr file_count;
+                          Prout.minor (fun () -> sf "Listing files... (%d)" !file_count);
+                          unit
         in
         let* () = list_iter_e paths add_path in
         let files = List.rev !files in
@@ -2361,10 +2385,16 @@ let config_show ~mode =
     match config with
       | Main ->
           Prout.echo "main repository: %s" (Device.show_location location)
-      | Clone { main_location; no_cache } ->
+      | Clone { main_location; no_cache; ignore_filters; ignore_filters_rex = _ } ->
           Prout.echo "clone repository: %s" (Device.show_location location);
           Prout.echo "main repository: %s" (Device.show_location main_location);
-          Prout.echo "no cache: %b" no_cache
+          Prout.echo "no cache: %b" no_cache;
+          match ignore_filters with
+            | [] ->
+                Prout.echo "ignore filters: empty"
+            | _ ->
+                Prout.echo "ignore filters:";
+                List.iter' ignore_filters (Prout.echo "- %s")
   );
   unit
 
@@ -2379,10 +2409,20 @@ let config_set_clone (config: Config.t) value =
               ok { config with main_location }
           | `no_cache value ->
               ok { config with no_cache = value }
+          | `add_ignore filters ->
+              (* Not recomputing [ignore_filters_rex] because we exit
+                 after writing the config (same for [remove_ignore]). *)
+              ok { config with ignore_filters = config.ignore_filters @ filters }
+          | `remove_ignore filters ->
+              let ignore_filters =
+                List.filter' config.ignore_filters @@ fun filter ->
+                not (List.mem filter filters)
+              in
+              ok { config with ignore_filters }
 
 let config_set ~mode value =
   let* _, location_dot_filou, config = find_local_config mode in
   match value with
-    | `main _ | `no_cache _ as value ->
+    | `main _ | `no_cache _ | `add_ignore _ | `remove_ignore _ as value ->
         let* config = config_set_clone config value in
         write_config ~dot_filou: location_dot_filou (Clone config)
