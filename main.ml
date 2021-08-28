@@ -4,37 +4,18 @@ let error message =
   prerr_endline (String.concat ":\n  " ("Error" :: message));
   exit 1
 
+let clap_bool =
+  let parse s =
+    match String.lowercase_ascii s with
+      | "true" | "yes" | "t" | "y" | "1" -> Some true
+      | "false" | "no" | "f" | "n" | "0" -> Some false
+      | _ -> None
+  in
+  let show = function true -> "true" | false -> "false" in
+  Clap.typ ~name: "bool" ~dummy: false ~parse ~show
+
 let main () =
   Clap.description "FILe Organizer Ultimate";
-(*   Clap.section "REPOSITORY KINDS" *)
-(*     "There are two kinds of Filou repositories: main repositories, and \ *)
-(*      clones.\n\ *)
-(*      \n\ *)
-(*      Main repositories contain all metadata and all data (the files \ *)
-(*      you store). They are the source of truth for the current state of \ *)
-(*      the directory tree. All metadata and all data is stored in a \ *)
-(*      .filou subdirectory, as files whose name is their hash.\n\ *)
-(*      \n\ *)
-(*      Clone repositories contain a cache of the metadata in their own \ *)
-(*      .filou subdirectory. They also contain the location of the main \ *)
-(*      repository in their configuration: clones are cloned from main \ *)
-(*      repositories. The cache is useful to view the current state of \ *)
-(*      the directory tree when the main repository is not \ *)
-(*      available. Clone repositories do not contain data in their .filou \ *)
-(*      subdirectory, however.\n\ *)
-(*      \n\ *)
-(*      Work directories contain data that have been pulled \ *)
-(*      (i.e. fetched) from main repositories, or data that can be pushed \ *)
-(*      (i.e. sent) to main repositories. All clone repositories also act \ *)
-(*      as work directories. So a clone repository is a work directory, \ *)
-(*      with a partial copy of the directory tree, and with a .filou \ *)
-(*      subdirectory that contains only metadata.\n\ *)
-(*      \n\ *)
-(*      By default, Filou finds the first parent directory that contains \ *)
-(*      a .filou subdirectory. If it is a clone, Filou operates on this \ *)
-(*      clone and on the main repository that is configured in the \ *)
-(*      clone. If it is a main repository, Filou operates on this main \ *)
-(*      repository."; *)
   let repository =
     Clap.optional_string
       ~description:
@@ -564,25 +545,57 @@ let main () =
              arguments, update the configuration."
           "config"
         @@ fun () ->
-        let main =
-          Clap.optional_string
-            ~long: "set-main"
-            ~description: "Set the location of the main repository. See 'clone --help'."
-            ()
+        let config_command =
+          Clap.subcommand [
+            (
+              Clap.case
+                ~description: "Show the configuration."
+                "show"
+              @@ fun () ->
+              `show
+            );
+            (
+              Clap.case
+                ~description: "Modify the configuration."
+                "set"
+              @@ fun () ->
+              let value_to_set =
+                Clap.subcommand [
+                  (
+                    Clap.case
+                      ~description: "Set the location of the main repository."
+                      "main"
+                    @@ fun () ->
+                    let value =
+                      Clap.mandatory_string
+                        ~description: "New location of the main repository."
+                        ~placeholder: "MAIN"
+                        ()
+                    in
+                    `main value
+                  );
+                  (
+                    Clap.case
+                      ~description: "Set no-cache mode (see --no-cache)."
+                      "no-cache"
+                    @@ fun () ->
+                    let value =
+                      Clap.mandatory clap_bool
+                        ~description:
+                          "New value for the no-cache option. 'true' \
+                           sets no-cache mode, 'false' unsets it."
+                        ~placeholder: "VALUE"
+                        ()
+                    in
+                    `no_cache value
+                  );
+                ]
+              in
+              `set value_to_set
+            );
+          ]
         in
-        let set_no_cache =
-          Clap.flag
-            ~set_long: "set-no-cache"
-            ~description: "Set no-cache mode (see --no-cache)."
-            false
-        in
-        let unset_no_cache =
-          Clap.flag
-            ~set_long: "unset-no-cache"
-            ~description: "Unset no-cache mode (see --no-cache)."
-            false
-        in
-        `config (main, set_no_cache, unset_no_cache)
+        `config config_command
       );
     ]
   in
@@ -718,20 +731,10 @@ let main () =
       | `show obj ->
           with_setup @@ fun setup ->
           Controller.show setup obj
-      | `config (set_main, set_no_cache, unset_no_cache) ->
-          let* set_main = opt_map_e set_main parse_location in
-          let set_flag set unset =
-            if set && unset then
-              failed [ "cannot both set and unset the same flag" ]
-            else if set then
-              ok (Some true)
-            else if unset then
-              ok (Some false)
-            else
-              ok None
-          in
-          let* set_no_cache = set_flag set_no_cache unset_no_cache in
-          Controller.config ~mode: device_mode ~set_main ~set_no_cache
+      | `config `show ->
+          Controller.config_show ~mode: device_mode
+      | `config (`set value) ->
+          Controller.config_set ~mode: device_mode value
   with
     | OK () ->
         Prout.clear_progress ()

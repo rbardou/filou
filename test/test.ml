@@ -303,20 +303,20 @@ struct
   let stats ?v ?dry_run ?color () =
     run ?v ?dry_run ?color [ "stats" ]
 
-  let config ?v ?dry_run ?color ?set_main
-      ?(set_no_cache = false) ?(unset_no_cache = false) () =
-    let set_main =
+  let config_show () =
+    run [ "config"; "show" ]
+
+  let config_set_main value =
+    let value =
       if use_ssh then
-        Option.map (fun set_main -> "filou+ssh://localhost/" ^ set_main) set_main
+        "filou+ssh://localhost/" ^ value
       else
-        set_main
+        value
     in
-    run ?v ?dry_run ?color (
-      "config"
-      :: list_of_option ~name: "--set-main" set_main
-      @ flag set_no_cache "--set-no-cache"
-      @ flag unset_no_cache "--unset-no-cache"
-    )
+    run [ "config"; "set"; "main"; value ]
+
+  let config_set_no_cache value =
+    run [ "config"; "set"; "no-cache"; string_of_bool value ]
 
   let show ?v ?dry_run ?color ?what ?r () =
     run ?v ?dry_run ?color (
@@ -391,21 +391,15 @@ let small_repo () =
 
   comment "Play with the configuration.";
   cd clone;
-  Filou.config ();
-  Filou.config ~set_main: "/tmp" ();
-  Filou.config ();
-  Filou.config ~set_main: main ();
-  Filou.config ();
-  Filou.config ~set_no_cache: true ();
-  Filou.config ();
-  Filou.config ~set_no_cache: true ~unset_no_cache: true ();
-  Filou.config ();
-  Filou.config ~unset_no_cache: true ();
-  Filou.config ();
-  Filou.config ~set_main: "/tmp" ~set_no_cache: true ();
-  Filou.config ();
-  Filou.config ~set_main: main ~unset_no_cache: true ();
-  Filou.config ();
+  Filou.config_show ();
+  Filou.config_set_main "/tmp";
+  Filou.config_show ();
+  Filou.config_set_main main;
+  Filou.config_show ();
+  Filou.config_set_no_cache true;
+  Filou.config_show ();
+  Filou.config_set_no_cache false;
+  Filou.config_show ();
 
   comment "Add a file.";
   cd clone;
@@ -978,7 +972,7 @@ let small_repo () =
   rm_rf clone;
   Filou.init ~main ();
   Filou.clone ~main ~clone ~no_cache: true ();
-  Clone.config ();
+  Clone.config_show ();
   cd clone;
   create_file "bla" "contents of bla";
   Clone.push [];

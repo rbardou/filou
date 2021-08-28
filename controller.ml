@@ -2355,37 +2355,34 @@ let show setup obj =
               in
               show_hash hash
 
-let show_config location: Config.t -> _ = function
-  | Main ->
-      Prout.echo "main repository: %s" (Device.show_location location)
-  | Clone { main_location; no_cache } ->
-      Prout.echo "clone repository: %s" (Device.show_location location);
-      Prout.echo "main repository: %s" (Device.show_location main_location);
-      Prout.echo "no cache: %b" no_cache
+let config_show ~mode =
+  let* location, _, config = find_local_config mode in
+  (
+    match config with
+      | Main ->
+          Prout.echo "main repository: %s" (Device.show_location location)
+      | Clone { main_location; no_cache } ->
+          Prout.echo "clone repository: %s" (Device.show_location location);
+          Prout.echo "main repository: %s" (Device.show_location main_location);
+          Prout.echo "no cache: %b" no_cache
+  );
+  unit
 
-let config ~mode ~set_main ~set_no_cache =
-  let* location, location_dot_filou, config = find_local_config mode in
-  match set_main, set_no_cache with
-    | None, None ->
-        show_config location config;
-        unit
-    | _ ->
-        match config with
-          | Main ->
-              failed [
-                "cannot set main location";
-                sf "%s is a main repository, not a clone repository"
-                  (Device.show_location location)
-              ]
-          | Clone clone_config ->
-              let clone_config =
-                match set_main with
-                  | None -> clone_config
-                  | Some main_location -> { clone_config with main_location }
-              in
-              let clone_config =
-                match set_no_cache with
-                  | None -> clone_config
-                  | Some no_cache -> { clone_config with no_cache }
-              in
-              write_config ~dot_filou: location_dot_filou (Clone clone_config)
+let config_set_clone (config: Config.t) value =
+  match config with
+    | Main ->
+        failed [ "cannot set this option for a main repository" ]
+    | Clone config ->
+        match value with
+          | `main main_location ->
+              let* main_location = Device.parse_location RW main_location in
+              ok { config with main_location }
+          | `no_cache value ->
+              ok { config with no_cache = value }
+
+let config_set ~mode value =
+  let* _, location_dot_filou, config = find_local_config mode in
+  match value with
+    | `main _ | `no_cache _ as value ->
+        let* config = config_set_clone config value in
+        write_config ~dot_filou: location_dot_filou (Clone config)

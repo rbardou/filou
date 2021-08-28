@@ -27,45 +27,27 @@ $ main.exe --no-color tree
 ./
 # Play with the configuration.
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color config
+$ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
 no cache: false
-$ main.exe --no-color config --set-main /tmp
-$ main.exe --no-color config
+$ main.exe --no-color config set main /tmp
+$ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/
 no cache: false
-$ main.exe --no-color config --set-main /tmp/filou-test/main
-$ main.exe --no-color config
+$ main.exe --no-color config set main /tmp/filou-test/main
+$ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
 no cache: false
-$ main.exe --no-color config --set-no-cache
-$ main.exe --no-color config
+$ main.exe --no-color config set no-cache true
+$ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
 no cache: true
-$ main.exe --no-color config --set-no-cache --unset-no-cache
-Error:
-  cannot both set and unset the same flag
-Exit code: 1
-$ main.exe --no-color config
-clone repository: /tmp/filou-test/clone/
-main repository: /tmp/filou-test/main/
-no cache: true
-$ main.exe --no-color config --unset-no-cache
-$ main.exe --no-color config
-clone repository: /tmp/filou-test/clone/
-main repository: /tmp/filou-test/main/
-no cache: false
-$ main.exe --no-color config --set-main /tmp --set-no-cache
-$ main.exe --no-color config
-clone repository: /tmp/filou-test/clone/
-main repository: /tmp/
-no cache: true
-$ main.exe --no-color config --set-main /tmp/filou-test/main --unset-no-cache
-$ main.exe --no-color config
+$ main.exe --no-color config set no-cache false
+$ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
 no cache: false
@@ -4110,7 +4092,7 @@ Checking /tmp/filou-test/main/...
 Creating /tmp/filou-test/clone/...
 Cloned /tmp/filou-test/main/ into: /tmp/filou-test/clone/
 $ cd /tmp/filou-test/clone
-$ main.exe --no-color config
+$ main.exe --no-color config show
 clone repository: /tmp/filou-test/clone/
 main repository: /tmp/filou-test/main/
 no cache: true
