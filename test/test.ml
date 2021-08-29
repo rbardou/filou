@@ -318,6 +318,12 @@ struct
   let config_set_no_cache value =
     run [ "config"; "set"; "no-cache"; string_of_bool value ]
 
+  let config_ignore filters =
+    run ("config" :: "ignore" :: filters)
+
+  let config_unignore filters =
+    run ("config" :: "unignore" :: filters)
+
   let show ?v ?dry_run ?color ?what ?r () =
     run ?v ?dry_run ?color (
       "show" ::
@@ -733,6 +739,35 @@ let small_repo () =
   comment "Main: diff should show one removed data file:";
   diff_string_sets main_files_1 main_files_2;
   Clone.log ();
+
+  comment "Test ignore filters.";
+  Clone.config_ignore [ "/_build/$" ];
+  Clone.config_show ();
+  mkdir "_build";
+  create_file "_build/ignored" "this is ignored";
+  mkdir "bla/_build";
+  create_file "bla/_build/ignored2" "this is also ignored";
+  create_file "bla/_build/ignored3" "this is also also ignored";
+  mkdir "bla/bli/_build";
+  Clone.push ~v: true [];
+  Clone.config_unignore [ "/_build/$" ];
+  Clone.config_show ();
+  Clone.config_ignore [ "/ignored$"; "/ignored2"; "gnored3" ];
+  Clone.config_show ();
+  Clone.push ~v: true [];
+  Clone.config_unignore [ "gnored3"; "/ignored$" ];
+  Clone.config_show ();
+  Clone.push ~v: true [];
+  Clone.config_unignore [ "/ignored2" ];
+  Clone.config_show ();
+  Clone.push ~v: true [];
+  Clone.undo ~count: 4 ();
+  rm "_build/ignored";
+  rm "bla/_build/ignored2";
+  rm "bla/_build/ignored3";
+  rmdir "_build";
+  rmdir "bla/_build";
+  rmdir "bla/bli/_build";
 
   comment "mv: rename a file at the root";
   Clone.tree ();

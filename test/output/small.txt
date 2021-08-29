@@ -2141,6 +2141,135 @@ Removed 1 files from main totalling 12 B.
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color log
 -->  0 push bla/bli
+# Test ignore filters.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color config ignore '/_build/$'
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color config show
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
+no cache: false
+ignore filters:
+- /_build/$
+$ mkdir _build
+$ echo 'this is ignored' > _build/ignored
+$ mkdir bla/_build
+$ echo 'this is also ignored' > bla/_build/ignored2
+$ echo 'this is also also ignored' > bla/_build/ignored3
+$ mkdir bla/bli/_build
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color push --yes
+Locking main repository...
+Listing files...
+Ignoring: bla/_build
+Ignoring: bla/bli/_build
+Ignoring: _build
+Listing files to push...
+Already exists: titi
+Already exists: bla/blo/plouf
+Already exists: bla/bli/plouf
+Already exists: bla/bli/truc
+Already exists: toto
+Already exists: tutu
+Already exists: plif
+Pushing files...
+Pushed 0 files (0 B).
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color config unignore '/_build/$'
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color config show
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
+no cache: false
+ignore filters: empty
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color config ignore '/ignored$' /ignored2 gnored3
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color config show
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
+no cache: false
+ignore filters:
+- /ignored$
+- /ignored2
+- gnored3
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color push --yes
+Locking main repository...
+Listing files...
+Ignoring: bla/_build/ignored2
+Ignoring: bla/_build/ignored3
+Ignoring: _build/ignored
+Listing files to push...
+Already exists: titi
+Already exists: bla/blo/plouf
+Already exists: bla/bli/plouf
+Already exists: bla/bli/truc
+Already exists: toto
+Already exists: tutu
+Already exists: plif
+Pushing files...
+Pushed 0 files (0 B).
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color config unignore gnored3 '/ignored$'
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color config show
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
+no cache: false
+ignore filters:
+- /ignored2
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color push --yes
+Locking main repository...
+Listing files...
+Ignoring: bla/_build/ignored2
+Listing files to push...
+Already exists: titi
+Already exists: bla/blo/plouf
+Already exists: bla/bli/plouf
+Already exists: bla/bli/truc
+Already exists: toto
+Already exists: tutu
+Already exists: plif
+Pushing files...
+Pushed: bla/_build/ignored3
+Pushed: _build/ignored
+Pushed 2 files (40 B).
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color config unignore /ignored2
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color config show
+clone repository: /tmp/filou-test/clone/
+main repository: /tmp/filou-test/main/
+no cache: false
+ignore filters: empty
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color push --yes
+Locking main repository...
+Listing files...
+Listing files to push...
+Already exists: titi
+Already exists: bla/blo/plouf
+Already exists: bla/_build/ignored3
+Already exists: bla/bli/plouf
+Already exists: bla/bli/truc
+Already exists: toto
+Already exists: _build/ignored
+Already exists: tutu
+Already exists: plif
+Pushing files...
+Pushed: bla/_build/ignored2
+Pushed 1 files (20 B).
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color undo 4
+Locking main repository...
+$ rm _build/ignored
+$ rm bla/_build/ignored2
+$ rm bla/_build/ignored3
+$ rmdir _build
+$ rmdir bla/_build
+$ rmdir bla/bli/_build
 # mv: rename a file at the root
 $ cd /tmp/filou-test/clone
 $ main.exe --no-color tree
