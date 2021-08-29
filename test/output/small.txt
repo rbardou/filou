@@ -113,6 +113,14 @@ $ cd /tmp/filou-test/clone
 $ echo blu > tutu
 $ echo blibli > titi
 $ cd /tmp/filou-test/clone
+$ main.exe --no-color status
+Locking main repository...
+Listing files...
+Listing files to push...
++ titi (6 B)
++ tutu (3 B)
+2 file(s) (9 B).
+$ cd /tmp/filou-test/clone
 $ main.exe -v --no-color push --yes tutu titi
 Locking main repository...
 Listing files...
@@ -1247,6 +1255,9 @@ Listing files...
 Listing files to push...
 Already exists: titi
 Already exists: bla/blo/plouf
+Already exists: toto
+Already exists: tutu
+Already exists: plif
 Error:
   bla/bli already exists as a directory
 Exit code: 1

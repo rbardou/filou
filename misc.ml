@@ -66,6 +66,18 @@ let rec list_filter_e ?(acc = []) l f =
         else
           list_filter_e ~acc tail f
 
+let rec list_filter_map_e ?(acc = []) l f =
+  match l with
+    | [] ->
+        ok (List.rev acc)
+    | head :: tail ->
+        let* mapped = f head in
+        match mapped with
+          | None ->
+              list_filter_map_e ~acc tail f
+          | Some mapped ->
+              list_filter_map_e ~acc: (mapped :: acc) tail f
+
 let opt_map_e o f =
   match o with
     | None -> ok None

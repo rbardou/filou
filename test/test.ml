@@ -241,6 +241,9 @@ struct
     in
     run ?v ?dry_run ?color ?no_cache ("clone" :: list_of_option main @ list_of_option clone)
 
+  let status paths =
+    run ("status" :: paths)
+
   let push ?(v = true) ?dry_run ?color paths =
     run ~v ?dry_run ?color ("push" :: "--yes" :: paths)
 
@@ -427,6 +430,7 @@ let small_repo () =
   cd clone;
   create_file "tutu" "blu";
   create_file "titi" "blibli";
+  Clone.status [];
   Clone.push [ "tutu"; "titi" ];
   Clone.check ();
   Clone.tree ();

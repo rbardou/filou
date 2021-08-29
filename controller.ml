@@ -1512,6 +1512,11 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
                 }
               )
 
+type file_to_push =
+  | New_file of { path: Device.file_path; size: int }
+  | File_with_different_hash of { path: Device.file_path; old_size: int; new_size: int }
+  | File_already_exists_as_directory of { path: Device.file_path }
+
 let list_files_to_push ~verbose (setup: Setup.t) (state: state) (paths: Device.path list) =
   match setup.workdir with
     | None ->
@@ -1558,7 +1563,7 @@ let list_files_to_push ~verbose (setup: Setup.t) (state: state) (paths: Device.p
         Prout.major_s "Listing files to push...";
         let* files_to_push =
           let file_index = ref 0 in
-          list_filter_e files @@ fun ((file_path: Device.file_path), _) ->
+          list_filter_map_e files @@ fun ((file_path: Device.file_path), size_in_workdir) ->
           let* found = Dir.find setup state (Device.path_of_file_path file_path) in
           incr file_index;
           (
@@ -1568,12 +1573,10 @@ let list_files_to_push ~verbose (setup: Setup.t) (state: state) (paths: Device.p
           );
           match found with
             | None ->
-                ok true
+                ok (Some (New_file { path = file_path; size = size_in_workdir }))
             | Some (Found_dir _) ->
-                failed [
-                  sf "%s already exists as a directory" (Device.show_file_path file_path);
-                ]
-            | Some (Found_file { path; hash; _ }) ->
+                ok (Some (File_already_exists_as_directory { path = file_path }))
+            | Some (Found_file { path; hash; size = size_in_repository }) ->
                 let* status =
                   let on_progress ~bytes ~size =
                     Prout.minor @@ fun () ->
@@ -1595,15 +1598,53 @@ let list_files_to_push ~verbose (setup: Setup.t) (state: state) (paths: Device.p
                         (
                           if verbose then
                             Prout.echo "Already exists: %s" (Device.show_file_path file_path);
-                          ok false
+                          ok None
                         )
                       else
-                        failed [
-                          sf "%s already exists with a different hash"
-                            (Device.show_file_path file_path);
-                        ]
+                        ok (
+                          Some (
+                            File_with_different_hash {
+                              path = file_path;
+                              old_size = size_in_repository;
+                              new_size = size_in_workdir;
+                            }
+                          )
+                        )
         in
         ok files_to_push
+
+let status ~color ~verbose (setup: Setup.t) (paths: Device.path list) =
+  with_lock setup @@ fun () ->
+  let* journal = fetch_journal setup in
+  let state = journal.head.state in
+  let* files_to_push = list_files_to_push ~verbose setup state paths in
+  let file_count = List.length files_to_push in
+  let total_size = ref 0 in
+  (
+    List.iter' files_to_push @@ function
+    | New_file { path; size } ->
+        total_size := !total_size + size;
+        Prout.echo "+ %s%s%s (%s)"
+          (if color then "\027[31m" else "")
+          (Device.show_file_path path)
+          (if color then "\027[0m" else "")
+          (show_size size);
+    | File_with_different_hash { path; old_size; new_size } ->
+        total_size := !total_size + new_size;
+        Prout.echo "≠ %s%s%s (%s -> %s)"
+          (if color then "\027[33m" else "")
+          (Device.show_file_path path)
+          (if color then "\027[0m" else "")
+          (show_size old_size)
+          (show_size new_size);
+    | File_already_exists_as_directory { path } ->
+        Prout.echo "! %s%s%s"
+          (if color then "\027[35m" else "")
+          (Device.show_file_path path)
+          (if color then "\027[0m" else "")
+  );
+  Prout.echo "%d file(s) (%s)." file_count (show_size !total_size);
+  unit
 
 let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
   with_lock setup @@ fun () ->
@@ -1611,6 +1652,15 @@ let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
   let* checked_redo = Check_redo.check ~yes journal in
   let state = journal.head.state in
   let* files_to_push = list_files_to_push ~verbose setup state paths in
+  let* files_to_push =
+    list_filter_map_e files_to_push @@ function
+    | New_file { path; size } ->
+        ok (Some (path, size))
+    | File_with_different_hash { path; _ } ->
+        failed [ sf "%s already exists with a different hash" (Device.show_file_path path) ]
+    | File_already_exists_as_directory { path } ->
+        failed [ sf "%s already exists as a directory" (Device.show_file_path path) ]
+  in
   let file_count = List.length files_to_push in
   Prout.major_s "Pushing files...";
   let total_size_to_push =

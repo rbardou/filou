@@ -232,6 +232,22 @@ let main () =
       );
       (
         Clap.case
+          ~description: "List new files in the work directory and files that differ."
+          "status"
+        @@ fun () ->
+        let paths =
+          Clap.list_string
+            ~description:
+              "Paths of the files or directories to list. Directories \
+               are listed recursively. If no PATH is specified, list \
+               the current directory."
+            ~placeholder: "PATH"
+            ()
+        in
+        `status paths
+      );
+      (
+        Clap.case
           ~description: "Copy files from a clone repository to a main repository."
           "push"
         @@ fun () ->
@@ -700,6 +716,15 @@ let main () =
           let* paths = list_map_e paths (parse_local_path setup) in
           Controller.tree ~color ~max_depth ~only_main ~only_dirs ~print_size
             ~print_file_count ~print_duplicates ~full_dir_paths setup paths
+      | `status paths ->
+          with_setup @@ fun setup ->
+          let paths =
+            match paths with
+              | [] -> [ "." ]
+              | _ -> paths
+          in
+          let* paths = list_map_e paths (parse_local_path setup) in
+          Controller.status ~color ~verbose setup paths
       | `push paths ->
           with_setup @@ fun setup ->
           let paths =
