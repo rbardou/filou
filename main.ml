@@ -251,6 +251,13 @@ let main () =
           ~description: "Copy files from a clone repository to a main repository."
           "push"
         @@ fun () ->
+        let force =
+          Clap.flag
+            ~description: "Overwrite files that already exists."
+            ~set_long: "force"
+            ~set_short: 'f'
+            false
+        in
         let paths =
           Clap.list_string
             ~description:
@@ -260,7 +267,7 @@ let main () =
             ~placeholder: "PATH"
             ()
         in
-        `push paths
+        `push (force, paths)
       );
       (
         Clap.case
@@ -725,7 +732,7 @@ let main () =
           in
           let* paths = list_map_e paths (parse_local_path setup) in
           Controller.status ~color ~verbose setup paths
-      | `push paths ->
+      | `push (force, paths) ->
           with_setup @@ fun setup ->
           let paths =
             match paths with
@@ -733,7 +740,7 @@ let main () =
               | _ -> paths
           in
           let* paths = list_map_e paths (parse_local_path setup) in
-          Controller.push ~verbose ~yes setup paths
+          Controller.push ~verbose ~yes ~force setup paths
       | `pull paths ->
           with_setup @@ fun setup ->
           let paths =

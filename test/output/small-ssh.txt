@@ -4139,6 +4139,106 @@ Listing files to pull...
 Error:
   toto already exists with a different hash
 Exit code: 1
+# Test push -f.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├≠≠ toto
+└── tutu
+$ cat toto
+TOTTOTTOT%
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color push --yes
+Locking main repository...
+Listing files...
+Listing files to push...
+Already exists: titi
+Already exists: bla/blo/plouf
+Already exists: bla/bli/plouf
+Already exists: bla/bli/truc
+Already exists: tutu
+Already exists: plif
+Error:
+  toto already exists with a different hash
+Exit code: 1
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├≠≠ toto
+└── tutu
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color push --yes -f
+Locking main repository...
+Listing files...
+Listing files to push...
+Already exists: titi
+Already exists: bla/blo/plouf
+Already exists: bla/bli/plouf
+Already exists: bla/bli/truc
+Already exists: tutu
+Already exists: plif
+Pushing files...
+Pushed: toto
+Pushed 1 files (9 B).
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color tree
+./
+├── bla/
+│   ├── bli/
+│   │   ├── plouf
+│   │   └── truc
+│   └── blo/
+│       └── plouf
+├── plif
+├── titi
+├── toto
+└── tutu
+$ cat toto
+TOTTOTTOT%
+$ rm toto
+$ cd /tmp/filou-test/clone
+$ main.exe -v --no-color pull toto
+Listing files...
+Listing files to pull...
+Pulling files...
+Pulled: toto
+Pulled 1 files (9 B).
+$ cat toto
+TOTTOTTOT%
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color check -h
+Listing main objects...
+Checking main object hashes...
+None of the 205 main objects are corrupted.
+Listing clone objects...
+Checking clone object hashes...
+None of the 205 clone objects are corrupted.
+Listing files...
+Checking file hashes...
+None of the 10 files are corrupted.
+Directory structure looks ok (total size: 44, file count: 7).
+All files are available.
+Hash index is consistent with the directory structure.
+$ cd /tmp/filou-test/clone
+$ main.exe --no-color log
+-->  0 push --force .
+     1 push bla/bli
 # Push a file, remove it and re-push it from another clone.
 $ rm -r -f /tmp/filou-test/main
 $ rm -r -f /tmp/filou-test/clone

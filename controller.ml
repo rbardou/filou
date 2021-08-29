@@ -659,9 +659,10 @@ struct
         new_dir_hash: dir hash;
         added_file_hash: Repository.file_hash;
         added_file_size: int;
+        already_existed_as_hash: Repository.file_hash option;
       }
 
-  let add setup (root_dir: dir) ((dir_path, filename): Device.file_path)
+  let add ~force setup (root_dir: dir) ((dir_path, filename): Device.file_path)
       (get_hash_and_size: unit -> (Repository.file_hash * int, _) r)
       (get_hash_just_checking: unit -> (Hash.t option, _) r):
     (add_result, [> `failed ]) r =
@@ -691,6 +692,7 @@ struct
                   new_dir_hash = new_head_dir_hash;
                   added_file_hash;
                   added_file_size;
+                  already_existed_as_hash;
                 } ->
                   let head_dir_entry =
                     Dir {
@@ -701,9 +703,35 @@ struct
                   in
                   let new_dir = Filename_map.add head head_dir_entry dir in
                   let new_dir_hash = Repo.hash new_dir in
-                  ok (Added { new_dir_hash; added_file_hash; added_file_size })
+                  ok (
+                    Added {
+                      new_dir_hash;
+                      added_file_hash;
+                      added_file_size;
+                      already_existed_as_hash;
+                    }
+                  )
           )
       | [] ->
+          let add_or_replace already_existed_as_hash =
+            let* added_file_hash, added_file_size = get_hash_and_size () in
+            let dir_entry =
+              File {
+                hash = added_file_hash;
+                size = added_file_size;
+              }
+            in
+            let new_dir = Filename_map.add filename dir_entry dir in
+            let new_dir_hash = Repo.hash new_dir in
+            ok (
+              Added {
+                new_dir_hash;
+                added_file_hash;
+                added_file_size;
+                already_existed_as_hash;
+              }
+            )
+          in
           match Filename_map.find_opt filename dir with
             | Some (Dir _) ->
                 failed [ "file already exists as a directory" ]
@@ -716,20 +744,13 @@ struct
                     | Some new_hash ->
                         if Hash.compare new_hash (Repository.concrete_file_hash hash) = 0 then
                           ok Already_exists_same
+                        else if force then
+                          add_or_replace (Some hash)
                         else
                           ok Already_exists_different
                 )
             | None ->
-                let* added_file_hash, added_file_size = get_hash_and_size () in
-                let dir_entry =
-                  File {
-                    hash = added_file_hash;
-                    size = added_file_size;
-                  }
-                in
-                let new_dir = Filename_map.add filename dir_entry dir in
-                let new_dir_hash = Repo.hash new_dir in
-                ok (Added { new_dir_hash; added_file_hash; added_file_size })
+                add_or_replace None
     in
     update_dir [] root_dir dir_path
 
@@ -1430,7 +1451,7 @@ let tree ~color ~max_depth ~only_main ~only_dirs
         in
         print_merged_entry ~last: true head
 
-let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
+let push_file ~force ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
     (setup: Setup.t) (state: state) (path: Device.file_path):
   (state, [> `failed ]) r =
   match setup.workdir with
@@ -1480,7 +1501,7 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
             let* status = Cash.get ~on_progress: on_hash_progress setup path in
             ok (match status with Does_not_exist | Dir -> None | File hash -> Some hash)
           in
-          Dir.add setup root_dir path get_hash_and_size get_hash_just_checking
+          Dir.add ~force setup root_dir path get_hash_and_size get_hash_just_checking
         in
         match add_result with
           | Already_exists_same ->
@@ -1491,7 +1512,31 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
                 sf "a different file with this name already exists: %s"
                   (Device.show_file_path path);
               ]
-          | Added { new_dir_hash = new_root_dir_hash; added_file_hash; _ } ->
+          | Added {
+              new_dir_hash = new_root_dir_hash;
+              added_file_hash;
+              added_file_size = _;
+              already_existed_as_hash;
+            } ->
+              let* state =
+                match state, already_existed_as_hash with
+                  | Empty, _ | _, None ->
+                      ok state
+                  | Non_empty root, Some hash_to_remove ->
+                      (* TODO: could simplify this by having Hash_index.add
+                         take a hash_index instead of a state. *)
+                      let* hash_index = fetch_or_fail setup Hash_index root.hash_index in
+                      let* new_hash_index =
+                        Hash_index.remove setup hash_index hash_to_remove path
+                      in
+                      let new_hash_index_hash = Repo.hash new_hash_index in
+                      ok (
+                        Non_empty {
+                          root_dir = root.root_dir;
+                          hash_index = new_hash_index_hash;
+                        }
+                      )
+              in
               let* new_hash_index_hash, old_paths =
                 Hash_index.add setup state added_file_hash path
               in
@@ -1646,7 +1691,7 @@ let status ~color ~verbose (setup: Setup.t) (paths: Device.path list) =
   Prout.echo "%d file(s) (%s)." file_count (show_size !total_size);
   unit
 
-let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
+let push ~verbose ~yes ~force (setup: Setup.t) (paths: Device.path list) =
   with_lock setup @@ fun () ->
   let* journal = fetch_journal setup in
   let* checked_redo = Check_redo.check ~yes journal in
@@ -1656,8 +1701,11 @@ let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
     list_filter_map_e files_to_push @@ function
     | New_file { path; size } ->
         ok (Some (path, size))
-    | File_with_different_hash { path; _ } ->
-        failed [ sf "%s already exists with a different hash" (Device.show_file_path path) ]
+    | File_with_different_hash { path; new_size; _ } ->
+        if force then
+          ok (Some (path, new_size))
+        else
+          failed [ sf "%s already exists with a different hash" (Device.show_file_path path) ]
     | File_already_exists_as_directory { path } ->
         failed [ sf "%s already exists as a directory" (Device.show_file_path path) ]
   in
@@ -1671,14 +1719,18 @@ let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
     list_fold_e (state, 0) files_to_push @@ fun (state, pushed_size) (path, size) ->
     incr file_index;
     let* state =
-      push_file ~verbose ~pushed_size ~total_size_to_push ~file_index: !file_index
+      push_file ~force ~verbose ~pushed_size ~total_size_to_push ~file_index: !file_index
         ~file_count setup state path
     in
     ok (state, pushed_size + size)
   in
   let* () =
     store_state ~checked_redo setup state @@
-    String.concat " " ("push" :: List.map Device.show_path paths)
+    String.concat " " (
+      "push" ::
+      (if force then [ "--force" ] else []) @
+      List.map Device.show_path paths
+    )
   in
   Prout.echo "Pushed %d files (%s)." file_count (show_size total_size_to_push);
   unit
@@ -1836,7 +1888,7 @@ let copy_or_move_file (action: copy_or_move) ~verbose setup root
   trace ("failed to add file: " ^ Device.show_file_path target_path) @@
   let* root_dir = fetch_root_dir setup root in
   let* add_result =
-    Dir.add setup root_dir target_path
+    Dir.add ~force: false setup root_dir target_path
       (fun () -> ok (source.hash, source.size))
       (fun () -> ok (Some (Repository.concrete_file_hash source.hash)))
   in

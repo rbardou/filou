@@ -244,8 +244,8 @@ struct
   let status paths =
     run ("status" :: paths)
 
-  let push ?(v = true) ?dry_run ?color paths =
-    run ~v ?dry_run ?color ("push" :: "--yes" :: paths)
+  let push ?(v = true) ?dry_run ?color ?(f = false) paths =
+    run ~v ?dry_run ?color ("push" :: "--yes" :: flag f "-f" @ paths)
 
   let pull ?(v = true) ?dry_run ?color paths =
     run ~v ?dry_run ?color ("pull" :: paths)
@@ -983,6 +983,20 @@ let small_repo () =
   Clone.tree ~duplicates: true ();
   Clone.push [ "toto" ];
   Clone.pull [ "toto" ];
+
+  comment "Test push -f.";
+  Clone.tree ();
+  cat "toto";
+  Clone.push [];
+  Clone.tree ();
+  Clone.push ~f: true [];
+  Clone.tree ();
+  cat "toto";
+  rm "toto";
+  Clone.pull [ "toto" ];
+  cat "toto";
+  Clone.check ~h: true ();
+  Clone.log ();
 
   comment "Push a file, remove it and re-push it from another clone.";
   rm_rf main;
