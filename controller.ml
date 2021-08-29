@@ -1512,14 +1512,11 @@ let push_file ~verbose ~pushed_size ~total_size_to_push ~file_index ~file_count
                 }
               )
 
-let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
+let list_files_to_push ~verbose (setup: Setup.t) (state: state) (paths: Device.path list) =
   match setup.workdir with
     | None ->
-        operation_not_available [ "cannot push with no work directory" ]
+        operation_not_available [ "cannot list files to push with no work directory" ]
     | Some workdir ->
-        with_lock setup @@ fun () ->
-        let* journal = fetch_journal setup in
-        let* checked_redo = Check_redo.check ~yes journal in
         Prout.major_s "Listing files...";
         let files = ref [] in
         let file_count = ref 0 in
@@ -1559,7 +1556,6 @@ let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
         let files = List.rev !files in
         let file_count = !file_count in
         Prout.major_s "Listing files to push...";
-        let state = journal.head.state in
         let* files_to_push =
           let file_index = ref 0 in
           list_filter_e files @@ fun ((file_path: Device.file_path), _) ->
@@ -1607,27 +1603,35 @@ let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
                             (Device.show_file_path file_path);
                         ]
         in
-        let file_count = List.length files_to_push in
-        Prout.major_s "Pushing files...";
-        let total_size_to_push =
-          List.fold_left' 0 files_to_push @@ fun acc (_, size) -> acc + size
-        in
-        let* state, _ =
-          let file_index = ref 0 in
-          list_fold_e (state, 0) files_to_push @@ fun (state, pushed_size) (path, size) ->
-          incr file_index;
-          let* state =
-            push_file ~verbose ~pushed_size ~total_size_to_push ~file_index: !file_index
-              ~file_count setup state path
-          in
-          ok (state, pushed_size + size)
-        in
-        let* () =
-          store_state ~checked_redo setup state @@
-          String.concat " " ("push" :: List.map Device.show_path paths)
-        in
-        Prout.echo "Pushed %d files (%s)." file_count (show_size total_size_to_push);
-        unit
+        ok files_to_push
+
+let push ~verbose ~yes (setup: Setup.t) (paths: Device.path list) =
+  with_lock setup @@ fun () ->
+  let* journal = fetch_journal setup in
+  let* checked_redo = Check_redo.check ~yes journal in
+  let state = journal.head.state in
+  let* files_to_push = list_files_to_push ~verbose setup state paths in
+  let file_count = List.length files_to_push in
+  Prout.major_s "Pushing files...";
+  let total_size_to_push =
+    List.fold_left' 0 files_to_push @@ fun acc (_, size) -> acc + size
+  in
+  let* state, _ =
+    let file_index = ref 0 in
+    list_fold_e (state, 0) files_to_push @@ fun (state, pushed_size) (path, size) ->
+    incr file_index;
+    let* state =
+      push_file ~verbose ~pushed_size ~total_size_to_push ~file_index: !file_index
+        ~file_count setup state path
+    in
+    ok (state, pushed_size + size)
+  in
+  let* () =
+    store_state ~checked_redo setup state @@
+    String.concat " " ("push" :: List.map Device.show_path paths)
+  in
+  Prout.echo "Pushed %d files (%s)." file_count (show_size total_size_to_push);
+  unit
 
 let pull ~verbose (setup: Setup.t) (paths: Device.path list) =
   match setup.workdir with
